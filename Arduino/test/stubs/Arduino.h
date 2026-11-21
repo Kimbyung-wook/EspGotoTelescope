@@ -27,3 +27,9 @@ inline void analogWrite(uint8_t pin, int v) { stub::pin_analog[pin] = v; }
 inline void pinMode(uint8_t, uint8_t) {}
 inline void noInterrupts() {}
 inline void interrupts() {}
+
+#define FALLING 2
+#define RISING  1
+#define CHANGE  3
+inline int  digitalPinToInterrupt(uint8_t pin) { return pin; }
+inline void attachInterrupt(int, void (*)(void), int) {}

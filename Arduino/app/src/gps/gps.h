@@ -1,7 +1,7 @@
 #ifndef _GPS_H_
 #define _GPS_H_
 #include <Adafruit_GPS.h>
-#include "tictok_us.h"
+#include "../util/tictok_us.h"
 
 class GPS{
 

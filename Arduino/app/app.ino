@@ -1,10 +1,10 @@
 /************************************/
 // Include Headers
 /************************************/
-#include "oled.h"
-#include "gps.h"
-#include "tictok_us.h"
-#include "esp_12f.h"
+#include "src/board_config.h"
+#include "src/display/oled.h"
+#include "src/gps/gps.h"
+#include "src/util/tictok_us.h"
 
 #include <Adafruit_ICM20X.h>
 #include <Adafruit_ICM20948.h>
@@ -23,8 +23,6 @@ void updateMenuCursor();
 /************************************/
 // Define Devices
 /************************************/
-#define GPS_PORT Serial
-// #define DEBUG_PORT Serial1
 
 /************************************/
 // Display Settings
@@ -41,7 +39,7 @@ Tictok_us* perform_main = new Tictok_us();
 Tictok_us* perform_rest = new Tictok_us();
 Tictok_us* perform_imu  = new Tictok_us();
 // Simple Scheduler
-float hz = 10.0f;
+float hz = MAIN_LOOP_HZ;
 unsigned long last_loop_time  = micros();
 unsigned long now_loop_time   = micros();
 unsigned long size_loop_time  = 1000 * (1000 / hz);
@@ -50,15 +48,7 @@ unsigned long delta_loop_time = 0;
 /************************************/
 // Rotary Button 
 /************************************/
-// Rotary Encoder Inputs
-#define BUTTON_KEY  GPIO_D4
-#define BUTTON_S1   GPIO_D6
-#define BUTTON_S2   GPIO_D7
-#define PWM1        GPIO_D5
-#define PWM2        GPIO_D8
-#define PWM3        GPIO_D3
-#define MOTOR_IN1   GPIO_D0
-#define MOTOR_IN2   GPIO_D3
+// Pins are defined in src/board_config.h
 
 volatile int rotary_pulse_s1 = 0;
 volatile int rotary_pulse_s2 = 0;
@@ -247,8 +237,8 @@ void setup() {
   /************************************/
   // PWM
   /************************************/
-  pinMode(PWM2, OUTPUT);
-  analogWrite(PWM2, 120);
+  pinMode(MOTOR_PWM, OUTPUT);
+  analogWrite(MOTOR_PWM, 120);
   snprintf(monitor->msg[line++], DISP_LINE_ROW, "5. GPIO/PWM is ON");
   pinMode(MOTOR_IN1, OUTPUT);
   pinMode(MOTOR_IN2, OUTPUT);
@@ -521,7 +511,7 @@ void loop() {
     {
       rotation_speed = rotation_speed_prev + 1.0f * (rotary_counter - rotation_speed_cnt_prev);
       // float spd = rotation_speed * 10.0f;
-      analogWrite(PWM2, fabs(rotation_speed));
+      analogWrite(MOTOR_PWM, fabs(rotation_speed));
       if(rotation_speed == 0.0f)
       {
         digitalWrite(MOTOR_IN1, LOW);

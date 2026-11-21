@@ -7,7 +7,8 @@
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>
 
-#include "tictok_us.h"
+#include "../util/tictok_us.h"
+#include "../board_config.h"
 
 /************************************/
 // Display Settings
@@ -21,7 +22,7 @@
 // Declaration for an SSD1306 display connected to I2C (SDA, SCL pins)
 // The pins for I2C are defined by the Wire-library. 
 #define OLED_RESET     -1 // Reset pin # (or -1 if sharing Arduino reset pin)
-#define SCREEN_ADDRESS 0x3C ///< See datasheet for Address; 0x3D for 128x64, 0x3C for 128x32
+#define SCREEN_ADDRESS OLED_I2C_ADDRESS
 
 class OLED{
   public: // Functions

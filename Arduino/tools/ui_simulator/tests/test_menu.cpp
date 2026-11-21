@@ -2,6 +2,7 @@
 // input sequence -> expected screen lines. Drives sim::Session, the same code
 // path the GUI uses, so the protocol layer is covered too.
 // Build and run with ../run_tests.sh.
+#include <cmath>
 #include <cstdio>
 #include <cstring>
 #include <string>
@@ -256,8 +257,12 @@ void test_imu_screens() {
   s.click();
   s.rotate(3);
   s.click();
-  EXPECT_SCREEN(s, {"*7Att.Estimator", "ROLL      0.00000 DEG", "PITCH    30.00001 DEG", " ",
-                    "Wx        1.25000 DPS", "Wy       -0.50000 DPS", " "});
+  // estimator output is checked in test_att_estimator_*; here the raw rows
+  EXPECT_LINE(s, 1, "*7Att.Estimator");
+  EXPECT_LINE(s, 4, "aR    0.00 aP   30.00");
+  EXPECT_LINE(s, 5, "Wx        1.25000 DPS");
+  EXPECT_LINE(s, 6, "Wy       -0.50000 DPS");
+  EXPECT_LINE(s, 7, "Wz       15.00000 DPS");
   s.click();
   s.rotate(2);
   s.click();
@@ -317,6 +322,64 @@ void test_gyro_bias_calibration() {
   EXPECT_LINE(s, 6, "bWy    -0.25000 dps");
 }
 
+// Reads the number in "ROLL   %10.5f DEG" / "PITCH  %10.5f DEG".
+double valueOf(const char* line) {
+  double v = 0;
+  const char* p = line;
+  while (*p && *p != ' ') p++;
+  std::sscanf(p, "%lf", &v);
+  return v;
+}
+
+// The complementary filter (tau 1 s) starts at the first accelerometer tilt
+// and then follows a tilt step with a 1 s time constant.
+void test_att_estimator_converges() {
+  Sim s;
+  s.send("{\"type\":\"sensors\",\"imu\":{\"wx\":0,\"wy\":0,\"wz\":0}}");
+  s.boot();
+  s.rotate(6);
+  s.click();
+  EXPECT_LINE(s, 1, "*7Att.Estimator");
+  EXPECT_LINE(s, 3, "PITCH     0.00000 DEG");   // level
+  s.send("{\"type\":\"sensors\",\"imu\":{\"ax\":-4.903325,\"az\":8.492806}}");
+  s.tick(1);
+  EXPECT_LINE(s, 4, "aR    0.00 aP   30.00");
+  double first = valueOf(s.line(3));
+  CHECK(std::fabs(first - 30.0 * (1.0 - std::exp(-0.1))) < 0.05);   // one step
+  s.tick(10);    // 1 s: ~63 %
+  double one_tau = valueOf(s.line(3));
+  CHECK(one_tau > 17.0 && one_tau < 22.0);
+  s.tick(100);   // 10 s
+  CHECK(std::fabs(valueOf(s.line(3)) - 30.0) < 0.01);
+  CHECK(std::fabs(valueOf(s.line(2))) < 0.01);
+}
+
+// After the gyro bias calibration, the estimator rows show bias-free rates.
+void test_att_estimator_uses_gyro_bias() {
+  Sim s;
+  s.send("{\"type\":\"sensors\",\"imu\":{\"wx\":0.5,\"wy\":-0.25,\"wz\":0.125}}");
+  s.boot();
+  s.rotate(6);
+  s.click();
+  EXPECT_LINE(s, 5, "Wx        0.50000 DPS");   // no bias yet
+  s.click();
+  s.rotate(-1);
+  s.click();     // 6 Do IMU Calib.
+  s.rotate(2);
+  s.click();     // Gyro Bias Calib
+  s.tick(170);   // past "Done."
+  EXPECT_LINE(s, 1, "Calib Gyro Bias Done.");
+  s.click();
+  s.rotate(3);
+  s.click();     // Quit
+  s.rotate(1);
+  s.click();     // 7 Att.Estimator
+  EXPECT_LINE(s, 1, "*7Att.Estimator");
+  EXPECT_LINE(s, 5, "Wx        0.00000 DPS");
+  EXPECT_LINE(s, 6, "Wy        0.00000 DPS");
+  EXPECT_LINE(s, 7, "Wz        0.00000 DPS");
+}
+
 void test_sleep_and_health() {
   Sim s;
   s.boot();
@@ -329,7 +392,7 @@ void test_sleep_and_health() {
   s.rotate(-2);
   s.click();
   EXPECT_SCREEN(s, {"*8Health", "Loop 100000/ 10.0Hz", "MAIN  24300", "DISP  21800",
-                    "GPS     650", "IMU    1250", "EST       0"});
+                    "GPS     650", "IMU    1250", "EST     180"});
 }
 
 void test_protocol_messages() {
@@ -359,7 +422,8 @@ int main() {
     T(test_reset_restarts_ui), T(test_cursor_blinks), T(test_main_menu_scrolls),
     T(test_enter_and_leave_every_screen), T(test_ra_speed_edit_drives_motor),
     T(test_gps_screen_shows_sensor_values), T(test_imu_screens), T(test_do_imu_calib_menu),
-    T(test_gyro_bias_calibration), T(test_sleep_and_health), T(test_protocol_messages),
+    T(test_gyro_bias_calibration), T(test_att_estimator_converges),
+    T(test_att_estimator_uses_gyro_bias), T(test_sleep_and_health), T(test_protocol_messages),
 #undef T
   };
   for (auto& t : tests) {

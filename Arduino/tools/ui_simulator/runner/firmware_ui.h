@@ -2,15 +2,16 @@
 //
 // It does on the PC what app.ino does on the board:
 //   setup(): the boot log lines (setup() itself is not host-buildable)
-//   loop():  rotary delta/click + updateTelemetry() -> TelescopeUi::step()
-//            -> RaMotor output from UiState::ra_speed_cmd
+//   loop():  rotary delta/click + updateTelemetry() -> AttitudeEstimator
+//            -> TelescopeUi::step() -> RaMotor output from UiState::ra_speed_cmd
 // Firmware sources are only read, never changed; see build.sh for the list.
 #pragma once
 #include <memory>
 
 #include "ui_backend.h"
 
-class TelescopeUi;   // Arduino/app/src/ui/telescope_ui.h
+class TelescopeUi;         // Arduino/app/src/ui/telescope_ui.h
+class AttitudeEstimator;   // Arduino/app/src/estimation/attitude_estimator.h
 struct UiContext;    // Arduino/app/src/ui/ui_context.h
 
 namespace sim {
@@ -23,6 +24,8 @@ class FirmwareUi : public UiBackend {
   static const int kBootLineFrames = 3;
   static const int kBootHoldFrames = 10;
   static const int kBootFrames = 7 * kBootLineFrames + kBootHoldFrames;
+  // ATT_EST_TAU_S in app.ino (not includable from the host build)
+  static constexpr float kAttEstTauS = 1.0f;
 
   FirmwareUi();
   ~FirmwareUi() override;
@@ -43,6 +46,7 @@ class FirmwareUi : public UiBackend {
 
   std::unique_ptr<TelescopeUi> ui_;
   std::unique_ptr<UiContext> ctx_;
+  std::unique_ptr<AttitudeEstimator> att_est_;
   BootConfig boot_;
   int boot_frame_ = 0;
   int last_count_ = 0;

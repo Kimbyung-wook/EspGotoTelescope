@@ -5,6 +5,7 @@
 #include <cstring>
 
 // Firmware (read-only, include path Arduino/app/src)
+#include "estimation/attitude_estimator.h"
 #include "motor/ra_motor.h"
 #include "sensors/imu_data.h"
 #include "ui/telescope_ui.h"
@@ -26,7 +27,7 @@ void bootLines(const BootConfig& boot, const char* out[8]) {
 }
 
 // updateTelemetry() of app.ino, with the fake sensors as the source.
-void fillTelemetry(unsigned long now_ms, const SensorState& s, Telemetry& t) {
+void fillTelemetry(unsigned long now_ms, const SensorState& s, const UiState& st, Telemetry& t) {
   const GpsState& g = s.gps;
   t.now_ms = now_ms;
   t.year = g.year;
@@ -56,6 +57,7 @@ void fillTelemetry(unsigned long now_ms, const SensorState& s, Telemetry& t) {
   t.imu.my = (float)m.my;
   t.imu.mz = (float)m.mz;
   t.imu.temperature = (float)m.temperature;
+  t.imu_corr = withoutGyroBias(t.imu, st.gyro_bias);
   t.roll_acc_deg = rollFromAccelDeg(t.imu);
   t.pitch_acc_deg = pitchFromAccelDeg(t.imu);
 
@@ -66,7 +68,7 @@ void fillTelemetry(unsigned long now_ms, const SensorState& s, Telemetry& t) {
   t.disp_us = 21800;
   t.gps_us = 650;
   t.imu_us = 1250;
-  t.est_us = 0;
+  t.est_us = 180;
 }
 
 }  // namespace
@@ -81,6 +83,8 @@ void FirmwareUi::begin(const BootConfig& boot, const SensorState&) {
   // Fresh UI and context, like a power cycle (TelescopeUi has no reset()).
   ui_.reset(new TelescopeUi());
   ctx_.reset(new UiContext());
+  att_est_.reset(new AttitudeEstimator());
+  att_est_->begin(kAttEstTauS, kFrameMs / 1000.0f);   // end of setup()
 }
 
 void FirmwareUi::renderBoot(Frame& out) {
@@ -105,7 +109,12 @@ void FirmwareUi::frame(unsigned long now_ms, const InputSnapshot& input,
     return;
   }
 
-  fillTelemetry(now_ms, sensors, ctx_->tel);
+  fillTelemetry(now_ms, sensors, ctx_->state, ctx_->tel);
+  // Estimation, as in loop()
+  att_est_->update(ctx_->tel.imu_corr, kFrameMs / 1000.0f);
+  ctx_->tel.roll_est_deg = att_est_->rollDeg();
+  ctx_->tel.pitch_est_deg = att_est_->pitchDeg();
+
   ::Frame f;   // the firmware's frame type
   ui_->step(delta, input.clicked(), *ctx_, f);
   static_assert(sizeof(f.lines[0]) == kCols + 1, "line width must match");

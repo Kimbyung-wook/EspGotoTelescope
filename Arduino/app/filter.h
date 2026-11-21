@@ -18,7 +18,8 @@ private:
   float x;
   float x_prev;
   float tau;
-  float gamma;
+  float gamma; // exp(-dt/tau)
+  bool  first = true;
   float dt;
 };
 
@@ -39,7 +40,8 @@ private:
   float x_prev;
   float u_prev;
   float tau;
-  float gamma; // exp(-dt/tau);
+  float gamma; // exp(-dt/tau)
+  bool  first = true;
   float dt;
 };
 

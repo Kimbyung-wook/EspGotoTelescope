@@ -1,10 +1,14 @@
 #include "filter.h"
 #include <math.h>
 
+// Discrete 1st-order LPF : x_k = gamma * x_(k-1) + (1 - gamma) * u_k,  gamma = exp(-dt/tau)
 void  LPF::initialize(float tau_in = 1.00f, float dt_in = 0.100f){
   tau = tau_in;
   dt = dt_in;
   gamma = expf(-(float)dt / tau);
+  x = 0.0f;
+  x_prev = 0.0f;
+  first = true;
 }
 void  LPF::setTau(float tau_in){
   tau = tau_in;
@@ -18,16 +22,26 @@ float LPF::getState(){
   return x;
 }
 float LPF::update(float u_in, float dt_in = 0.100f){
-  x = (1.0f - gamma) * x_prev + gamma * u_in;
+  // Start from the first input instead of 0 to avoid a slow start-up transient
+  if(first){
+    x_prev = u_in;
+    first = false;
+  }
+  x = gamma * x_prev + (1.0f - gamma) * u_in;
   x_prev = x;
   return x;
 }
 
 
+// Discrete 1st-order HPF : x_k = gamma * (x_(k-1) + u_k - u_(k-1)),  gamma = exp(-dt/tau)
 void  HPF::initialize(float tau_in, float dt_in = 0.100f){
   tau = tau_in;
   dt = dt_in;
   gamma = expf(-(float)dt / tau);
+  x = 0.0f;
+  x_prev = 0.0f;
+  u_prev = 0.0f;
+  first = true;
 }
 void  HPF::setTau(float tau_in){
   tau = tau_in;
@@ -40,7 +54,12 @@ float HPF::getState(){
   return x;
 }
 float HPF::update(float u_in, float dt_in = 0.100f){
-  x = (1.0f - gamma) * x_prev + (u_in - u_prev);
+  // No step at start-up : the first input is taken as the previous input
+  if(first){
+    u_prev = u_in;
+    first = false;
+  }
+  x = gamma * (x_prev + u_in - u_prev);
   x_prev = x;
   u_prev = u_in;
   return x;

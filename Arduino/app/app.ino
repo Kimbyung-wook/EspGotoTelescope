@@ -147,31 +147,31 @@ void setup() {
   /************************************/
   int monitor_on  = monitor->setup_display();
   system_on = system_on & monitor_on;
-  sprintf(monitor->msg[line++], "1. Display is ON");
+  snprintf(monitor->msg[line++], DISP_LINE_ROW, "1. Display is ON");
   monitor->print();
 
   /************************************/
   // IMU Setup - ICM 20948
   /************************************/
-  sprintf(monitor->msg[line], "2. Intialize IMU");
+  snprintf(monitor->msg[line], DISP_LINE_ROW, "2. Intialize IMU");
   int imu_on = imu.begin_I2C();
   system_on = system_on & imu_on;
-  if(imu_on == true)    sprintf(monitor->msg[line++], "2. IMU is ON");
-  else                  sprintf(monitor->msg[line++], ">> IMU failed");
+  if(imu_on == true)    snprintf(monitor->msg[line++], DISP_LINE_ROW, "2. IMU is ON");
+  else                  snprintf(monitor->msg[line++], DISP_LINE_ROW, ">> IMU failed");
 
   imu.setAccelRange(ICM20948_ACCEL_RANGE_16_G);
   switch (imu.getAccelRange()) {
   case ICM20948_ACCEL_RANGE_2_G:
-    sprintf(monitor->msg[line++], "Acc +-2G");
+    snprintf(monitor->msg[line++], DISP_LINE_ROW, "Acc +-2G");
     break;
   case ICM20948_ACCEL_RANGE_4_G:
-    sprintf(monitor->msg[line++], "Acc +-4G");
+    snprintf(monitor->msg[line++], DISP_LINE_ROW, "Acc +-4G");
     break;
   case ICM20948_ACCEL_RANGE_8_G:
-    sprintf(monitor->msg[line++], "Acc +-8G");
+    snprintf(monitor->msg[line++], DISP_LINE_ROW, "Acc +-8G");
     break;
   case ICM20948_ACCEL_RANGE_16_G:
-    sprintf(monitor->msg[line++], "Acc +-16G");
+    snprintf(monitor->msg[line++], DISP_LINE_ROW, "Acc +-16G");
     break;
   }
   uint16_t accel_divisor = imu.getAccelRateDivisor();
@@ -181,16 +181,16 @@ void setup() {
   imu.setGyroRange(ICM20948_GYRO_RANGE_250_DPS);
   switch (imu.getGyroRange()) {
   case ICM20948_GYRO_RANGE_250_DPS:
-    sprintf(monitor->msg[line++], "Gyro 250 dps");
+    snprintf(monitor->msg[line++], DISP_LINE_ROW, "Gyro 250 dps");
     break;
   case ICM20948_GYRO_RANGE_500_DPS:
-    sprintf(monitor->msg[line++], "Gyro 500 dps");
+    snprintf(monitor->msg[line++], DISP_LINE_ROW, "Gyro 500 dps");
     break;
   case ICM20948_GYRO_RANGE_1000_DPS:
-    sprintf(monitor->msg[line++], "Gyro 1000 dps");
+    snprintf(monitor->msg[line++], DISP_LINE_ROW, "Gyro 1000 dps");
     break;
   case ICM20948_GYRO_RANGE_2000_DPS:
-    sprintf(monitor->msg[line++], "Gyro 2000 dps");
+    snprintf(monitor->msg[line++], DISP_LINE_ROW, "Gyro 2000 dps");
     break;
   }
   uint8_t gyro_divisor = imu.getGyroRateDivisor();
@@ -200,22 +200,22 @@ void setup() {
   imu.setMagDataRate(AK09916_MAG_DATARATE_10_HZ);
   switch (imu.getMagDataRate()) {
   case AK09916_MAG_DATARATE_SHUTDOWN:
-    sprintf(monitor->msg[line++], "Mag Shutdown");
+    snprintf(monitor->msg[line++], DISP_LINE_ROW, "Mag Shutdown");
     break;
   case AK09916_MAG_DATARATE_SINGLE:
-    sprintf(monitor->msg[line++], "Mag Single/One shot");
+    snprintf(monitor->msg[line++], DISP_LINE_ROW, "Mag Single/One shot");
     break;
   case AK09916_MAG_DATARATE_10_HZ:
-    sprintf(monitor->msg[line++], "Mag 10 Hz");
+    snprintf(monitor->msg[line++], DISP_LINE_ROW, "Mag 10 Hz");
     break;
   case AK09916_MAG_DATARATE_20_HZ:
-    sprintf(monitor->msg[line++], "Mag 20 Hz");
+    snprintf(monitor->msg[line++], DISP_LINE_ROW, "Mag 20 Hz");
     break;
   case AK09916_MAG_DATARATE_50_HZ:
-    sprintf(monitor->msg[line++], "Mag 50 Hz");
+    snprintf(monitor->msg[line++], DISP_LINE_ROW, "Mag 50 Hz");
     break;
   case AK09916_MAG_DATARATE_100_HZ:
-    sprintf(monitor->msg[line++], "Mag 100 Hz");
+    snprintf(monitor->msg[line++], DISP_LINE_ROW, "Mag 100 Hz");
     break;
   }
   monitor->print();
@@ -223,18 +223,18 @@ void setup() {
   /************************************/
   // GPS Setup
   /************************************/
-  sprintf(monitor->msg[line], "3. Intialize GPS");
+  snprintf(monitor->msg[line], DISP_LINE_ROW, "3. Intialize GPS");
   monitor->print();
   int gps_on      = gps->setup_gps();
   system_on = system_on & gps_on;
-  if(gps_on == true)    sprintf(monitor->msg[line++], "3. GPS is ON");
-  else                  sprintf(monitor->msg[line++], ">> GPS is timeout");
+  if(gps_on == true)    snprintf(monitor->msg[line++], DISP_LINE_ROW, "3. GPS is ON");
+  else                  snprintf(monitor->msg[line++], DISP_LINE_ROW, ">> GPS is timeout");
   monitor->print();
   /************************************/
   // Rotary Button Setup
   /************************************/
 	// Set encoder pins as inputs
-  sprintf(monitor->msg[line], "4. Intialize Buttons");
+  snprintf(monitor->msg[line], DISP_LINE_ROW, "4. Intialize Buttons");
   monitor->print();
 	pinMode(BUTTON_S1,  INPUT);
 	pinMode(BUTTON_S2,  INPUT);
@@ -242,18 +242,18 @@ void setup() {
   attachInterrupt(digitalPinToInterrupt(BUTTON_S1),  isr_rotary_s1,     FALLING);
   attachInterrupt(digitalPinToInterrupt(BUTTON_S2),  isr_rotary_s2,     FALLING);
   attachInterrupt(digitalPinToInterrupt(BUTTON_KEY), isr_button_click,  RISING);
-  sprintf(monitor->msg[line++], "4. Buttons are ON");
+  snprintf(monitor->msg[line++], DISP_LINE_ROW, "4. Buttons are ON");
   monitor->print();
   /************************************/
   // PWM
   /************************************/
   pinMode(PWM2, OUTPUT);
   analogWrite(PWM2, 120);
-  sprintf(monitor->msg[line++], "5. GPIO/PWM is ON");
+  snprintf(monitor->msg[line++], DISP_LINE_ROW, "5. GPIO/PWM is ON");
   pinMode(MOTOR_IN1, OUTPUT);
   pinMode(MOTOR_IN2, OUTPUT);
-  analogWrite(MOTOR_IN1, LOW);
-  analogWrite(MOTOR_IN2, LOW);
+  digitalWrite(MOTOR_IN1, LOW);
+  digitalWrite(MOTOR_IN2, LOW);
   monitor->print();
 }
 
@@ -268,9 +268,9 @@ void loop() {
   ax =-accel.acceleration.x;
   ay = accel.acceleration.y;
   az = accel.acceleration.z;
-  wx = gyro.gyro.x;
-  wy =-gyro.gyro.y;
-  wz =-gyro.gyro.z;
+  wx = gyro.gyro.x * RAD_TO_DEG; // rad/s -> dps
+  wy =-gyro.gyro.y * RAD_TO_DEG;
+  wz =-gyro.gyro.z * RAD_TO_DEG;
   mx = mag.magnetic.x;
   my = mag.magnetic.y;
   mz = mag.magnetic.z;
@@ -286,10 +286,10 @@ void loop() {
   // Display
   /************************************/
   // Top Window
-  sprintf(monitor->msg[0], "T %2d:%2d:%2d.%1d V %5.2f",
+  snprintf(monitor->msg[0], DISP_LINE_ROW, "T %2d:%2d:%2d.%1d V %5.2f",
           gps->gps_device->hour, gps->gps_device->minute,
           gps->gps_device->seconds, gps->gps_device->milliseconds/100, 12.60f);
-  // sprintf(monitor->msg[1], "Button %2d Rotary %2d",
+  // snprintf(monitor->msg[1], DISP_LINE_ROW, "Button %2d Rotary %2d",
   //         button_counter, rotary_counter);
 
   // Sub Window
@@ -297,22 +297,23 @@ void loop() {
   {
     case Menu::main_menu:
     {
-      menu_index_max = 10;
+      menu_index_max = 10-1; // 10 items, index 0..9
       updateMenuCursor();
-      menu_index_first = max(0, rotary_counter_interval - cursor_pos - 1);
+      menu_index_first = max(0, rotary_counter_interval - cursor_pos);
       
-      sprintf(monitor->msg[1], "Main Menu");
-      sprintf(monitor->msg[2], main_menu_string[0 + menu_index_first], cursor[0]);
-      sprintf(monitor->msg[3], main_menu_string[1 + menu_index_first], cursor[1]);
-      sprintf(monitor->msg[4], main_menu_string[2 + menu_index_first], cursor[2]);
-      sprintf(monitor->msg[5], main_menu_string[3 + menu_index_first], cursor[3]);
-      sprintf(monitor->msg[6], main_menu_string[4 + menu_index_first], cursor[4]);
-      sprintf(monitor->msg[7], main_menu_string[5 + menu_index_first], cursor[5]);
+      snprintf(monitor->msg[1], DISP_LINE_ROW, "Main Menu");
+      snprintf(monitor->msg[2], DISP_LINE_ROW, main_menu_string[0 + menu_index_first], cursor[0]);
+      snprintf(monitor->msg[3], DISP_LINE_ROW, main_menu_string[1 + menu_index_first], cursor[1]);
+      snprintf(monitor->msg[4], DISP_LINE_ROW, main_menu_string[2 + menu_index_first], cursor[2]);
+      snprintf(monitor->msg[5], DISP_LINE_ROW, main_menu_string[3 + menu_index_first], cursor[3]);
+      snprintf(monitor->msg[6], DISP_LINE_ROW, main_menu_string[4 + menu_index_first], cursor[4]);
+      snprintf(monitor->msg[7], DISP_LINE_ROW, main_menu_string[5 + menu_index_first], cursor[5]);
       
       if(did_button_clicked == true)
       {
         menu_index = menu_index_first + cursor_pos + 1;
         cursor_pos = 0;
+        rotary_counter_prev = rotary_counter; // sub menu starts at the first line
       }
     }
     break;
@@ -320,13 +321,13 @@ void loop() {
     {
       menu_index_max = 3-1;
       updateMenuCursor();
-      sprintf(monitor->msg[1], main_menu_string[menu_index-1], '*');
-      sprintf(monitor->msg[2], "%cRRcmd %10.5fDEG", cursor[0], rotation_speed);
-      sprintf(monitor->msg[3], "%cRRate %10.5fDEG", cursor[1], wx);
-      sprintf(monitor->msg[4], "%cQuit"           , cursor[2]);
-      sprintf(monitor->msg[5], " ROL %10.5f  DEG",  phi_acc);
-      sprintf(monitor->msg[6], " LAT %c%10.6fDEG", gps->gps_device->lat, latitude);
-      sprintf(monitor->msg[7], " PIT %10.5f  DEG",  theta_acc);
+      snprintf(monitor->msg[1], DISP_LINE_ROW, main_menu_string[menu_index-1], '*');
+      snprintf(monitor->msg[2], DISP_LINE_ROW, "%cRRcmd %10.5fDEG", cursor[0], rotation_speed);
+      snprintf(monitor->msg[3], DISP_LINE_ROW, "%cRRate %10.5fDPS", cursor[1], wx);
+      snprintf(monitor->msg[4], DISP_LINE_ROW, "%cQuit"           , cursor[2]);
+      snprintf(monitor->msg[5], DISP_LINE_ROW, " ROL %10.5f  DEG",  phi_acc);
+      snprintf(monitor->msg[6], DISP_LINE_ROW, " LAT %c%10.6fDEG", gps->gps_device->lat, latitude);
+      snprintf(monitor->msg[7], DISP_LINE_ROW, " PIT %10.5f  DEG",  theta_acc);
       if(did_button_clicked == true)
       {
         if(cursor_pos == 0)
@@ -345,21 +346,23 @@ void loop() {
     case Menu::status_gps:
     {
       menu_index_max = 0;
-      char fixqual[5];
+      char fixqual[6];
       if(gps->gps_device->fixquality == 0)
-        sprintf(fixqual, "NoFix");
+        snprintf(fixqual, sizeof(fixqual), "NoFix");
       else if (gps->gps_device->fixquality == 1)
-        sprintf(fixqual, "GPS");
+        snprintf(fixqual, sizeof(fixqual), "GPS");
       else if (gps->gps_device->fixquality == 2)
-        sprintf(fixqual, "DGPS");
+        snprintf(fixqual, sizeof(fixqual), "DGPS");
+      else
+        snprintf(fixqual, sizeof(fixqual), "Q%d", (int)gps->gps_device->fixquality);
 
-      sprintf(monitor->msg[1], main_menu_string[menu_index-1], '*');
-      sprintf(monitor->msg[2], "Date: 20%02d/%02d/%02d",      gps->gps_device->year, gps->gps_device->month, gps->gps_device->day);
-      sprintf(monitor->msg[3], "Time:   %02d:%02d:%02d.%03d", gps->gps_device->hour, gps->gps_device->minute, gps->gps_device->seconds, gps->gps_device->milliseconds);
-      sprintf(monitor->msg[4], "%5s Sat %2d",                 fixqual, (int)gps->gps_device->satellites);
-      sprintf(monitor->msg[5], " ");
-      sprintf(monitor->msg[6], " %c %12.8f DEG",              gps->gps_device->lat, latitude);
-      sprintf(monitor->msg[7], " %c %12.8f DEG",              gps->gps_device->lon, longitude);
+      snprintf(monitor->msg[1], DISP_LINE_ROW, main_menu_string[menu_index-1], '*');
+      snprintf(monitor->msg[2], DISP_LINE_ROW, "Date: 20%02d/%02d/%02d",      gps->gps_device->year, gps->gps_device->month, gps->gps_device->day);
+      snprintf(monitor->msg[3], DISP_LINE_ROW, "Time:   %02d:%02d:%02d.%03d", gps->gps_device->hour, gps->gps_device->minute, gps->gps_device->seconds, gps->gps_device->milliseconds);
+      snprintf(monitor->msg[4], DISP_LINE_ROW, "%5s Sat %2d",                 fixqual, (int)gps->gps_device->satellites);
+      snprintf(monitor->msg[5], DISP_LINE_ROW, " ");
+      snprintf(monitor->msg[6], DISP_LINE_ROW, " %c %12.8f DEG",              gps->gps_device->lat, latitude);
+      snprintf(monitor->msg[7], DISP_LINE_ROW, " %c %12.8f DEG",              gps->gps_device->lon, longitude);
       if(did_button_clicked == true)
       {
         rotary_counter_prev = rotary_counter - menu_index + 1;
@@ -370,13 +373,13 @@ void loop() {
     case Menu::status_acc_gyro:
     {
       menu_index_max = 0;
-      sprintf(monitor->msg[1], main_menu_string[menu_index-1], '*');
-      sprintf(monitor->msg[2],"Ax    %10.5f mpss", ax);
-      sprintf(monitor->msg[3],"Ay    %10.5f mpss", ay);
-      sprintf(monitor->msg[4],"Az    %10.5f mpss", az);
-      sprintf(monitor->msg[5],"Wx    %10.5f dps",  wx);
-      sprintf(monitor->msg[6],"Wy    %10.5f dps",  wy);
-      sprintf(monitor->msg[7],"Wz    %10.5f dps",  wz);
+      snprintf(monitor->msg[1], DISP_LINE_ROW, main_menu_string[menu_index-1], '*');
+      snprintf(monitor->msg[2], DISP_LINE_ROW, "Ax    %10.5f mpss", ax);
+      snprintf(monitor->msg[3], DISP_LINE_ROW, "Ay    %10.5f mpss", ay);
+      snprintf(monitor->msg[4], DISP_LINE_ROW, "Az    %10.5f mpss", az);
+      snprintf(monitor->msg[5], DISP_LINE_ROW, "Wx    %10.5f dps",  wx);
+      snprintf(monitor->msg[6], DISP_LINE_ROW, "Wy    %10.5f dps",  wy);
+      snprintf(monitor->msg[7], DISP_LINE_ROW, "Wz    %10.5f dps",  wz);
       if(did_button_clicked == true)
       {
         rotary_counter_prev = rotary_counter - menu_index + 1;
@@ -386,13 +389,13 @@ void loop() {
     break;
     case Menu::status_mag_temp:
     {
-      sprintf(monitor->msg[1], main_menu_string[menu_index-1], '*');
-      sprintf(monitor->msg[2], "Mx   %10.5f uT", mx);
-      sprintf(monitor->msg[3], "My   %10.5f uT", my);
-      sprintf(monitor->msg[4], "Mz   %10.5f uT", mz);
-      sprintf(monitor->msg[5], "Temp %10.5f 'c ", temperature);
-      sprintf(monitor->msg[6], " ");
-      sprintf(monitor->msg[7], " ");
+      snprintf(monitor->msg[1], DISP_LINE_ROW, main_menu_string[menu_index-1], '*');
+      snprintf(monitor->msg[2], DISP_LINE_ROW, "Mx   %10.5f uT", mx);
+      snprintf(monitor->msg[3], DISP_LINE_ROW, "My   %10.5f uT", my);
+      snprintf(monitor->msg[4], DISP_LINE_ROW, "Mz   %10.5f uT", mz);
+      snprintf(monitor->msg[5], DISP_LINE_ROW, "Temp %10.5f 'c ", temperature);
+      snprintf(monitor->msg[6], DISP_LINE_ROW, " ");
+      snprintf(monitor->msg[7], DISP_LINE_ROW, " ");
       if(did_button_clicked == true)
       {
         rotary_counter_prev = rotary_counter - menu_index + 1;
@@ -402,13 +405,13 @@ void loop() {
     break;
     case Menu::status_imu_calib:
     {
-      sprintf(monitor->msg[1], main_menu_string[menu_index-1], '*');
-      sprintf(monitor->msg[2], "bAx  %10.5f mpss", 0.0f);
-      sprintf(monitor->msg[3], "bAy  %10.5f mpss", 0.0f);
-      sprintf(monitor->msg[4], "bAz  %10.5f mpss", 0.0f);
-      sprintf(monitor->msg[5], "bWx  %10.5f dps",  0.0f);
-      sprintf(monitor->msg[6], "bWy  %10.5f dps",  0.0f);
-      sprintf(monitor->msg[7], "bWz  %10.5f dps",  0.0f);
+      snprintf(monitor->msg[1], DISP_LINE_ROW, main_menu_string[menu_index-1], '*');
+      snprintf(monitor->msg[2], DISP_LINE_ROW, "bAx  %10.5f mpss", 0.0f);
+      snprintf(monitor->msg[3], DISP_LINE_ROW, "bAy  %10.5f mpss", 0.0f);
+      snprintf(monitor->msg[4], DISP_LINE_ROW, "bAz  %10.5f mpss", 0.0f);
+      snprintf(monitor->msg[5], DISP_LINE_ROW, "bWx  %10.5f dps",  0.0f);
+      snprintf(monitor->msg[6], DISP_LINE_ROW, "bWy  %10.5f dps",  0.0f);
+      snprintf(monitor->msg[7], DISP_LINE_ROW, "bWz  %10.5f dps",  0.0f);
       if(did_button_clicked == true)
       {
         rotary_counter_prev = rotary_counter - menu_index + 1;
@@ -420,13 +423,13 @@ void loop() {
     {
       menu_index_max = 6-1;
       updateMenuCursor();
-      sprintf(monitor->msg[1], main_menu_string[menu_index-1], '*');
-      sprintf(monitor->msg[2], "%cAcc. Bias Calib", cursor[0]);
-      sprintf(monitor->msg[3], "%cAcc. Scale Calib", cursor[1]);
-      sprintf(monitor->msg[4], "%cGyro Bias Calib", cursor[2]);
-      sprintf(monitor->msg[5], "%cGyro Scale Calib", cursor[3]);
-      sprintf(monitor->msg[6], "%c", cursor[4]);
-      sprintf(monitor->msg[7], "%cQuit", cursor[5]);
+      snprintf(monitor->msg[1], DISP_LINE_ROW, main_menu_string[menu_index-1], '*');
+      snprintf(monitor->msg[2], DISP_LINE_ROW, "%cAcc. Bias Calib", cursor[0]);
+      snprintf(monitor->msg[3], DISP_LINE_ROW, "%cAcc. Scale Calib", cursor[1]);
+      snprintf(monitor->msg[4], DISP_LINE_ROW, "%cGyro Bias Calib", cursor[2]);
+      snprintf(monitor->msg[5], DISP_LINE_ROW, "%cGyro Scale Calib", cursor[3]);
+      snprintf(monitor->msg[6], DISP_LINE_ROW, "%c", cursor[4]);
+      snprintf(monitor->msg[7], DISP_LINE_ROW, "%cQuit", cursor[5]);
       if(did_button_clicked == true)
       {
         switch (cursor_pos)
@@ -442,6 +445,7 @@ void loop() {
           case 3: // Gyro Scale Calib
           break;
           case 5:
+            rotary_counter_prev = rotary_counter - Menu::do_imu_calib + 1;
             menu_index = Menu::main_menu;
           break;
         }
@@ -450,32 +454,32 @@ void loop() {
     break;
     case Menu::att_est:
     {
-      sprintf(monitor->msg[1], main_menu_string[menu_index-1], '*');
-      sprintf(monitor->msg[2], "ROLL   %10.5f DEG", phi_acc);
-      sprintf(monitor->msg[3], "PITCH  %10.5f DEG", theta_acc);
-      sprintf(monitor->msg[4], " ");
-      sprintf(monitor->msg[5], "Wx     %10.5f DPS", wx);
-      sprintf(monitor->msg[6], "Wy     %10.5f DPS", wy);
-      sprintf(monitor->msg[7], " ");
+      snprintf(monitor->msg[1], DISP_LINE_ROW, main_menu_string[menu_index-1], '*');
+      snprintf(monitor->msg[2], DISP_LINE_ROW, "ROLL   %10.5f DEG", phi_acc);
+      snprintf(monitor->msg[3], DISP_LINE_ROW, "PITCH  %10.5f DEG", theta_acc);
+      snprintf(monitor->msg[4], DISP_LINE_ROW, " ");
+      snprintf(monitor->msg[5], DISP_LINE_ROW, "Wx     %10.5f DPS", wx);
+      snprintf(monitor->msg[6], DISP_LINE_ROW, "Wy     %10.5f DPS", wy);
+      snprintf(monitor->msg[7], DISP_LINE_ROW, " ");
       if(did_button_clicked == true)
       {
-        rotary_counter_prev = rotary_counter - menu_index;
+        rotary_counter_prev = rotary_counter - menu_index + 1;
         menu_index = Menu::main_menu;
       }
     }
     break;
     case Menu::health:
     {
-      sprintf(monitor->msg[1], main_menu_string[menu_index-1], '*');
-      sprintf(monitor->msg[2], "Loop %6d/%5.1fHz", perform_rest->getdt() + perform_main->getdt(), hz);
-      sprintf(monitor->msg[3], "MAIN %6d", perform_main->getdt());
-      sprintf(monitor->msg[4], "DISP %6d", monitor->perform_print.getdt());
-      sprintf(monitor->msg[5], "GPS  %6d", gps->perform_read.getdt());
-      sprintf(monitor->msg[6], "IMU  %6d", perform_imu->getdt());
-      sprintf(monitor->msg[7], "EST  %6d", 0);
+      snprintf(monitor->msg[1], DISP_LINE_ROW, main_menu_string[menu_index-1], '*');
+      snprintf(monitor->msg[2], DISP_LINE_ROW, "Loop %6d/%5.1fHz", perform_rest->getdt() + perform_main->getdt(), hz);
+      snprintf(monitor->msg[3], DISP_LINE_ROW, "MAIN %6d", perform_main->getdt());
+      snprintf(monitor->msg[4], DISP_LINE_ROW, "DISP %6d", monitor->perform_print.getdt());
+      snprintf(monitor->msg[5], DISP_LINE_ROW, "GPS  %6d", gps->perform_read.getdt());
+      snprintf(monitor->msg[6], DISP_LINE_ROW, "IMU  %6d", perform_imu->getdt());
+      snprintf(monitor->msg[7], DISP_LINE_ROW, "EST  %6d", 0);
       if(did_button_clicked == true)
       {
-        rotary_counter_prev = rotary_counter - menu_index;
+        rotary_counter_prev = rotary_counter - menu_index + 1;
         menu_index = Menu::main_menu;
       }
     }
@@ -483,29 +487,29 @@ void loop() {
     case Menu::moon_axis:
     {
       updateMenuCursor();
-      sprintf(monitor->msg[1], main_menu_string[menu_index-1], '*');
-      sprintf(monitor->msg[2], "ROLL  %10.5f DEG", phi_acc);
-      sprintf(monitor->msg[3], "PITCH %10.5f DEG", theta_acc);
-      sprintf(monitor->msg[4], "YAW   %10.5f DEG", 120.0012f);
-      sprintf(monitor->msg[5], "-- Moon --------");
-      sprintf(monitor->msg[6], "R.A.  %10.5f DEG",  37.0013f);
-      sprintf(monitor->msg[7], "DEC.  %10.5f DEG",-120.0014f);
+      snprintf(monitor->msg[1], DISP_LINE_ROW, main_menu_string[menu_index-1], '*');
+      snprintf(monitor->msg[2], DISP_LINE_ROW, "ROLL  %10.5f DEG", phi_acc);
+      snprintf(monitor->msg[3], DISP_LINE_ROW, "PITCH %10.5f DEG", theta_acc);
+      snprintf(monitor->msg[4], DISP_LINE_ROW, "YAW   %10.5f DEG", 120.0012f);
+      snprintf(monitor->msg[5], DISP_LINE_ROW, "-- Moon --------");
+      snprintf(monitor->msg[6], DISP_LINE_ROW, "R.A.  %10.5f DEG",  37.0013f);
+      snprintf(monitor->msg[7], DISP_LINE_ROW, "DEC.  %10.5f DEG",-120.0014f);
       if(did_button_clicked == true)
       {
-        rotary_counter_prev = rotary_counter - menu_index;
+        rotary_counter_prev = rotary_counter - menu_index + 1;
         menu_index = Menu::main_menu;
       }
     }
     break;
     case Menu::sleep:
     {
-      sprintf(monitor->msg[1], " ");
-      sprintf(monitor->msg[2], " ");
-      sprintf(monitor->msg[3], " ");
-      sprintf(monitor->msg[4], " ");
-      sprintf(monitor->msg[5], " ");
-      sprintf(monitor->msg[6], " ");
-      sprintf(monitor->msg[7], " ");
+      snprintf(monitor->msg[1], DISP_LINE_ROW, " ");
+      snprintf(monitor->msg[2], DISP_LINE_ROW, " ");
+      snprintf(monitor->msg[3], DISP_LINE_ROW, " ");
+      snprintf(monitor->msg[4], DISP_LINE_ROW, " ");
+      snprintf(monitor->msg[5], DISP_LINE_ROW, " ");
+      snprintf(monitor->msg[6], DISP_LINE_ROW, " ");
+      snprintf(monitor->msg[7], DISP_LINE_ROW, " ");
       if(did_button_clicked == true)
       {
         rotary_counter_prev = rotary_counter + 1;
@@ -520,26 +524,26 @@ void loop() {
       analogWrite(PWM2, fabs(rotation_speed));
       if(rotation_speed == 0.0f)
       {
-        analogWrite(MOTOR_IN1, LOW);
-        analogWrite(MOTOR_IN2, LOW);
+        digitalWrite(MOTOR_IN1, LOW);
+        digitalWrite(MOTOR_IN2, LOW);
       }
       else if (rotation_speed > 0.0f)
       {
-        analogWrite(MOTOR_IN1, LOW);
-        analogWrite(MOTOR_IN2, HIGH);
+        digitalWrite(MOTOR_IN1, LOW);
+        digitalWrite(MOTOR_IN2, HIGH);
       }
       else if (rotation_speed < 0.0f)
       {
-        analogWrite(MOTOR_IN1, HIGH);
-        analogWrite(MOTOR_IN2, LOW);
+        digitalWrite(MOTOR_IN1, HIGH);
+        digitalWrite(MOTOR_IN2, LOW);
       }
-      sprintf(monitor->msg[1], "*Set RA Speed");
-      sprintf(monitor->msg[2], "%cRRcmd %10.5fDEG", cursor_icon, rotation_speed);
-      sprintf(monitor->msg[3], " RRate %10.5fDEG",  wx);
-      sprintf(monitor->msg[4], " Exit");
-      sprintf(monitor->msg[5], " ROL %10.5f  DEG",  phi_acc);
-      sprintf(monitor->msg[6], " LAT %c%10.6fDEG", gps->gps_device->lat, latitude);
-      sprintf(monitor->msg[7], " PIT %10.5f  DEG",  theta_acc);
+      snprintf(monitor->msg[1], DISP_LINE_ROW, "*Set RA Speed");
+      snprintf(monitor->msg[2], DISP_LINE_ROW, "%cRRcmd %10.5fDEG", cursor_icon, rotation_speed);
+      snprintf(monitor->msg[3], DISP_LINE_ROW, " RRate %10.5fDPS",  wx);
+      snprintf(monitor->msg[4], DISP_LINE_ROW, " Exit");
+      snprintf(monitor->msg[5], DISP_LINE_ROW, " ROL %10.5f  DEG",  phi_acc);
+      snprintf(monitor->msg[6], DISP_LINE_ROW, " LAT %c%10.6fDEG", gps->gps_device->lat, latitude);
+      snprintf(monitor->msg[7], DISP_LINE_ROW, " PIT %10.5f  DEG",  theta_acc);
       if(did_button_clicked == true)
       {
         menu_index = Menu::ra_speed;
@@ -554,7 +558,7 @@ void loop() {
     {
       if(did_button_clicked == true)
       {
-        rotary_counter_prev = rotary_counter - Menu::do_imu_calib + 0;
+        rotary_counter_prev = rotary_counter - 0;
         menu_index = Menu::do_imu_calib;
       }
     }
@@ -563,7 +567,7 @@ void loop() {
     {
       if(did_button_clicked == true)
       {
-        rotary_counter_prev = rotary_counter - Menu::do_imu_calib + 1;
+        rotary_counter_prev = rotary_counter - 1;
         menu_index = Menu::do_imu_calib;
       }
     }
@@ -576,7 +580,7 @@ void loop() {
         bwx = wx;
         bwy = wy;
         bwz = wz;
-        sprintf(monitor->msg[1], "Calib Gyro Bias Ready");
+        snprintf(monitor->msg[1], DISP_LINE_ROW, "Calib Gyro Bias Ready");
       }
       else if((millis() - last_calib_time_since) < 6000)
       {
@@ -584,7 +588,7 @@ void loop() {
         bwx = (1.0 - alpha) * bwx + alpha * wx;
         bwy = (1.0 - alpha) * bwy + alpha * wy;
         bwz = (1.0 - alpha) * bwz + alpha * wz;
-        sprintf(monitor->msg[1], "Calib Gyro Bias ing.1");
+        snprintf(monitor->msg[1], DISP_LINE_ROW, "Calib Gyro Bias ing.1");
       }
       else if((millis() - last_calib_time_since) < 16000)
       {
@@ -592,21 +596,21 @@ void loop() {
         bwx = (1.0 - alpha) * bwx + alpha * wx;
         bwy = (1.0 - alpha) * bwy + alpha * wy;
         bwz = (1.0 - alpha) * bwz + alpha * wz;
-        sprintf(monitor->msg[1], "Calib Gyro Bias ing.2");
+        snprintf(monitor->msg[1], DISP_LINE_ROW, "Calib Gyro Bias ing.2");
       }
       else
       {
-        sprintf(monitor->msg[1], "Calib Gyro Bias Done.");
+        snprintf(monitor->msg[1], DISP_LINE_ROW, "Calib Gyro Bias Done.");
       }
-      sprintf(monitor->msg[2], "Wx %8.5f->%8.5f", wx, wx - bwx);
-      sprintf(monitor->msg[3], "Wy %8.5f->%8.5f", wy, wy - bwy);
-      sprintf(monitor->msg[4], "Wz %8.5f->%8.5f", wz, wz - bwz);
-      sprintf(monitor->msg[5], "bWx   %10.5f dps",  bwx);
-      sprintf(monitor->msg[6], "bWy   %10.5f dps",  bwy);
-      sprintf(monitor->msg[7], "bWz   %10.5f dps",  bwz);
+      snprintf(monitor->msg[2], DISP_LINE_ROW, "Wx %8.5f->%8.5f", wx, wx - bwx);
+      snprintf(monitor->msg[3], DISP_LINE_ROW, "Wy %8.5f->%8.5f", wy, wy - bwy);
+      snprintf(monitor->msg[4], DISP_LINE_ROW, "Wz %8.5f->%8.5f", wz, wz - bwz);
+      snprintf(monitor->msg[5], DISP_LINE_ROW, "bWx   %10.5f dps",  bwx);
+      snprintf(monitor->msg[6], DISP_LINE_ROW, "bWy   %10.5f dps",  bwy);
+      snprintf(monitor->msg[7], DISP_LINE_ROW, "bWz   %10.5f dps",  bwz);
       if(did_button_clicked == true)
       {
-        rotary_counter_prev = rotary_counter - Menu::do_imu_calib + 2;
+        rotary_counter_prev = rotary_counter - 2;
         menu_index = Menu::do_imu_calib;
       }
     }
@@ -615,20 +619,20 @@ void loop() {
     {
       if(did_button_clicked == true)
       {
-        rotary_counter_prev = rotary_counter - Menu::do_imu_calib + 3;
+        rotary_counter_prev = rotary_counter - 3;
         menu_index = Menu::do_imu_calib;
       }
     }
     break;
     default:
     {
-      sprintf(monitor->msg[1], "ERROR");
-      sprintf(monitor->msg[2], " ");
-      sprintf(monitor->msg[3], " ");
-      sprintf(monitor->msg[4], " ");
-      sprintf(monitor->msg[5], " ");
-      sprintf(monitor->msg[6], " ");
-      sprintf(monitor->msg[7], " ");
+      snprintf(monitor->msg[1], DISP_LINE_ROW, "ERROR");
+      snprintf(monitor->msg[2], DISP_LINE_ROW, " ");
+      snprintf(monitor->msg[3], DISP_LINE_ROW, " ");
+      snprintf(monitor->msg[4], DISP_LINE_ROW, " ");
+      snprintf(monitor->msg[5], DISP_LINE_ROW, " ");
+      snprintf(monitor->msg[6], DISP_LINE_ROW, " ");
+      snprintf(monitor->msg[7], DISP_LINE_ROW, " ");
       if(did_button_clicked == true)
       {
         rotary_counter_prev = rotary_counter + 1;
@@ -669,14 +673,14 @@ void loop() {
 //3201 3201
 
 // 0 -> 4 (2(0+1)+2) -> 10 (2*(4+1)+0) -> 23 (2*(10+1)+1)
-void setRotaryRight(){
+IRAM_ATTR void setRotaryRight(){
   rotary_counter++;
   rotary_direction = 1; // left
   rotary_event = true;
 }
 // 3102 3102
 // 0 -> 3 (2*(0+1)+1) -> 8 (2*(3+1)+0) -> 20 (2*(8+1)+2)
-void setRotaryLeft(){
+IRAM_ATTR void setRotaryLeft(){
   rotary_counter--;
   rotary_direction = -1; // right
   rotary_event = true;
@@ -685,7 +689,7 @@ void setRotaryNeutral(){
   rotary_event = false;
   rotary_direction = 0; // neutral
 }
-void updateRotary(){
+IRAM_ATTR void updateRotary(){
   rotary_state_s1 = digitalRead(BUTTON_S1);
   rotary_state_s2 = digitalRead(BUTTON_S2);
   rotary_state = 2 * rotary_state_s1 + rotary_state_s2;
@@ -712,7 +716,7 @@ void updateRotary(){
 // CCW (-, L) : S1 Rising, S2 true
 IRAM_ATTR void isr_rotary_s1(){
   // prevent being clicked over twice at once
-  if(rotary_last_pulse_s1 - millis() < 30)
+  if(millis() - rotary_last_pulse_s1 < 30)
     rotary_pulse_s1 = false;
   else{
     rotary_pulse_s1 = true;
@@ -728,7 +732,7 @@ IRAM_ATTR void isr_rotary_s1(){
 
 IRAM_ATTR void isr_rotary_s2(){
   // prevent being clicked over twice at once
-  if(rotary_last_pulse_s2 - millis() < 30)
+  if(millis() - rotary_last_pulse_s2 < 30)
     rotary_pulse_s2 = false;
   else{
     rotary_pulse_s2 = true;
@@ -745,7 +749,7 @@ IRAM_ATTR void isr_rotary_s2(){
 // Button Interrupt Routine
 IRAM_ATTR void isr_button_click(){
   // prevent being clicked over twice at once
-  if(button_last_press - millis() < 500)
+  if(millis() - button_last_press < 500)
     button_clicked = false;
   else
     button_clicked = true;

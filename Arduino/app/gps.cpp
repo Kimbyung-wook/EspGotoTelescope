@@ -3,7 +3,7 @@
 GPS::GPS(HardwareSerial* SerialPort){
   gps_device = new Adafruit_GPS(SerialPort);
   last_recv = 0;
-  timeout_gps_failed = 3000*1000;
+  timeout_gps_failed = 3000; // [ms]
   gps_connection = false;
 }
 GPS::~GPS(){
@@ -31,7 +31,7 @@ int GPS::setup_gps(){
   delay(200);
 
   // Verification Process
-  unsigned long last_setup = micros();
+  unsigned long last_setup = millis();
   char get_new_gps = false;
   char c = false;
   do{
@@ -41,7 +41,7 @@ int GPS::setup_gps(){
     {
       return true;
     }
-    if(micros() - last_setup > timeout_gps_failed)
+    if(millis() - last_setup > timeout_gps_failed)
       return false;
   }while(1);
 }
@@ -68,8 +68,8 @@ int GPS::read_all(){
     }
   }while(c);
 
-  // Check GPS Timeout
-  if(millis() - last_recv > timeout_gps_failed)
+  // Check GPS Timeout : connected while NMEA arrives within the timeout
+  if((last_recv != 0) && (millis() - last_recv <= timeout_gps_failed))
     gps_connection = true;
   else
     gps_connection = false;

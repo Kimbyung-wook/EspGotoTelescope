@@ -7,6 +7,7 @@
 #include "src/display/oled.h"
 #include "src/gps/gps.h"
 #include "src/util/tictok_us.h"
+#include "src/util/loop_timer.h"
 #include "src/input/rotary.h"
 #include "src/sensors/imu.h"
 #include "src/motor/ra_motor.h"
@@ -46,8 +47,7 @@ Tictok_us perform_rest;
 Tictok_us perform_imu;
 Tictok_us perform_est;
 const float   hz             = MAIN_LOOP_HZ;
-unsigned long last_loop_time = micros();
-unsigned long size_loop_time = 1000 * (1000 / hz);
+LoopTimer     loop_timer((unsigned long)(1000000.0f / hz));
 
 void bootLine(int& line, const char* text) {
   snprintf(monitor->msg[line++], DISP_LINE_ROW, "%s", text);
@@ -97,6 +97,7 @@ void setup() {
   bootLine(line, "5. GPIO/PWM is ON");
 
   att_est.begin(ATT_EST_TAU_S, 1.0f / hz);
+  loop_timer.start(micros());
 }
 
 // Copy sensor values into the UI telemetry
@@ -168,8 +169,8 @@ void loop() {
   // Simple scheduler : wait for the next period
   /************************************/
   perform_rest.tic();
-  while (micros() - last_loop_time < size_loop_time) {
+  while (!loop_timer.due(micros())) {
+    yield();
   }
-  last_loop_time += size_loop_time;
   perform_rest.toc();
 }

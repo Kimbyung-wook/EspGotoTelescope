@@ -17,6 +17,6 @@ SRCS=(
   "$SRC/ui/telescope_ui.cpp"
 )
 
-g++ -std=c++14 -Wall -Wextra -Wno-unused-parameter -I "$HERE/stubs" -I "$HERE" \
+g++ -std=c++14 -Wall -Wextra -I "$HERE/stubs" -I "$HERE" \
   "$HERE"/test_*.cpp "${SRCS[@]}" -o "$OUT/unit_tests.exe"
 "$OUT/unit_tests.exe"

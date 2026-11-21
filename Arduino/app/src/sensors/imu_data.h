@@ -32,6 +32,15 @@ inline ImuData imuSensorToBody(const float acc[3], const float gyro_radps[3],
   return d;
 }
 
+// Gyro rate with the calibrated bias removed
+inline ImuData withoutGyroBias(const ImuData& d, const float bias_dps[3]) {
+  ImuData c = d;
+  c.wx -= bias_dps[0];
+  c.wy -= bias_dps[1];
+  c.wz -= bias_dps[2];
+  return c;
+}
+
 /************************************/
 // Tilt from gravity (valid when the mount is not accelerating)
 /************************************/

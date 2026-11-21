@@ -28,44 +28,34 @@ int GPS::setup_gps(){
   gps_device->begin(115200);
   gps_device->sendCommand(PMTK_SET_NMEA_OUTPUT_RMCGGA);
   //gps_device->sendCommand(PMTK_SET_NMEA_OUTPUT_RMCONLY);
-  gps_device->sendCommand(PMTK_SET_NMEA_UPDATE_5HZ); // 1 Hz update rate
+  gps_device->sendCommand(PMTK_SET_NMEA_UPDATE_5HZ); // 5 Hz update rate
   delay(200);
 
-  // Verification Process
+  // Verification : wait for the first valid NMEA sentence
   unsigned long last_setup = millis();
-  char get_new_gps = false;
-  char c = false;
-  do{
-    c = gps_device->read();
-    get_new_gps = gps_device->newNMEAreceived();
-    if((get_new_gps == true) && (gps_device->parse(gps_device->lastNMEA()) == true))
-    {
+  while(true){
+    gps_device->read();
+    if(gps_device->newNMEAreceived() && gps_device->parse(gps_device->lastNMEA()))
       return true;
-    }
     if(millis() - last_setup > timeout_gps_failed)
       return false;
-  }while(1);
+    yield();
+  }
 }
 
 int GPS::read_all(){
   perform_read.tic();
   /************************************/
-  // GPS Parser
+  // GPS Parser : drain the UART buffer and parse every complete sentence
   // Outputs
   //   Adafruit_GPS GPS : GPS Data
   /************************************/
-  char get_new_gps = false;
-  char c = false;
+  char c = 0;
   do{
     c = gps_device->read();
-    get_new_gps = gps_device->newNMEAreceived();
-    if(get_new_gps == true)
-    {
+    if(gps_device->newNMEAreceived()){
       last_recv = millis();
-      if (!gps_device->parse(gps_device->lastNMEA())){
-        // DEBUG_PORT.println("GPS Failed!!");
-        continue;
-      }
+      gps_device->parse(gps_device->lastNMEA()); // a broken sentence is just skipped
     }
   }while(c);
 

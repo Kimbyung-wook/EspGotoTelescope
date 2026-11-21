@@ -17,8 +17,10 @@ struct Telemetry {
   double latitude = 0.0, longitude = 0.0;   // [deg]
 
   // IMU
-  ImuData imu;
-  float roll_acc_deg = 0.0f, pitch_acc_deg = 0.0f;
+  ImuData imu;                              // raw (gyro bias not removed)
+  ImuData imu_corr;                         // gyro bias removed
+  float roll_acc_deg = 0.0f, pitch_acc_deg = 0.0f;  // tilt from gravity only
+  float roll_est_deg = 0.0f, pitch_est_deg = 0.0f;  // complementary filter
 
   // Power
   float voltage = 12.60f;                   // not measured yet

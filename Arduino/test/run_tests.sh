@@ -9,6 +9,7 @@ mkdir -p "$OUT"
 # Firmware sources that build on the host (no hardware libraries)
 SRCS=(
   "$SRC/estimation/filter.cpp"
+  "$SRC/estimation/attitude_estimator.cpp"
   "$SRC/input/rotary.cpp"
   "$SRC/motor/ra_motor.cpp"
   "$SRC/ui/screen_manager.cpp"
@@ -16,6 +17,6 @@ SRCS=(
   "$SRC/ui/telescope_ui.cpp"
 )
 
-g++ -std=c++14 -Wall -Wextra -Wno-unused-parameter -I "$HERE/stubs" -I "$HERE" \
+g++ -std=c++14 -Wall -Wextra -I "$HERE/stubs" -I "$HERE" \
   "$HERE"/test_*.cpp "${SRCS[@]}" -o "$OUT/unit_tests.exe"
 "$OUT/unit_tests.exe"

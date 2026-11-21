@@ -2,7 +2,7 @@
 #include <math.h>
 
 // Discrete 1st-order LPF : x_k = gamma * x_(k-1) + (1 - gamma) * u_k,  gamma = exp(-dt/tau)
-void  LPF::initialize(float tau_in = 1.00f, float dt_in = 0.100f){
+void  LPF::initialize(float tau_in, float dt_in){
   tau = tau_in;
   dt = dt_in;
   gamma = expf(-(float)dt / tau);
@@ -21,7 +21,7 @@ float LPF::getTau(){
 float LPF::getState(){
   return x;
 }
-float LPF::update(float u_in, float dt_in = 0.100f){
+float LPF::update(float u_in, float /*dt_in*/){
   // Start from the first input instead of 0 to avoid a slow start-up transient
   if(first){
     x_prev = u_in;
@@ -34,7 +34,7 @@ float LPF::update(float u_in, float dt_in = 0.100f){
 
 
 // Discrete 1st-order HPF : x_k = gamma * (x_(k-1) + u_k - u_(k-1)),  gamma = exp(-dt/tau)
-void  HPF::initialize(float tau_in, float dt_in = 0.100f){
+void  HPF::initialize(float tau_in, float dt_in){
   tau = tau_in;
   dt = dt_in;
   gamma = expf(-(float)dt / tau);
@@ -53,7 +53,7 @@ float HPF::getTau(){
 float HPF::getState(){
   return x;
 }
-float HPF::update(float u_in, float dt_in = 0.100f){
+float HPF::update(float u_in, float /*dt_in*/){
   // No step at start-up : the first input is taken as the previous input
   if(first){
     u_prev = u_in;
@@ -65,7 +65,7 @@ float HPF::update(float u_in, float dt_in = 0.100f){
   return x;
 }
 
-void ComplementaryFilter::initialize(float tau_in = 1.00f, float dt_in = 0.100f){
+void ComplementaryFilter::initialize(float tau_in, float dt_in){
   tau = tau_in;
   dt = dt_in;
   lpf_L.initialize(tau, dt);

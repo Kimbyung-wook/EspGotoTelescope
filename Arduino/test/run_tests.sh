@@ -11,6 +11,9 @@ SRCS=(
   "$SRC/estimation/filter.cpp"
   "$SRC/input/rotary.cpp"
   "$SRC/motor/ra_motor.cpp"
+  "$SRC/ui/screen_manager.cpp"
+  "$SRC/ui/screens.cpp"
+  "$SRC/ui/telescope_ui.cpp"
 )
 
 g++ -std=c++14 -Wall -Wextra -Wno-unused-parameter -I "$HERE/stubs" -I "$HERE" \

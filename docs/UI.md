@@ -1,7 +1,7 @@
 # OLED UI / UX 설계
 
 SSD1306 OLED(128×64)와 로터리 엔코더 하나로 망원경을 조작하는 화면 구성입니다.
-코드 위치: `Arduino/app/app.ino` (`loop()`의 `switch(menu_index)`), `Arduino/app/oled.*`
+코드 위치: `Arduino/app/src/ui/` (화면 로직), `Arduino/app/src/display/oled.*` (출력). 구조는 아래 "10. 코드 구조"를 보세요.
 
 ## 1. 하드웨어 제약
 
@@ -37,7 +37,7 @@ SSD1306 OLED(128×64)와 로터리 엔코더 하나로 망원경을 조작하는
 - **커서 표시**: 선택된 줄 맨 앞에 `>`가 붙습니다. 매 프레임 `>`와 `-`를 번갈아 그려 깜박이므로(10 Hz 루프 → 5 Hz 깜박임) 작은 화면에서도 커서 위치가 잘 보입니다.
 - **편집 모드**: 값 앞의 커서가 깜박이는 상태가 편집 중이라는 뜻입니다. 로터리 1틱마다 값이 1씩 바뀝니다(`ra_speed_select`).
 - **스크롤**: 메인 메뉴는 10개 항목 가운데 6개만 보입니다. 커서가 맨 아래 줄에 닿은 뒤에도 계속 돌리면 목록이 한 칸씩 올라갑니다.
-- **위치 기억**: 하위 화면에서 나오면 커서가 방금 들어갔던 항목 위로 돌아갑니다(`rotary_counter_prev`를 조정).
+- **위치 기억**: 하위 화면에서 나오면 커서가 방금 들어갔던 항목 위로 돌아갑니다. 화면을 스택으로 관리하고 각 화면이 자기 커서를 기억합니다.
 - **하위 메뉴 진입**: 하위 메뉴에 들어가면 커서가 첫 줄에서 시작합니다.
 - **나가기**: 항목이 없는 정보 화면은 버튼 클릭 한 번으로 메인 메뉴로 돌아갑니다. 항목이 있는 화면은 `Exit`/`Quit` 항목을 선택해서 나갑니다.
 
@@ -223,10 +223,10 @@ T XX:XX:XX.X VXX.XX
 |---|---|---|
 | 숫자 서식 | `XXXX.XXXX` (`%9.4f`) | `%10.5f` (`ws/menu.ino`는 `%9.4f`) |
 | 4 Mag/Alt | HEAD(방위) | 방위 대신 온도(Temp) 표시 |
-| 5 IMU Calib | 바이어스 값 | `0.0` 고정 출력. 보정값 적용 전 |
+| 5 IMU Calib | 바이어스 값 | 자이로 바이어스는 Gyro Bias Calib 결과를 표시. 가속도 바이어스는 보정 기능이 없어 0. 측정값에는 아직 적용하지 않음 |
 | 7 Att.Estimator | Roll/Pitch/Yaw + R/Q/K + Exit, 스크롤 | 가속도 기반 Roll/Pitch와 Wx/Wy만 표시. 추정기 미구현 |
 | 9 Axis for Moon | 추정 자세 + 달 RA/Dec | 롤/피치는 가속도 값, Yaw·RA·Dec는 임시 고정값 |
-| Sleep | `(Sleep)` 표시 | 빈 화면. 디스플레이 전원은 끄지 않음 |
+| Sleep | `(Sleep)` 표시 | 빈 화면. 디스플레이 전원은 끄지 않음. 나오면 커서가 Sleep 항목에 있음 |
 | 1 RA Speed | RRcmd/RRate 단위 DEG | RRate는 dps로 표시. RRcmd는 PWM 듀티 값 |
 
 ## 8. 이후 구조 구상 (`Arduino/ws/menu_display.h`, 미완성)
@@ -245,3 +245,18 @@ Sensor 하위: Show Acc/Gyro/Mag Raw, Show Acc/Gyro Bias, Show Mag Calib,
 1. `ws/gps_imu_oled_button.cpp`: 버튼 하나로 GPS → IMU → EST → PERFORM 페이지를 차례로 넘김
 2. `ws/menu.ino`, `app/app.ino`: 로터리 + 버튼 기반 메뉴, 상태바/제목줄/내용 영역 레이아웃 정립
 3. `ws/menu_display.h`: 계층형 메뉴 클래스로 일반화하는 구상
+
+## 10. 코드 구조
+
+| 파일 | 역할 |
+|---|---|
+| `src/ui/frame.h` | 한 화면 분량(8줄×22바이트) 버퍼. `set(row, fmt, ...)`은 줄 너비를 넘으면 잘라냄 |
+| `src/ui/ui_context.h` | `Telemetry`(UI가 보여줄 값, 메인 루프가 매 프레임 채움), `UiState`(UI가 바꾸는 값: RA 속도 명령, 바이어스) |
+| `src/ui/screen.h` | `Screen` 인터페이스(`onEnter`/`onRotate`/`onClick`/`tick`/`render`)와 `MenuCursor`(선택·스크롤 창) |
+| `src/ui/screen_manager.*` | 화면 스택(push = 들어가기, pop = 나가기)과 커서 깜박임 |
+| `src/ui/screens.*` | 각 화면 클래스 |
+| `src/ui/telescope_ui.*` | 화면들을 묶은 `TelescopeUi`. 메인 루프는 프레임마다 `ui.step(회전량, 클릭, ctx, frame)`만 호출 |
+
+UI 코드는 하드웨어에 의존하지 않아서 PC에서도 빌드됩니다. 단위 테스트(`Arduino/test/test_ui.cpp`)와 UI 시뮬레이터가 같은 코드를 씁니다.
+
+화면을 추가하려면 `Screen`을 상속한 클래스를 만들고, `TelescopeUi`에 멤버로 넣은 뒤 메뉴 항목에 연결하면 됩니다.

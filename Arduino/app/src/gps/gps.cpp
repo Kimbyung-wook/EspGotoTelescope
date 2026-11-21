@@ -1,4 +1,5 @@
 #include "gps.h"
+#include "gps_link.h"
 
 GPS::GPS(HardwareSerial* SerialPort){
   gps_device = new Adafruit_GPS(SerialPort);
@@ -69,10 +70,7 @@ int GPS::read_all(){
   }while(c);
 
   // Check GPS Timeout : connected while NMEA arrives within the timeout
-  if((last_recv != 0) && (millis() - last_recv <= timeout_gps_failed))
-    gps_connection = true;
-  else
-    gps_connection = false;
+  gps_connection = gpsLinkAlive(last_recv, millis(), timeout_gps_failed);
 
   perform_read.toc();
 

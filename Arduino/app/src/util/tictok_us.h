@@ -7,7 +7,7 @@
 class Tictok_us{
 public:
   Tictok_us();
-  ~Tictok_us();
+  ~Tictok_us() {}
 
 public:
   void tic();

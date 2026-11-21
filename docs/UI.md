@@ -164,7 +164,7 @@ T XX:XX:XX.X VXX.XX
  Quit
 ```
 처음 설계는 `Exit`만 있는 화면이었고, 코드에는 보정 항목 4개가 들어가 있습니다.
-Gyro Bias 보정은 정지 상태에서 진행합니다. 0–1초에 초기값을 잡고, 1–6초에는 α=0.3, 6–16초에는 α=0.01로 지수 평균을 낸 뒤 `Done`을 표시합니다.
+Gyro Bias 보정은 정지 상태에서 진행합니다. 0–1초에는 산술평균으로 초기값을 잡고, 1–6초에는 α=0.3 지수 이동평균, 6–16초에는 그 구간 샘플의 산술평균을 낸 뒤 `Done`을 표시하고 값을 고정합니다. 로직은 `src/estimation/bias_calibrator.h`에 있습니다. 결과는 메인 루프에서 자이로 측정값에서 빼서 자세 추정기에 들어갑니다.
 
 ### 7 Att.Estimator — 자세 추정기 상태와 튜닝 값
 ```
@@ -223,8 +223,8 @@ T XX:XX:XX.X VXX.XX
 |---|---|---|
 | 숫자 서식 | `XXXX.XXXX` (`%9.4f`) | `%10.5f` (`ws/menu.ino`는 `%9.4f`) |
 | 4 Mag/Alt | HEAD(방위) | 방위 대신 온도(Temp) 표시 |
-| 5 IMU Calib | 바이어스 값 | 자이로 바이어스는 Gyro Bias Calib 결과를 표시. 가속도 바이어스는 보정 기능이 없어 0. 측정값에는 아직 적용하지 않음 |
-| 7 Att.Estimator | Roll/Pitch/Yaw + R/Q/K + Exit, 스크롤 | 가속도 기반 Roll/Pitch와 Wx/Wy만 표시. 추정기 미구현 |
+| 5 IMU Calib | 바이어스 값 | 자이로 바이어스는 Gyro Bias Calib 결과를 표시하고 자이로 측정값에 적용. 가속도 바이어스는 보정 기능이 없어 0 |
+| 7 Att.Estimator | Roll/Pitch/Yaw + R/Q/K + Exit, 스크롤 | 상보필터(τ=1 s) Roll/Pitch, 가속도 기반 Roll/Pitch(aR/aP), 바이어스 보정된 Wx/Wy/Wz를 표시. Yaw와 튜닝 값은 미구현 |
 | 9 Axis for Moon | 추정 자세 + 달 RA/Dec | 롤/피치는 가속도 값, Yaw·RA·Dec는 임시 고정값 |
 | Sleep | `(Sleep)` 표시 | 빈 화면. 디스플레이 전원은 끄지 않음. 나오면 커서가 Sleep 항목에 있음 |
 | 1 RA Speed | RRcmd/RRate 단위 DEG | RRate는 dps로 표시. RRcmd는 PWM 듀티 값 |

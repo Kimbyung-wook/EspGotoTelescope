@@ -10,6 +10,7 @@
 #include "src/input/rotary.h"
 #include "src/sensors/imu.h"
 #include "src/motor/ra_motor.h"
+#include "src/estimation/attitude_estimator.h"
 #include "src/ui/telescope_ui.h"
 
 /************************************/
@@ -20,6 +21,12 @@ GPS*    gps     = new GPS(&GPS_PORT);
 Imu     imu;
 RaMotor ra_motor(MOTOR_PWM, MOTOR_IN1, MOTOR_IN2);
 Rotary  rotary(BUTTON_S1, BUTTON_S2, BUTTON_KEY);
+
+/************************************/
+// Estimation
+/************************************/
+AttitudeEstimator att_est;
+const float       ATT_EST_TAU_S = 1.0f;  // complementary filter crossover
 
 /************************************/
 // UI
@@ -37,6 +44,7 @@ static_assert(sizeof(frame.lines) == sizeof(monitor->msg), "Frame and OLED buffe
 Tictok_us perform_main;
 Tictok_us perform_rest;
 Tictok_us perform_imu;
+Tictok_us perform_est;
 const float   hz             = MAIN_LOOP_HZ;
 unsigned long last_loop_time = micros();
 unsigned long size_loop_time = 1000 * (1000 / hz);
@@ -87,6 +95,8 @@ void setup() {
   /************************************/
   ra_motor.begin();
   bootLine(line, "5. GPIO/PWM is ON");
+
+  att_est.begin(ATT_EST_TAU_S, 1.0f / hz);
 }
 
 // Copy sensor values into the UI telemetry
@@ -108,16 +118,16 @@ void updateTelemetry(Telemetry& t) {
   t.longitude    = ((double)g->longitude_fixed) * 1E-7;
 
   t.imu           = imu.data();
+  t.imu_corr      = withoutGyroBias(t.imu, ui_ctx.state.gyro_bias);
   t.roll_acc_deg  = rollFromAccelDeg(t.imu);
   t.pitch_acc_deg = pitchFromAccelDeg(t.imu);
-
   t.loop_hz = hz;
   t.loop_us = perform_rest.getdt() + perform_main.getdt();
   t.main_us = perform_main.getdt();
   t.disp_us = monitor->perform_print.getdt();
   t.gps_us  = gps->perform_read.getdt();
   t.imu_us  = perform_imu.getdt();
-  t.est_us  = 0;
+  t.est_us  = perform_est.getdt();
 }
 
 void loop() {
@@ -135,6 +145,13 @@ void loop() {
   imu.read();
   perform_imu.toc();
   updateTelemetry(ui_ctx.tel);
+
+  // Estimation
+  perform_est.tic();
+  att_est.update(ui_ctx.tel.imu_corr, 1.0f / hz);
+  perform_est.toc();
+  ui_ctx.tel.roll_est_deg  = att_est.rollDeg();
+  ui_ctx.tel.pitch_est_deg = att_est.pitchDeg();
 
   // UI -> display
   frame.clear();

@@ -119,12 +119,12 @@ void ImuCalibStatusScreen::render(Frame& f, const UiContext& ctx, char /*blink*/
 void AttEstScreen::render(Frame& f, const UiContext& ctx, char /*blink*/) {
   const Telemetry& t = ctx.tel;
   renderTitle(f);
-  f.set(2, "ROLL   %10.5f DEG", t.roll_acc_deg);
-  f.set(3, "PITCH  %10.5f DEG", t.pitch_acc_deg);
-  f.set(4, " ");
-  f.set(5, "Wx     %10.5f DPS", t.imu.wx);
-  f.set(6, "Wy     %10.5f DPS", t.imu.wy);
-  f.set(7, " ");
+  f.set(2, "ROLL   %10.5f DEG", t.roll_est_deg);
+  f.set(3, "PITCH  %10.5f DEG", t.pitch_est_deg);
+  f.set(4, "aR %7.2f aP %7.2f", t.roll_acc_deg, t.pitch_acc_deg);
+  f.set(5, "Wx     %10.5f DPS", t.imu_corr.wx);
+  f.set(6, "Wy     %10.5f DPS", t.imu_corr.wy);
+  f.set(7, "Wz     %10.5f DPS", t.imu_corr.wz);
 }
 
 void HealthScreen::render(Frame& f, const UiContext& ctx, char /*blink*/) {
@@ -176,22 +176,15 @@ void ImuCalibMenuScreen::render(Frame& f, const UiContext& /*ctx*/, char blink) 
 
 // 0-1 s : take the current rate, 1-6 s : fast average (a=0.3), 6-16 s : slow average (a=0.01)
 void GyroBiasCalibScreen::tick(UiContext& ctx) {
-  unsigned long elapsed = ctx.tel.now_ms - start_ms_;
   const float w[3] = {ctx.tel.imu.wx, ctx.tel.imu.wy, ctx.tel.imu.wz};
-  float* b = ctx.state.gyro_bias;
-  float alpha = -1.0f;
-  if (elapsed < 1000)       { for (int i = 0; i < 3; i++) b[i] = w[i]; phase_ = "Calib Gyro Bias Ready"; }
-  else if (elapsed < 6000)  { alpha = 0.3f;  phase_ = "Calib Gyro Bias ing.1"; }
-  else if (elapsed < 16000) { alpha = 0.01f; phase_ = "Calib Gyro Bias ing.2"; }
-  else                      { phase_ = "Calib Gyro Bias Done."; }
-  if (alpha > 0.0f)
-    for (int i = 0; i < 3; i++) b[i] = (1.0f - alpha) * b[i] + alpha * w[i];
+  calib_.update(ctx.tel.now_ms, w);
+  for (int i = 0; i < 3; i++) ctx.state.gyro_bias[i] = calib_.bias()[i];
 }
 
 void GyroBiasCalibScreen::render(Frame& f, const UiContext& ctx, char /*blink*/) {
   const ImuData& d = ctx.tel.imu;
   const float* b = ctx.state.gyro_bias;
-  f.set(1, "%s", phase_);
+  f.set(1, "%s", GyroBiasCalibrator::phaseText(calib_.phase()));
   f.set(2, "Wx %8.5f->%8.5f", d.wx, d.wx - b[0]);
   f.set(3, "Wy %8.5f->%8.5f", d.wy, d.wy - b[1]);
   f.set(4, "Wz %8.5f->%8.5f", d.wz, d.wz - b[2]);

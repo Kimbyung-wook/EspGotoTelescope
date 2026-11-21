@@ -2,6 +2,7 @@
 #ifndef _UI_SCREENS_H_
 #define _UI_SCREENS_H_
 #include "screen_manager.h"
+#include "../estimation/bias_calibrator.h"
 
 /************************************/
 // Screens of docs/UI.md
@@ -83,13 +84,12 @@ private:
 // Gyro bias calibration : keep the mount still for 16 s
 class GyroBiasCalibScreen : public Screen {
 public:
-  void onEnter(UiContext& ctx) override { start_ms_ = ctx.tel.now_ms; }
+  void onEnter(UiContext& ctx) override { calib_.start(ctx.tel.now_ms); }
   void tick(UiContext& ctx) override;
   void onClick(ScreenManager& mgr, UiContext& /*ctx*/) override { mgr.pop(); }
   void render(Frame& f, const UiContext& ctx, char blink) override;
 private:
-  unsigned long start_ms_ = 0;
-  const char* phase_ = "";
+  GyroBiasCalibrator calib_;
 };
 
 // Do IMU Calib. menu

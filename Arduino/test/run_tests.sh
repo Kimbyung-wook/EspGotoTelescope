@@ -10,6 +10,7 @@ mkdir -p "$OUT"
 SRCS=(
   "$SRC/estimation/filter.cpp"
   "$SRC/input/rotary.cpp"
+  "$SRC/motor/ra_motor.cpp"
 )
 
 g++ -std=c++14 -Wall -Wextra -Wno-unused-parameter -I "$HERE/stubs" -I "$HERE" \

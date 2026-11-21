@@ -6,10 +6,9 @@
 #include "src/gps/gps.h"
 #include "src/util/tictok_us.h"
 #include "src/input/rotary.h"
-
-#include <Adafruit_ICM20X.h>
-#include <Adafruit_ICM20948.h>
-#include <Adafruit_Sensor.h>
+#include "src/sensors/imu.h"
+#include "src/motor/ra_motor.h"
+#include "src/gps/gps_link.h"
 
 #define min(x, y) (x) < (y) ? (x) : (y)// -> x, y중에 작은값 반환
 #define max(x, y) (x) > (y) ? (x) : (y)// -> x, y중에 큰값 반환
@@ -26,11 +25,8 @@ void updateMenuCursor();
 /************************************/
 OLED* monitor           = new OLED();
 GPS* gps                = new GPS(&GPS_PORT);
-Adafruit_ICM20948 imu;
-sensors_event_t accel;
-sensors_event_t gyro;
-sensors_event_t mag;
-sensors_event_t temp;
+Imu imu;
+RaMotor ra_motor(MOTOR_PWM, MOTOR_IN1, MOTOR_IN2);
 
 Tictok_us* perform_main = new Tictok_us();
 Tictok_us* perform_rest = new Tictok_us();
@@ -126,70 +122,14 @@ void setup() {
   // IMU Setup - ICM 20948
   /************************************/
   snprintf(monitor->msg[line], DISP_LINE_ROW, "2. Intialize IMU");
-  int imu_on = imu.begin_I2C();
+  monitor->print();
+  int imu_on = imu.begin();
   system_on = system_on & imu_on;
   if(imu_on == true)    snprintf(monitor->msg[line++], DISP_LINE_ROW, "2. IMU is ON");
   else                  snprintf(monitor->msg[line++], DISP_LINE_ROW, ">> IMU failed");
-
-  imu.setAccelRange(ICM20948_ACCEL_RANGE_16_G);
-  switch (imu.getAccelRange()) {
-  case ICM20948_ACCEL_RANGE_2_G:
-    snprintf(monitor->msg[line++], DISP_LINE_ROW, "Acc +-2G");
-    break;
-  case ICM20948_ACCEL_RANGE_4_G:
-    snprintf(monitor->msg[line++], DISP_LINE_ROW, "Acc +-4G");
-    break;
-  case ICM20948_ACCEL_RANGE_8_G:
-    snprintf(monitor->msg[line++], DISP_LINE_ROW, "Acc +-8G");
-    break;
-  case ICM20948_ACCEL_RANGE_16_G:
-    snprintf(monitor->msg[line++], DISP_LINE_ROW, "Acc +-16G");
-    break;
-  }
-  uint16_t accel_divisor = imu.getAccelRateDivisor();
-  float accel_rate = 1125 / (1.0 + accel_divisor);
-  monitor->print();
-
-  imu.setGyroRange(ICM20948_GYRO_RANGE_250_DPS);
-  switch (imu.getGyroRange()) {
-  case ICM20948_GYRO_RANGE_250_DPS:
-    snprintf(monitor->msg[line++], DISP_LINE_ROW, "Gyro 250 dps");
-    break;
-  case ICM20948_GYRO_RANGE_500_DPS:
-    snprintf(monitor->msg[line++], DISP_LINE_ROW, "Gyro 500 dps");
-    break;
-  case ICM20948_GYRO_RANGE_1000_DPS:
-    snprintf(monitor->msg[line++], DISP_LINE_ROW, "Gyro 1000 dps");
-    break;
-  case ICM20948_GYRO_RANGE_2000_DPS:
-    snprintf(monitor->msg[line++], DISP_LINE_ROW, "Gyro 2000 dps");
-    break;
-  }
-  uint8_t gyro_divisor = imu.getGyroRateDivisor();
-  float gyro_rate = 1100 / (1.0 + gyro_divisor);
-  monitor->print();
-
-  imu.setMagDataRate(AK09916_MAG_DATARATE_10_HZ);
-  switch (imu.getMagDataRate()) {
-  case AK09916_MAG_DATARATE_SHUTDOWN:
-    snprintf(monitor->msg[line++], DISP_LINE_ROW, "Mag Shutdown");
-    break;
-  case AK09916_MAG_DATARATE_SINGLE:
-    snprintf(monitor->msg[line++], DISP_LINE_ROW, "Mag Single/One shot");
-    break;
-  case AK09916_MAG_DATARATE_10_HZ:
-    snprintf(monitor->msg[line++], DISP_LINE_ROW, "Mag 10 Hz");
-    break;
-  case AK09916_MAG_DATARATE_20_HZ:
-    snprintf(monitor->msg[line++], DISP_LINE_ROW, "Mag 20 Hz");
-    break;
-  case AK09916_MAG_DATARATE_50_HZ:
-    snprintf(monitor->msg[line++], DISP_LINE_ROW, "Mag 50 Hz");
-    break;
-  case AK09916_MAG_DATARATE_100_HZ:
-    snprintf(monitor->msg[line++], DISP_LINE_ROW, "Mag 100 Hz");
-    break;
-  }
+  snprintf(monitor->msg[line++], DISP_LINE_ROW, "%s", imu.accelRangeText());
+  snprintf(monitor->msg[line++], DISP_LINE_ROW, "%s", imu.gyroRangeText());
+  snprintf(monitor->msg[line++], DISP_LINE_ROW, "%s", imu.magRateText());
   monitor->print();
 
   /************************************/
@@ -213,13 +153,8 @@ void setup() {
   /************************************/
   // PWM
   /************************************/
-  pinMode(MOTOR_PWM, OUTPUT);
-  analogWrite(MOTOR_PWM, 120);
+  ra_motor.begin();
   snprintf(monitor->msg[line++], DISP_LINE_ROW, "5. GPIO/PWM is ON");
-  pinMode(MOTOR_IN1, OUTPUT);
-  pinMode(MOTOR_IN2, OUTPUT);
-  digitalWrite(MOTOR_IN1, LOW);
-  digitalWrite(MOTOR_IN2, LOW);
   monitor->print();
 }
 
@@ -232,20 +167,15 @@ void loop() {
   double longitude = ((double)gps->gps_device->longitude_fixed)*1E-7;
 
   perform_imu->tic();
-  imu.getEvent(&accel, &gyro, &temp, &mag);
-  ax =-accel.acceleration.x;
-  ay = accel.acceleration.y;
-  az = accel.acceleration.z;
-  wx = gyro.gyro.x * RAD_TO_DEG; // rad/s -> dps
-  wy =-gyro.gyro.y * RAD_TO_DEG;
-  wz =-gyro.gyro.z * RAD_TO_DEG;
-  mx = mag.magnetic.x;
-  my = mag.magnetic.y;
-  mz = mag.magnetic.z;
-  temperature = temp.temperature;
-  grav      = sqrt(ax*ax + ay*ay + az*az);
-  phi_acc   = atan2(ay, az) * 57.296f;
-  theta_acc = asin(-ax/grav)  * 57.296f;
+  imu.read();
+  const ImuData& d = imu.data();
+  ax = d.ax;  ay = d.ay;  az = d.az;
+  wx = d.wx;  wy = d.wy;  wz = d.wz;
+  mx = d.mx;  my = d.my;  mz = d.mz;
+  temperature = d.temperature;
+  grav      = accelNorm(d);
+  phi_acc   = rollFromAccelDeg(d);
+  theta_acc = pitchFromAccelDeg(d);
   perform_imu->toc();
 
 
@@ -315,14 +245,7 @@ void loop() {
     {
       menu_index_max = 0;
       char fixqual[6];
-      if(gps->gps_device->fixquality == 0)
-        snprintf(fixqual, sizeof(fixqual), "NoFix");
-      else if (gps->gps_device->fixquality == 1)
-        snprintf(fixqual, sizeof(fixqual), "GPS");
-      else if (gps->gps_device->fixquality == 2)
-        snprintf(fixqual, sizeof(fixqual), "DGPS");
-      else
-        snprintf(fixqual, sizeof(fixqual), "Q%d", (int)gps->gps_device->fixquality);
+      gpsFixText(gps->gps_device->fixquality, fixqual, sizeof(fixqual));
 
       snprintf(monitor->msg[1], DISP_LINE_ROW, main_menu_string[menu_index-1], '*');
       snprintf(monitor->msg[2], DISP_LINE_ROW, "Date: 20%02d/%02d/%02d",      gps->gps_device->year, gps->gps_device->month, gps->gps_device->day);
@@ -489,22 +412,7 @@ void loop() {
     {
       rotation_speed = rotation_speed_prev + 1.0f * (rotary_counter - rotation_speed_cnt_prev);
       // float spd = rotation_speed * 10.0f;
-      analogWrite(MOTOR_PWM, fabs(rotation_speed));
-      if(rotation_speed == 0.0f)
-      {
-        digitalWrite(MOTOR_IN1, LOW);
-        digitalWrite(MOTOR_IN2, LOW);
-      }
-      else if (rotation_speed > 0.0f)
-      {
-        digitalWrite(MOTOR_IN1, LOW);
-        digitalWrite(MOTOR_IN2, HIGH);
-      }
-      else if (rotation_speed < 0.0f)
-      {
-        digitalWrite(MOTOR_IN1, HIGH);
-        digitalWrite(MOTOR_IN2, LOW);
-      }
+      ra_motor.setSpeed(rotation_speed);
       snprintf(monitor->msg[1], DISP_LINE_ROW, "*Set RA Speed");
       snprintf(monitor->msg[2], DISP_LINE_ROW, "%cRRcmd %10.5fDEG", cursor_icon, rotation_speed);
       snprintf(monitor->msg[3], DISP_LINE_ROW, " RRate %10.5fDPS",  wx);

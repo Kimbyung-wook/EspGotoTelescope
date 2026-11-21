@@ -1,6 +1,6 @@
 """Telescope OLED UI simulator (tkinter, Python 3.12, no extra packages).
 
-    python simulator.py [--runner PATH] [--backend mock] [--scale 5] [--shots DIR]
+    python simulator.py [--runner PATH] [--backend firmware] [--scale 5] [--shots DIR]
 
 Starts ../build/ui_runner.exe, ticks it at 10 Hz and shows the 128x64 SSD1306
 screen it returns, with fake sensor inputs and the RA motor output.
@@ -51,7 +51,7 @@ INT_KEYS = {"year", "month", "day", "hour", "minute", "seconds", "milliseconds",
 
 
 class Simulator:
-    def __init__(self, root, runner_path, scale, backend="mock"):
+    def __init__(self, root, runner_path, scale, backend="firmware"):
         self.root = root
         self.scale = scale
         self.client = RunnerClient(runner_path, ["--backend", backend])
@@ -411,9 +411,8 @@ TOUR = [
     ("rotate", 1, None), ("click", None, "07_status_imu_calib"), ("click", None, None),
     ("rotate", 1, None), ("click", None, "08_do_imu_calib"),
     ("rotate", 2, None), ("click", None, "09_calib_gyro_bias"), ("click", None, None),
-    ("rotate", 2, None), ("click", None, "10_main_after_calib"),
-    ("rotate", 1, None), ("click", None, "11_att_estimator"),
-    ("rotate", 12, "12_att_estimator_exit"), ("click", None, None),
+    ("rotate", 3, "10_do_imu_calib_quit"), ("click", None, "11_main_after_calib"),
+    ("rotate", 1, None), ("click", None, "12_att_estimator"), ("click", None, None),
     ("rotate", 1, None), ("click", None, "13_health"), ("click", None, None),
     ("rotate", 1, None), ("click", None, "14_axis_for_moon"), ("click", None, None),
     ("rotate", 1, None), ("click", None, "15_sleep"), ("click", None, "16_back_to_main"),
@@ -491,7 +490,7 @@ def grab_window(root, path):
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--runner", default=DEFAULT_RUNNER, help="path to ui_runner.exe")
-    ap.add_argument("--backend", default="mock", help="UI backend inside the runner (default mock)")
+    ap.add_argument("--backend", default="firmware", help="UI backend inside the runner (default firmware)")
     ap.add_argument("--scale", type=int, default=5, help="pixel zoom (default 5)")
     ap.add_argument("--shots", metavar="DIR", help="run the scripted tour and save screenshots")
     args = ap.parse_args()

@@ -1,5 +1,5 @@
 // UI simulator runner: reads one JSON message per line on stdin, writes one
-// JSON message per line on stdout. Usage: ui_runner [--backend mock]
+// JSON message per line on stdout. Usage: ui_runner [--backend firmware]
 #include <cstdio>
 #include <cstring>
 #include <iostream>
@@ -11,12 +11,12 @@
 
 
 int main(int argc, char** argv) {
-  const char* backend_name = "mock";
+  const char* backend_name = "firmware";
   for (int i = 1; i < argc; i++) {
     if (std::strcmp(argv[i], "--backend") == 0 && i + 1 < argc) {
       backend_name = argv[++i];
     } else if (std::strcmp(argv[i], "--help") == 0) {
-      std::printf("usage: ui_runner [--backend mock]\n");
+      std::printf("usage: ui_runner [--backend firmware]\n");
       return 0;
     }
   }

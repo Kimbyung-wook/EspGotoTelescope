@@ -4,19 +4,19 @@ PC에서 망원경 펌웨어의 OLED 메뉴를 돌려 보는 도구입니다. �
 
 ```
 gui/simulator.py  (tkinter)  ──stdin: input/sensors/tick──▶  build/ui_runner.exe  (C++)
-  128×64 화면, 센서 패널,    ◀──stdout: frame(8줄+모터)───    Session ─ UiBackend ─ MockUi
-  모터 표시                                                              (나중에 실제 펌웨어 UI)
+  128×64 화면, 센서 패널,    ◀──stdout: frame(8줄+모터)───    Session ─ UiBackend ─ FirmwareUi
+  모터 표시                                                       └ TelescopeUi (Arduino/app/src/ui)
 ```
 
 - **UI 러너** (`runner/`): C++14 콘솔 프로그램. 한 줄 JSON으로 입력·센서 값을 받고 10 Hz 프레임마다 화면 8줄과 모터 출력을 돌려줍니다. 프로토콜은 [PROTOCOL.md](PROTOCOL.md).
-- **UI 백엔드 경계**: UI 로직은 `runner/ui_backend.h`의 `sim::UiBackend` 뒤에만 있습니다. 지금은 [docs/UI.md](../../../docs/UI.md)를 따라 만든 목업 `MockUi`이고, 펌웨어 UI가 `Screen`/`ScreenManager`로 정리되면 그 코드를 감싼 백엔드로 바꿔 끼웁니다.
+- **UI 백엔드 경계**: UI는 `runner/ui_backend.h`의 `sim::UiBackend` 뒤에만 있습니다. 구현은 `FirmwareUi`(`runner/firmware_ui.*`) 하나로, **실제 펌웨어 UI 코드**(`Arduino/app/src/ui`의 `TelescopeUi`, `Screen`/`ScreenManager`)를 그대로 컴파일해 돌립니다. 펌웨어 소스는 읽기만 하고 고치지 않습니다.
 - **GUI** (`gui/`): Python 3.12 표준 라이브러리(tkinter)만 씁니다. 추가 패키지가 필요 없습니다.
 
 ## 빌드와 실행 (Git Bash)
 
 ```bash
 cd Arduino/tools/ui_simulator
-./build.sh                     # build/ui_runner.exe (MinGW g++ 6.3, -std=c++14)
+./build.sh                     # build/ui_runner.exe (MinGW g++ 6.3, -std=c++14, 펌웨어 UI 소스 포함)
 python gui/simulator.py        # GUI 실행 (--scale 4 로 확대 배율 변경)
 ```
 
@@ -45,7 +45,7 @@ python Arduino\tools\ui_simulator\gui\simulator.py
 ## 테스트
 
 ```bash
-./run_tests.sh                 # 러너 메뉴 로직 테스트 (입력 순서 -> 기대 화면 줄)
+./run_tests.sh                 # 실제 펌웨어 UI로 메뉴 테스트 (입력 순서 -> 기대 화면 줄)
 python gui/protocol_check.py   # 실제 러너 프로세스와 JSON 프로토콜로 모든 메뉴 왕복 (GUI 없음)
 python gui/simulator.py --shots build/shots   # GUI 자동 순회 + 스크린샷 저장 후 종료
 ```
@@ -60,21 +60,18 @@ python gui/simulator.py --shots build/shots   # GUI 자동 순회 + 스크린샷
 python gui/make_font.py   # 기본 경로: ~/Documents/Arduino/libraries/Adafruit_GFX_Library/glcdfont.c
 ```
 
-## 목업과 실제 펌웨어의 차이
+## 펌웨어 UI를 돌리는 방식
 
-목업은 `docs/UI.md`의 **설계**를 따릅니다. 현재 `app.ino`와 다른 점:
+`FirmwareUi`는 `app.ino`가 보드에서 하는 일을 PC에서 똑같이 합니다.
 
-- 숫자 서식 `%9.4f`(코드는 `%10.5f`), 메뉴 문자열 `2Status-GPS`처럼 공백 없음.
-- `4 Status-Mag/Alt`에 HEAD(지자기 방위)와 온도를 함께 표시.
-- `5 Status-IMUCalib`은 `6 Do IMU Calib.`의 Gyro Bias 보정 결과를 보여줌. Acc Bias/Scale, Gyro Scale은 "Not implemented" 화면.
-- `7 Att.Estimator`는 13항목 스크롤 목록 + Exit. R/Q/K는 고정 예시 값.
-- `8 Health`의 시간, `9 Axis for Moon`의 달 R.A./DEC.는 고정 예시 값.
-- 하위 화면 전환은 클릭한 그 프레임에 바로 그려짐(펌웨어는 다음 프레임).
-- RRcmd는 로터리 1틱 = 1, 값이 곧 PWM 듀티(부호 = 방향), ±255로 제한.
+| `app.ino` | 시뮬레이터 (`runner/firmware_ui.cpp`) |
+|---|---|
+| `setup()`의 부팅 로그 | 같은 문구를 3프레임마다 한 줄씩 보여 주고 10프레임 유지 (`setup()`은 하드웨어 라이브러리 때문에 PC에서 빌드되지 않아 문구만 옮김). 부팅 중 회전·클릭은 버림 |
+| `rotary.count()` 차이, `takeClick()` | 프로토콜 `input`을 모은 값 |
+| `updateTelemetry()` | 가짜 센서 값 → `Telemetry` (롤/피치는 `rollFromAccelDeg`/`pitchFromAccelDeg`). Health 시간은 보드에서 잰 듯한 고정 값 |
+| `ui.step(delta, click, ctx, frame)` | 그대로 호출, `Frame.lines`를 응답 8줄로 |
+| `ra_motor.setSpeed(ra_speed_cmd)` | `RaMotor::toOutput(ra_speed_cmd)` → IN1/IN2/PWM |
 
-## 실제 펌웨어 UI 연결하기 (예정)
+빌드에 쓰는 펌웨어 소스와 include 경로는 `sources.sh`에 있습니다. `Arduino.h`는 이 폴더의 `stubs/`(핀 함수는 빈 함수)를 씁니다. `Arduino/test/stubs`는 단위 테스트용이라 따로 둡니다. 펌웨어 UI에 화면이나 소스 파일이 늘면 `sources.sh`의 `FIRMWARE_SRCS`에 추가하고 `tests/test_menu.cpp`의 기대 화면을 맞춥니다.
 
-1. `runner/firmware_ui.cpp`에 `sim::UiBackend`를 구현합니다. `begin()`에서 화면 관리자를 만들고, `frame()`에서 `InputSnapshot`·`SensorState`를 펌웨어가 읽는 형태(Rotary 카운트/클릭, GPS·IMU 값)로 넘긴 뒤 `msg[8][22]`를 `Frame`으로, 모터 핀 상태를 `MotorOutput`으로 복사합니다.
-2. 펌웨어 헤더에 필요한 호스트 스텁(`Arduino.h` 등)은 이 폴더의 `stubs/`에 따로 둡니다(`Arduino/test/stubs`는 단위 테스트 전용).
-3. `runner/backends.cpp`의 `createBackend()`에 등록하고 `build.sh`에 펌웨어 소스 경로를 추가합니다.
-4. GUI는 그대로 두고 `python gui/simulator.py --backend firmware`로 실행합니다(러너에 `--backend firmware`가 전달됨).
+재부팅(`reset`)하면 `TelescopeUi`와 `UiContext`를 새로 만들어 전원을 다시 켠 것처럼 처음부터 시작합니다.

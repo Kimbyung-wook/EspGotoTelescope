@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
-# Build and run the runner's menu/protocol tests (host, MinGW g++ C++14).
+# Build and run the runner's menu/protocol tests against the real firmware UI.
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
+source "$HERE/sources.sh"
 OUT="${UI_SIM_OUT:-$HERE/build}"
 mkdir -p "$OUT"
 CXX="${CXX:-g++}"
@@ -10,6 +11,6 @@ SRCS=()
 for f in "$HERE"/runner/*.cpp; do
   [ "$(basename "$f")" = "main.cpp" ] || SRCS+=("$f")
 done
-"$CXX" -std=c++14 -Wall -Wextra -Wno-unused-parameter -Wno-format-nonliteral \
-  -I "$HERE/runner" "$HERE"/tests/test_*.cpp "${SRCS[@]}" -o "$OUT/ui_tests.exe"
+"$CXX" "${CXXFLAGS[@]}" "${INCLUDES[@]}" \
+  "$HERE"/tests/test_*.cpp "${SRCS[@]}" "${FIRMWARE_SRCS[@]}" -o "$OUT/ui_tests.exe"
 "$OUT/ui_tests.exe"

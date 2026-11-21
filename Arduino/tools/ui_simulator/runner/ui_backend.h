@@ -2,9 +2,9 @@
 //
 // The runner (protocol.cpp) owns time, input accumulation and sensor values.
 // A backend only turns them into a frame of text and a motor output.
-// Today the backend is MockUi (mock_ui.cpp, a stand-in following docs/UI.md).
-// Later a FirmwareUi backend can wrap the real Screen/ScreenManager code from
-// Arduino/app/src with host stubs, and be selected with `--backend firmware`.
+// The backend is FirmwareUi (firmware_ui.cpp), which runs the real
+// TelescopeUi from Arduino/app/src/ui. Another UI can be plugged in by
+// implementing this interface and registering it in backends.cpp.
 #pragma once
 #include "sim_types.h"
 
@@ -14,7 +14,7 @@ class UiBackend {
  public:
   virtual ~UiBackend() {}
 
-  // Short name reported in the "hello" message, e.g. "mock".
+  // Short name reported in the "hello" message, e.g. "firmware".
   virtual const char* name() const = 0;
 
   // Power-on: start the boot sequence (like setup()). Called once at start

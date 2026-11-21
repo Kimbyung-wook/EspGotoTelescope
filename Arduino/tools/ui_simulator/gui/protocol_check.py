@@ -13,11 +13,11 @@ import sys
 import oled_render
 from runner_client import DEFAULT_RUNNER, RunnerClient
 
-TITLES = ["*1RA Speed", "*2Status-GPS", "*3Status-Acc/Gyro", "*4Status-Mag/Alt",
-          "*5Status-IMUCalib", "*6Do IMU Calib.", "*7Att.Estimator", "*8Health",
-          "*9Axis for Moon", "(Sleep)"]
-# rotations from the first row to Exit/Quit; None = info screen (click leaves)
-EXIT_ROTATE = [2, None, None, None, None, 4, 12, None, None, None]
+TITLES = ["*1RA Speed", "*2Status - GPS", "*3Status - Acc/Gyro", "*4Status - Mag/Alt",
+          "*5Status - IMUCalib", "*6Do IMU Calib.", "*7Att.Estimator", "*8Health",
+          "*9Axis for Moon", " "]   # Sleep blanks the title line
+# rotations from the first row to Quit; None = info screen (click leaves)
+EXIT_ROTATE = [2, None, None, None, None, 5, None, None, None, None]
 
 failures = 0
 verbose = False
@@ -54,6 +54,7 @@ def main():
     try:
         check(c.hello["version"] == 1 and c.hello["lines"] == 8 and c.hello["cols"] == 21,
               "hello: version 1, 8x21")
+        check(c.hello["backend"] == "firmware", "backend is the firmware UI")
 
         f = c.step()
         check(f["lines"][0] == "1. Display is ON", "boot starts with display line", f)
@@ -101,8 +102,8 @@ def main():
         c.rotate(2); c.step()
         c.click()
         f = c.step()
-        check(f["lines"][0] == "T 23:59:58.9 V12.60", "status bar shows GPS time", f)
-        check(f["lines"][7] == "Wz     -12.5000 dps", "Wz on Acc/Gyro screen", f)
+        check(f["lines"][0] == "T 23:59:58.9 V 12.60", "status bar shows GPS time", f)
+        check(f["lines"][7] == "Wz     -12.50000 dps", "Wz on Acc/Gyro screen", f)
         c.click(); c.step()
 
         # reset with failing devices

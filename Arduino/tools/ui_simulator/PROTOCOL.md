@@ -43,15 +43,15 @@ GUI(`gui/simulator.py`)와 UI 러너(`build/ui_runner.exe`)가 주고받는 메�
 시작하자마자 `hello`를 한 번 보냅니다.
 
 ```json
-{"type":"hello","version":1,"backend":"mock","lines":8,"cols":21,"frame_ms":100}
+{"type":"hello","version":1,"backend":"firmware","lines":8,"cols":21,"frame_ms":100}
 ```
 
 `tick`마다 `frame`을 보냅니다.
 
 ```json
 {"type":"frame","seq":34,"t_ms":3400,
- "lines":["T 12:00:03.4 V12.60","Main Menu",">1RA Speed"," 2Status-GPS"," 3Status-Acc/Gyro"," 4Status-Mag/Alt"," 5Status-IMUCalib"," 6Do IMU Calib."],
- "motor":{"in1":0,"in2":0,"pwm":120}}
+ "lines":["T 12: 0: 3.4 V 12.60","Main Menu",">1RA Speed"," 2Status - GPS"," 3Status - Acc/Gyro"," 4Status - Mag/Alt"," 5Status - IMUCalib"," 6Do IMU Calib."],
+ "motor":{"in1":0,"in2":0,"pwm":0}}
 ```
 (실제로는 한 줄입니다.)
 
@@ -92,4 +92,4 @@ class UiBackend {
 ```
 
 - `InputSnapshot.count`는 부팅 뒤 누적 회전 수(`Rotary::count()`), `clicks`는 직전 프레임 뒤 클릭 수(`Rotary::takeClick()`는 `clicks > 0`).
-- 지금은 `MockUi`(`runner/mock_ui.*`, `docs/UI.md` 기반 목업)만 있습니다. 실제 펌웨어 UI(`Screen`/`ScreenManager`)가 생기면 이를 감싸는 백엔드를 추가하고 `runner/backends.cpp`의 `createBackend()`에 등록한 뒤 `ui_runner --backend 이름`으로 고릅니다. 프로토콜과 GUI는 바꿀 필요가 없습니다.
+- 구현은 `FirmwareUi`(`runner/firmware_ui.*`, 백엔드 이름 `firmware`, 기본값) 하나로, 실제 펌웨어 `TelescopeUi::step()`을 10 Hz 프레임마다 호출합니다. 다른 UI를 붙이려면 `UiBackend`를 구현해 `runner/backends.cpp`의 `createBackend()`에 등록하고 `ui_runner --backend 이름`(GUI는 `simulator.py --backend 이름`)으로 고릅니다. 프로토콜과 GUI는 바꿀 필요가 없습니다.

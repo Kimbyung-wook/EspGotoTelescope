@@ -106,10 +106,37 @@ private:
   GyroBiasCalibScreen gyro_bias_;
 };
 
-// Main menu with 10 items in a 6-line scroll window
+// Planet Tracking : position of the chosen target, tracking on/off
+class TargetScreen : public Screen {
+public:
+  TargetScreen() : cursor_(2) {}
+  void onEnter(UiContext& /*ctx*/) override { cursor_.reset(); }
+  void onRotate(int delta, UiContext& /*ctx*/) override { cursor_.move(delta); }
+  void onClick(ScreenManager& mgr, UiContext& ctx) override;
+  void render(Frame& f, const UiContext& ctx, char blink) override;
+private:
+  MenuCursor cursor_;   // 0 Track on/off, 1 Back
+};
+
+// Planet Tracking menu : Moon, Mercury .. Saturn, Quit (scrolls)
+class TargetMenuScreen : public Screen {
+public:
+  static const int ITEMS = 7;
+  explicit TargetMenuScreen(const char* title) : title_(title), cursor_(ITEMS) {}
+  void onEnter(UiContext& ctx) override;
+  void onRotate(int delta, UiContext& /*ctx*/) override { cursor_.move(delta); }
+  void onClick(ScreenManager& mgr, UiContext& ctx) override;
+  void render(Frame& f, const UiContext& ctx, char blink) override;
+private:
+  const char* title_;
+  MenuCursor cursor_;
+  TargetScreen target_;
+};
+
+// Main menu with 11 items in a 6-line scroll window
 class MainMenuScreen : public Screen {
 public:
-  static const int ITEMS = 10;
+  static const int ITEMS = 11;
   MainMenuScreen(const char* const labels[ITEMS], Screen* const targets[ITEMS]);
   void onRotate(int delta, UiContext& /*ctx*/) override { cursor_.move(delta); }
   void onClick(ScreenManager& mgr, UiContext& ctx) override;

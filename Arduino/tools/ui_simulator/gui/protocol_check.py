@@ -15,9 +15,9 @@ from runner_client import DEFAULT_RUNNER, RunnerClient
 
 TITLES = ["*1RA Speed", "*2Status - GPS", "*3Status - Acc/Gyro", "*4Status - Mag/Alt",
           "*5Status - IMUCalib", "*6Do IMU Calib.", "*7Att.Estimator", "*8Health",
-          "*9Axis for Moon", " "]   # Sleep blanks the title line
+          "*9Axis for Moon", "*10Planet Tracking", " "]   # Sleep blanks the title line
 # rotations from the first row to Quit; None = info screen (click leaves)
-EXIT_ROTATE = [2, None, None, None, None, 5, None, None, None, None]
+EXIT_ROTATE = [2, None, None, None, None, 5, None, None, None, 5, None]
 
 failures = 0
 verbose = False

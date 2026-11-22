@@ -69,10 +69,10 @@ void expectScreen(Sim& s, const char* const (&pat)[7], int src_line) {
 }
 #define EXPECT_SCREEN(s, ...) do { const char* const _p[7] = __VA_ARGS__; expectScreen(s, _p, __LINE__); } while (0)
 
-const char* const kItems[10] = {
+const char* const kItems[11] = {
   "1RA Speed", "2Status - GPS", "3Status - Acc/Gyro", "4Status - Mag/Alt",
   "5Status - IMUCalib", "6Do IMU Calib.", "7Att.Estimator", "8Health",
-  "9Axis for Moon", "Sleep",
+  "9Axis for Moon", "10Planet Tracking", "Sleep",
 };
 
 /******************************************************************/
@@ -143,11 +143,11 @@ void test_main_menu_scrolls() {
   EXPECT_SCREEN(s, {"Main Menu", " 2Status - GPS", " 3Status - Acc/Gyro", " 4Status - Mag/Alt",
                     " 5Status - IMUCalib", " 6Do IMU Calib.", "?7Att.Estimator"});
   s.rotate(10);  // clamps at the last item
-  EXPECT_SCREEN(s, {"Main Menu", " 5Status - IMUCalib", " 6Do IMU Calib.", " 7Att.Estimator",
-                    " 8Health", " 9Axis for Moon", "?Sleep"});
+  EXPECT_SCREEN(s, {"Main Menu", " 6Do IMU Calib.", " 7Att.Estimator", " 8Health",
+                    " 9Axis for Moon", " 10Planet Tracking", "?Sleep"});
   s.rotate(-1);  // the selected item stays on the bottom row while scrolling back
-  EXPECT_LINE(s, 2, " 4Status - Mag/Alt");
-  EXPECT_LINE(s, 7, "?9Axis for Moon");
+  EXPECT_LINE(s, 2, " 5Status - IMUCalib");
+  EXPECT_LINE(s, 7, "?10Planet Tracking");
   s.rotate(-20);
   EXPECT_LINE(s, 2, "?1RA Speed");
 }
@@ -155,12 +155,14 @@ void test_main_menu_scrolls() {
 // Every main menu item can be entered and left; the cursor comes back to it.
 void test_enter_and_leave_every_screen() {
   struct Item { const char* title; int exit_rotate; };   // rotations to Quit; -1 = click leaves
-  const Item items[10] = {
+  const Item items[11] = {
     {"*1RA Speed", 2}, {"*2Status - GPS", -1}, {"*3Status - Acc/Gyro", -1},
     {"*4Status - Mag/Alt", -1}, {"*5Status - IMUCalib", -1}, {"*6Do IMU Calib.", 5},
-    {"*7Att.Estimator", -1}, {"*8Health", -1}, {"*9Axis for Moon", -1}, {" ", -1},
+    {"*7Att.Estimator", -1}, {"*8Health", -1}, {"*9Axis for Moon", -1},
+    {"*10Planet Tracking", 5},   // cursor starts on Mercury (1); Quit is item 6
+    {" ", -1},
   };
-  for (int k = 0; k < 10; k++) {
+  for (int k = 0; k < 11; k++) {
     Sim s;
     s.boot();
     s.rotate(k);
@@ -388,16 +390,39 @@ void test_att_estimator_uses_gyro_bias() {
   EXPECT_LINE(s, 7, "Wz        0.00000 DPS");
 }
 
-void test_sleep_and_health() {
+// Planet Tracking with the default GPS (2026-11-21 12:00:00 UT, Seoul); values from targetState().
+// RA_DUTY_AT_SIDEREAL is 0 (not calibrated), so tracking must not move the motor.
+void test_planet_tracking() {
   Sim s;
   s.boot();
   s.rotate(9);
+  s.click();
+  EXPECT_LINE(s, 1, "*10Planet Tracking");
+  EXPECT_LINE(s, 3, "?Mercury");
+  s.rotate(2);
+  s.click();
+  s.tick(1);
+  EXPECT_SCREEN(s, {"*Mars", "R.A.   151.06717 DEG", "DEC.    14.04876 DEG", "ALT -28.09 AZ  40.75",
+                    "HA -143.586 D  1.2602", "?Track OFF 15.0234\"/s", " Back"});
+  s.click();   // Track on
+  EXPECT_LINE(s, 6, "?Track ON  15.0234\"/s");
+  EXPECT_LINE(s, 7, " Back   (RA uncal)");
+  CHECK(s.motor().pwm == 0);
+  s.rotate(1);
+  s.click();   // Back to the target list
+  EXPECT_LINE(s, 5, "?Mars     TRACKING");
+}
+
+void test_sleep_and_health() {
+  Sim s;
+  s.boot();
+  s.rotate(10);
   s.click();
   EXPECT_SCREEN(s, {" ", " ", " ", " ", " ", " ", " "});
   EXPECT_LINE(s, 0, "T 12: 0: 0.0 V 12.60");   // status bar stays
   s.click();
   EXPECT_LINE(s, 7, "?Sleep");
-  s.rotate(-2);
+  s.rotate(-3);
   s.click();
   EXPECT_SCREEN(s, {"*8Health", "Loop 100000/ 10.0Hz", "MAIN  24300", "DISP  21800",
                     "GPS     650", "IMU    1250", "EST     180 AST  4000"});
@@ -431,7 +456,7 @@ int main() {
     T(test_enter_and_leave_every_screen), T(test_ra_speed_edit_drives_motor),
     T(test_gps_screen_shows_sensor_values), T(test_imu_screens), T(test_do_imu_calib_menu),
     T(test_gyro_bias_calibration), T(test_att_estimator_converges),
-    T(test_att_estimator_uses_gyro_bias), T(test_sleep_and_health), T(test_protocol_messages),
+    T(test_att_estimator_uses_gyro_bias), T(test_sleep_and_health), T(test_planet_tracking), T(test_protocol_messages),
 #undef T
   };
   for (auto& t : tests) {

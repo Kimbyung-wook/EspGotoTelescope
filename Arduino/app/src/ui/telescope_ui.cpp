@@ -10,6 +10,7 @@ static const char* const MAIN_MENU_LABELS[MainMenuScreen::ITEMS] = {
   "7Att.Estimator",
   "8Health",
   "9Axis for Moon",
+  "10Planet Tracking",
   "Sleep",
 };
 
@@ -23,8 +24,9 @@ TelescopeUi::TelescopeUi()
     att_est_(MAIN_MENU_LABELS[6]),
     health_(MAIN_MENU_LABELS[7]),
     moon_axis_(MAIN_MENU_LABELS[8]),
+    target_menu_(MAIN_MENU_LABELS[9]),
     targets_{&ra_speed_, &gps_, &acc_gyro_, &mag_temp_, &imu_calib_status_,
-             &imu_calib_menu_, &att_est_, &health_, &moon_axis_, &sleep_},
+             &imu_calib_menu_, &att_est_, &health_, &moon_axis_, &target_menu_, &sleep_},
     main_(MAIN_MENU_LABELS, targets_),
     mgr_(&main_) {}
 

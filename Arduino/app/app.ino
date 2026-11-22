@@ -16,7 +16,7 @@
 #include "src/sensors/imu.h"
 #include "src/motor/ra_motor.h"
 #include "src/estimation/attitude_estimator.h"
-#include "src/astro/moon_telemetry.h"
+#include "src/astro/target_telemetry.h"
 #include "src/ui/telescope_ui.h"
 
 /************************************/
@@ -33,7 +33,8 @@ Rotary  rotary(BUTTON_S1, BUTTON_S2, BUTTON_KEY);
 /************************************/
 AttitudeEstimator att_est;
 const float       ATT_EST_TAU_S = 1.0f;  // complementary filter crossover
-astro::MoonTracker moon_tracker(1000);   // Moon position once per second (double math, a few ms)
+astro::TargetTracker moon_tracker(astro::Target::Moon, 1000);     // 9Axis for Moon, once per second
+astro::TargetTracker target_tracker(astro::Target::Mercury, 1000); // 10Planet Tracking, once per second
 
 /************************************/
 // UI
@@ -165,10 +166,12 @@ void loop() {
   ui_ctx.tel.roll_est_deg  = att_est.rollDeg();
   ui_ctx.tel.pitch_est_deg = att_est.pitchDeg();
 
-  // Moon position (only on the frames where the 1 s period has passed)
+  // Moon and tracking target (each only on the frames where its 1 s period has passed)
   perform_astro.tic();
-  const bool astro_ran = astro::updateMoonTelemetry(moon_tracker, ui_ctx.tel);
+  bool astro_ran = astro::updateMoonTelemetry(moon_tracker, ui_ctx.tel);
+  astro_ran |= astro::updateTargetTelemetry(target_tracker, ui_ctx.state.track_target, ui_ctx.tel);
   if (astro_ran) perform_astro.toc();
+  ui_ctx.tel.ra_calibrated = RA_DUTY_AT_SIDEREAL > 0.0f;
 
   // UI -> display
   frame.clear();
@@ -176,7 +179,8 @@ void loop() {
   memcpy(monitor->msg, frame.lines, sizeof(frame.lines));
   monitor->print();
 
-  // Outputs
+  // Outputs (tracking overrides the manual RRcmd while it is on)
+  astro::applyTracking(ui_ctx.tel, ui_ctx.state, RA_DUTY_AT_SIDEREAL);
   ra_motor.setSpeed(ui_ctx.state.ra_speed_cmd);
 
   perform_main.toc();

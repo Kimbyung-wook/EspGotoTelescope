@@ -26,6 +26,7 @@ private:
   AttEstScreen         att_est_;
   HealthScreen         health_;
   MoonAxisScreen       moon_axis_;
+  TargetMenuScreen     target_menu_;
   SleepScreen          sleep_;
   Screen* targets_[MainMenuScreen::ITEMS];
   MainMenuScreen main_;

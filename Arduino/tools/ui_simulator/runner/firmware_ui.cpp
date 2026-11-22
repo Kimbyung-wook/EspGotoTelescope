@@ -5,7 +5,7 @@
 #include <cstring>
 
 // Firmware (read-only, include path Arduino/app/src)
-#include "astro/moon_telemetry.h"
+#include "astro/target_telemetry.h"
 #include "estimation/attitude_estimator.h"
 #include "motor/ra_motor.h"
 #include "sensors/imu_data.h"
@@ -86,7 +86,8 @@ void FirmwareUi::begin(const BootConfig& boot, const SensorState&) {
   ui_.reset(new TelescopeUi());
   ctx_.reset(new UiContext());
   att_est_.reset(new AttitudeEstimator());
-  moon_tracker_.reset(new astro::MoonTracker(1000));
+  moon_tracker_.reset(new astro::TargetTracker(astro::Target::Moon, 1000));
+  target_tracker_.reset(new astro::TargetTracker(astro::Target::Mercury, 1000));
   att_est_->begin(kAttEstTauS, kFrameMs / 1000.0f);   // end of setup()
 }
 
@@ -118,6 +119,8 @@ void FirmwareUi::frame(unsigned long now_ms, const InputSnapshot& input,
   ctx_->tel.roll_est_deg = att_est_->rollDeg();
   ctx_->tel.pitch_est_deg = att_est_->pitchDeg();
   astro::updateMoonTelemetry(*moon_tracker_, ctx_->tel);
+  astro::updateTargetTelemetry(*target_tracker_, ctx_->state.track_target, ctx_->tel);
+  ctx_->tel.ra_calibrated = kRaDutyAtSidereal > 0.0f;
 
   ::Frame f;   // the firmware's frame type
   ui_->step(delta, input.clicked(), *ctx_, f);
@@ -127,6 +130,7 @@ void FirmwareUi::frame(unsigned long now_ms, const InputSnapshot& input,
     out.lines[i][kCols] = '\0';
   }
 
+  astro::applyTracking(ctx_->tel, ctx_->state, kRaDutyAtSidereal);
   ::MotorOutput m = RaMotor::toOutput(ctx_->state.ra_speed_cmd);
   motor.in1 = m.in1;
   motor.in2 = m.in2;

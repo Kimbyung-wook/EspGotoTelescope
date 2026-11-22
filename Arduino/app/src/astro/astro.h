@@ -6,7 +6,9 @@
 // Methods (see docs/MOON_POSITION.md):
 //   Moon   : Schlyter low-precision elements + 12/5/2 perturbation terms (~2' error)
 //   Sun    : Schlyter elements (~1')
-//   Planets: Standish (JPL) J2000 Keplerian elements, valid 1800-2050 (J2000 frame)
+//   Planets: Standish (JPL) J2000 Keplerian elements, valid 1800-2050, then
+//            light-time and precession to the equinox of date (~1' Venus/Mars,
+//            several ' for Jupiter/Saturn from the element accuracy)
 //   GMST   : IAU 1982 formula
 //   Topocentric Moon: vector subtraction of the observer position (WGS84)
 //
@@ -56,6 +58,11 @@ struct Observer {
 
 enum class Planet { Mercury, Venus, Earth, Mars, Jupiter, Saturn };
 
+// Things the telescope can point at and track. The order is used by the UI.
+enum class Target { Moon, Mercury, Venus, Mars, Jupiter, Saturn };
+constexpr int TARGET_COUNT = 6;
+const char* targetName(Target t);
+
 // ---- time
 double julianDate(const UtcTime& t);           // Gregorian calendar -> JD (UT)
 inline double ttFromUt(double jd_ut) { return jd_ut + DELTA_T_S / 86400.0; }
@@ -75,24 +82,33 @@ Equatorial moonGeocentric(double jd_tt);
 
 // Heliocentric ecliptic J2000 position in AU (x, y, z).
 void planetHeliocentric(Planet p, double jd_tt, double xyz[3]);
-// Geocentric equatorial J2000 RA/Dec, distance in AU.
+// Geocentric equatorial J2000 RA/Dec, distance in AU (geometric, no light-time).
 Equatorial planetGeocentric(Planet p, double jd_tt);
+// Geocentric RA/Dec of date, corrected for light-time, distance in AU.
+Equatorial planetApparent(Planet p, double jd_tt);
+// Precession J2000 -> mean equinox of date (Meeus 21.4).
+Equatorial precessFromJ2000(const Equatorial& q, double jd_tt);
 
 // ---- observer
 // Geocentric -> topocentric (parallax). geo.dist must be in Earth radii.
 Equatorial topocentric(const Equatorial& geo, double lst_deg, const Observer& obs);
 Horizontal toHorizontal(double ha_deg, double dec_deg, double lat_deg);
 
-// Everything the Moon screen and the RA motor need, from one UT instant.
-struct MoonState {
-  Equatorial geo;        // geocentric (Earth radii)
-  Equatorial topo;       // as seen from the observer
+// Everything a pointing/tracking screen and the RA motor need, from one UT instant.
+struct TargetState {
+  Equatorial geo;        // geocentric, of date (Moon: Earth radii, planets: AU)
+  Equatorial topo;       // as seen from the observer (same distance unit)
   double lst_deg;
   double ha_deg;         // topocentric hour angle, -180..180
   Horizontal hor;
   double ha_rate_arcsec_s;   // RA-axis tracking rate (sidereal ~15.04, Moon ~14.5)
   double dec_rate_arcsec_s;
 };
-MoonState moonState(double jd_ut, const Observer& obs);
+TargetState targetState(Target target, double jd_ut, const Observer& obs);
+
+using MoonState = TargetState;
+inline MoonState moonState(double jd_ut, const Observer& obs) {
+  return targetState(Target::Moon, jd_ut, obs);
+}
 
 }  // namespace astro

@@ -58,6 +58,12 @@ const Elements kPlanets[] = {
    {-0.00301530, -0.00036762, 6.11, -1591.05, -1948.89, 4401052.95}},     // Saturn
 };
 constexpr double OBLIQUITY_J2000 = 23.43928;
+constexpr double AU_KM = 149597870.7;
+constexpr double EARTH_RADIUS_KM = 6378.137;
+constexpr double EARTH_RADII_PER_AU = AU_KM / EARTH_RADIUS_KM;
+constexpr double LIGHT_DAYS_PER_AU = 0.0057755183;   // 499.005 s
+
+const char* const kTargetNames[TARGET_COUNT] = {"Moon", "Mercury", "Venus", "Mars", "Jupiter", "Saturn"};
 
 }  // namespace
 
@@ -204,6 +210,44 @@ Equatorial planetGeocentric(Planet p, double jd_tt) {
   return eclipticToEquatorial(lon, lat, dist, OBLIQUITY_J2000);
 }
 
+Equatorial precessFromJ2000(const Equatorial& q, double jd_tt) {
+  const double T = (jd_tt - JD_J2000) / 36525.0;
+  const double zeta = (2306.2181 + (0.30188 + 0.017998 * T) * T) * T / 3600.0;
+  const double z = (2306.2181 + (1.09468 + 0.018203 * T) * T) * T / 3600.0;
+  const double theta = (2004.3109 - (0.42665 + 0.041833 * T) * T) * T / 3600.0;
+  const double cd = cosd(q.dec_deg), sd = sind(q.dec_deg);
+  const double az = q.ra_deg + zeta;
+  const double A = cd * sind(az);
+  const double B = cosd(theta) * cd * cosd(az) - sind(theta) * sd;
+  const double C = sind(theta) * cd * cosd(az) + cosd(theta) * sd;
+  Equatorial r;
+  r.ra_deg = wrap360(atan2(A, B) * R2D + z);
+  r.dec_deg = asin(C) * R2D;
+  r.dist = q.dist;
+  return r;
+}
+
+Equatorial planetApparent(Planet p, double jd_tt) {
+  // Light-time: the planet is seen where it was dist/c ago (two passes are plenty).
+  double ea[3], pl[3];
+  planetHeliocentric(Planet::Earth, jd_tt, ea);
+  double tau = 0.0, x = 0, y0 = 0, z0 = 0;
+  for (int k = 0; k < 2; k++) {
+    planetHeliocentric(p, jd_tt - tau, pl);
+    x = pl[0] - ea[0]; y0 = pl[1] - ea[1]; z0 = pl[2] - ea[2];
+    tau = sqrt(x * x + y0 * y0 + z0 * z0) * LIGHT_DAYS_PER_AU;
+  }
+  const double dist = sqrt(x * x + y0 * y0 + z0 * z0);
+  const double lon = atan2(y0, x) * R2D;
+  const double lat = atan2(z0, sqrt(x * x + y0 * y0)) * R2D;
+  return precessFromJ2000(eclipticToEquatorial(lon, lat, dist, OBLIQUITY_J2000), jd_tt);
+}
+
+const char* targetName(Target t) {
+  const int i = static_cast<int>(t);
+  return (i >= 0 && i < TARGET_COUNT) ? kTargetNames[i] : "?";
+}
+
 Equatorial topocentric(const Equatorial& geo, double lst_deg, const Observer& obs) {
   // Observer position in Earth equatorial radii (WGS84, Meeus ch. 11).
   constexpr double F = 1.0 / 298.257223563;
@@ -234,16 +278,34 @@ Horizontal toHorizontal(double ha_deg, double dec_deg, double lat_deg) {
 }
 
 namespace {
-Equatorial moonTopoAt(double jd_ut, const Observer& obs, double* lst_out) {
+Planet planetOf(Target t) {
+  switch (t) {
+    case Target::Mercury: return Planet::Mercury;
+    case Target::Venus:   return Planet::Venus;
+    case Target::Mars:    return Planet::Mars;
+    case Target::Jupiter: return Planet::Jupiter;
+    default:              return Planet::Saturn;
+  }
+}
+
+// Geocentric RA/Dec of date. dist in Earth radii (for the parallax step).
+Equatorial geocentricEr(Target t, double jd_tt) {
+  if (t == Target::Moon) return moonGeocentric(jd_tt);
+  Equatorial q = planetApparent(planetOf(t), jd_tt);
+  q.dist *= EARTH_RADII_PER_AU;
+  return q;
+}
+
+Equatorial topoAt(Target t, double jd_ut, const Observer& obs, double* lst_out) {
   const double lst = lstDeg(jd_ut, obs.lon_deg);
   if (lst_out) *lst_out = lst;
-  return topocentric(moonGeocentric(ttFromUt(jd_ut)), lst, obs);
+  return topocentric(geocentricEr(t, ttFromUt(jd_ut)), lst, obs);
 }
 }  // namespace
 
-MoonState moonState(double jd_ut, const Observer& obs) {
-  MoonState s;
-  s.geo = moonGeocentric(ttFromUt(jd_ut));
+TargetState targetState(Target target, double jd_ut, const Observer& obs) {
+  TargetState s;
+  s.geo = geocentricEr(target, ttFromUt(jd_ut));
   s.lst_deg = lstDeg(jd_ut, obs.lon_deg);
   s.topo = topocentric(s.geo, s.lst_deg, obs);
   s.ha_deg = wrap180(s.lst_deg - s.topo.ra_deg);
@@ -253,11 +315,16 @@ MoonState moonState(double jd_ut, const Observer& obs) {
   constexpr double DT_S = 30.0;
   const double dt_day = DT_S / 86400.0;
   double lst_a, lst_b;
-  const Equatorial a = moonTopoAt(jd_ut - dt_day, obs, &lst_a);
-  const Equatorial b = moonTopoAt(jd_ut + dt_day, obs, &lst_b);
+  const Equatorial a = topoAt(target, jd_ut - dt_day, obs, &lst_a);
+  const Equatorial b = topoAt(target, jd_ut + dt_day, obs, &lst_b);
   const double dha = wrap180((lst_b - b.ra_deg) - (lst_a - a.ra_deg));
   s.ha_rate_arcsec_s = dha * 3600.0 / (2.0 * DT_S);
   s.dec_rate_arcsec_s = (b.dec_deg - a.dec_deg) * 3600.0 / (2.0 * DT_S);
+
+  if (target != Target::Moon) {   // back to AU for planets
+    s.geo.dist /= EARTH_RADII_PER_AU;
+    s.topo.dist /= EARTH_RADII_PER_AU;
+  }
   return s;
 }
 

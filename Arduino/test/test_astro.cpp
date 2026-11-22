@@ -56,6 +56,51 @@ TEST(astro_venus_meeus_33a) {
   CHECK_NEAR(v.dist, 0.910947, 0.001);
 }
 
+TEST(astro_venus_apparent_meeus_33a) {
+  // with light-time and precession to date: matches Meeus' apparent place within ~1'
+  const Equatorial v = planetApparent(Planet::Venus, 2448976.5);
+  CHECK_NEAR(v.ra_deg, 316.172725, 1 * ARCMIN);
+  CHECK_NEAR(v.dec_deg, -18.888011, 1 * ARCMIN);
+  CHECK_NEAR(v.dist, 0.910947, 0.0002);
+}
+
+TEST(astro_precession_meeus_21b) {
+  // theta Persei, J2000 (proper motion applied) -> 2028-11-13.19 TD
+  const Equatorial q = precessFromJ2000({41.054063, 49.227750, 1.0}, 2462088.69);
+  CHECK_NEAR(q.ra_deg, 41.547214, 2e-5);
+  CHECK_NEAR(q.dec_deg, 49.348483, 2e-5);
+}
+
+static double separationDeg(const Equatorial& a, const Equatorial& b) {
+  const double d = 3.14159265358979 / 180.0;
+  const double c = std::sin(a.dec_deg * d) * std::sin(b.dec_deg * d) +
+                   std::cos(a.dec_deg * d) * std::cos(b.dec_deg * d) * std::cos((a.ra_deg - b.ra_deg) * d);
+  return std::acos(c > 1.0 ? 1.0 : c) / d;
+}
+
+TEST(astro_great_conjunction_2020) {
+  // Jupiter-Saturn closest on 2020-12-21 (~18 UT), 6.1' apart
+  double best = 1e9, best_jd = 0;
+  const double jd0 = julianDate({2020, 12, 14, 0, 0, 0.0});
+  for (double jd = jd0; jd < jd0 + 14.0; jd += 0.05) {
+    const double s = separationDeg(planetApparent(Planet::Jupiter, jd), planetApparent(Planet::Saturn, jd));
+    if (s < best) { best = s; best_jd = jd; }
+  }
+  CHECK_NEAR(best * 60.0, 6.1, 1.5);
+  CHECK_NEAR(best_jd, julianDate({2020, 12, 21, 18, 0, 0.0}), 1.0);
+}
+
+TEST(astro_planet_rates_near_sidereal) {
+  const Observer seoul{37.5665, 126.9780};
+  const double jd = julianDate({2026, 11, 22, 12, 0, 0.0});
+  for (int k = 1; k < TARGET_COUNT; k++) {
+    const TargetState s = targetState(static_cast<Target>(k), jd, seoul);
+    CHECK_NEAR(s.ha_rate_arcsec_s, SIDEREAL_RATE_ARCSEC_S, 0.1);   // planets move < 0.1"/s
+    CHECK(s.topo.dist > 0.2 && s.topo.dist < 12.0);                  // AU
+  }
+  CHECK_STR(targetName(Target::Jupiter), "Jupiter");
+}
+
 TEST(astro_mars_opposition_2003) {
   // Closest approach 2003-08-27 ~9:51 UT, 0.37272 AU
   const double jd = ttFromUt(julianDate({2003, 8, 27, 12, 0, 0.0}));
@@ -116,8 +161,8 @@ TEST(astro_moon_rate_matches_hour_angle_change) {
   CHECK_NEAR(a.hor.alt_deg, toHorizontal(a.ha_deg, a.topo.dec_deg, seoul.lat_deg).alt_deg, 1e-12);
 }
 
-// ---- MoonTracker / Telemetry glue
-#include "../app/src/astro/moon_telemetry.h"
+// ---- TargetTracker / Telemetry glue
+#include "../app/src/astro/target_telemetry.h"
 
 TEST(astro_utc_from_gps) {
   UtcTime u;
@@ -128,7 +173,7 @@ TEST(astro_utc_from_gps) {
 }
 
 TEST(astro_moon_tracker_period_and_fix) {
-  MoonTracker tr(1000);
+  TargetTracker tr(Target::Moon, 1000);
   UtcTime u{2026, 11, 22, 12, 0, 0.0};
   const Observer seoul{37.5665, 126.9780};
   CHECK(!tr.update(0, false, &u, seoul));               // no fix
@@ -142,7 +187,7 @@ TEST(astro_moon_tracker_period_and_fix) {
 }
 
 TEST(astro_moon_telemetry_matches_moon_state) {
-  MoonTracker tr(1000);
+  TargetTracker tr(Target::Moon, 1000);
   Telemetry t;
   t.now_ms = 5000;
   t.year = 26; t.month = 11; t.day = 22; t.hour = 12;
@@ -158,4 +203,37 @@ TEST(astro_moon_telemetry_matches_moon_state) {
   t.fixquality = 0;
   updateMoonTelemetry(tr, t);
   CHECK(!t.moon_valid);
+}
+
+TEST(astro_tracker_switches_target_immediately) {
+  TargetTracker tr(Target::Moon, 1000);
+  UtcTime u{2026, 11, 22, 12, 0, 0.0};
+  const Observer seoul{37.5665, 126.9780};
+  CHECK(tr.update(0, true, &u, seoul));
+  CHECK(!tr.update(500, true, &u, seoul));
+  tr.setTarget(Target::Mars);
+  CHECK(!tr.valid());
+  CHECK(tr.update(600, true, &u, seoul));        // no wait for the 1 s period
+  CHECK_NEAR(tr.state().topo.dist, 1.2515, 0.01);  // AU
+}
+
+TEST(astro_tracking_drives_motor_only_when_calibrated) {
+  TargetTracker tr(Target::Moon, 1000);
+  Telemetry t;
+  UiState st;
+  t.now_ms = 1000; t.year = 26; t.month = 11; t.day = 22; t.hour = 12; t.fixquality = 1;
+  t.latitude = 37.5665; t.longitude = 126.9780;
+  st.track_target = 3;   // Mars
+  CHECK(updateTargetTelemetry(tr, st.track_target, t));
+  CHECK(t.target_valid && t.target_index == 3);
+  st.ra_speed_cmd = 7.0f;
+  CHECK(!applyTracking(t, st, 100.0f));           // tracking off
+  st.tracking = true;
+  CHECK(!applyTracking(t, st, 0.0f));             // not calibrated: manual command kept
+  CHECK_NEAR(st.ra_speed_cmd, 7.0, 1e-9);
+  CHECK(applyTracking(t, st, 100.0f));
+  CHECK_NEAR(st.ra_speed_cmd, 100.0 * t.target_rate_arcsec_s / SIDEREAL_RATE_ARCSEC_S, 1e-4);
+  CHECK_NEAR(trackingDuty(SIDEREAL_RATE_ARCSEC_S, 80.0f), 80.0, 1e-4);
+  st.track_target = 4;                            // target changed, data not there yet
+  CHECK(!applyTracking(t, st, 100.0f));
 }

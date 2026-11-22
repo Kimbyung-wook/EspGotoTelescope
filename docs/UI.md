@@ -69,6 +69,8 @@ Main Menu
 ├─ 7 Att.Estimator    (상태 + 필터 파라미터, 스크롤)
 ├─ 8 Health
 ├─ 9 Axis for Moon
+├─ 10 Planet Tracking ─ Moon / Mercury / Venus / Mars / Jupiter / Saturn / Quit
+│                       └─ 대상 화면: 위치 + Track ON/OFF / Back
 └─ Sleep
 ```
 
@@ -89,6 +91,7 @@ Main Menu
  7Att.Estimator
  8Health
  9Axis for Moon
+ 10Planet Tracking
  Sleep
 ```
 6줄 스크롤 창으로 보여줍니다.
@@ -226,6 +229,38 @@ DEC.  XXXX.XXXXX DEG     DEC.         ---
 - `"/s`는 RA 축 추적 속도입니다(항성 15.041″/s, 달 평균 약 14.49″/s).
 - R.A./DEC.는 관측지 보정(시차)을 한 날짜 기준 좌표입니다. GPS 시각과 위치로 1초마다 다시 계산합니다.
 
+### 10 Planet Tracking — 행성 선택, 위치, 추적
+대상 목록 (7개, 6줄 스크롤 창). 들어가면 커서가 지금 고른 대상 위에 있습니다. 추적 중인 대상 옆에 `TRACKING`이 붙습니다.
+```
+T XX:XX:XX.X VXX.XX
+*10Planet Tracking
+ Moon
+>Mercury
+ Venus
+ Mars     TRACKING
+ Jupiter
+ Saturn
+ Quit                   ← 스크롤해서 보임
+```
+
+대상을 클릭하면 대상 화면으로 들어갑니다.
+```
+T XX:XX:XX.X VXX.XX      T XX:XX:XX.X VXX.XX
+*Mars                    *Mars
+R.A.  XXXX.XXXXX DEG     R.A.         ---
+DEC.  XXXX.XXXXX DEG     DEC.         ---
+ALT XXX.XX AZ XXX.XX        no GPS fix
+HA XXXX.XXX DXXX.XXXX
+>Track OFF XX.XXXX"/s    >Track OFF
+ Back                     Back
+```
+- R.A./DEC.는 날짜 기준 겉보기 좌표입니다(광행시간, 세차, 관측지 시차 보정). GPS 시각과 위치로 1초마다 다시 계산합니다.
+- ALT가 음수면 지평선 아래에 있다는 뜻입니다.
+- `HA`는 시간각(°), `D`는 거리입니다(행성은 AU, 달은 지구 반지름).
+- `Track`을 클릭하면 추적을 켜고 끕니다. 오른쪽 값은 RA 축 추적 속도입니다(항성 15.041″/s).
+- 추적은 화면에서 나가도 계속됩니다. 다른 대상을 고르거나 1 RA Speed에서 RRcmd를 편집하면 꺼집니다.
+- 추적이 켜져 있으면 RA 모터 지령(RRcmd)을 `RA_DUTY_AT_SIDEREAL × 추적속도 / 15.041`로 덮어씁니다. `board_config.h`의 `RA_DUTY_AT_SIDEREAL`이 0(보정 전)이면 모터를 움직이지 않고 `(RA uncal)`을 표시합니다.
+
 ### Sleep
 ```
 T XX:XX:XX.X VXX.XX
@@ -242,6 +277,7 @@ T XX:XX:XX.X VXX.XX
 | 5 IMU Calib | 바이어스 값 | 자이로 바이어스는 Gyro Bias Calib 결과를 표시하고 자이로 측정값에 적용. 가속도 바이어스는 보정 기능이 없어 0 |
 | 7 Att.Estimator | Roll/Pitch/Yaw + R/Q/K + Exit, 스크롤 | 상보필터(τ=1 s) Roll/Pitch, 가속도 기반 Roll/Pitch(aR/aP), 바이어스 보정된 Wx/Wy/Wz를 표시. Yaw와 튜닝 값은 미구현 |
 | 9 Axis for Moon | 추정 자세 + 달 RA/Dec | 롤/피치는 상보필터 값. Yaw 대신 달 고도·방위와 추적 속도. RA/Dec는 `src/astro`로 계산(GPS fix 없으면 `---`) |
+| 10 Planet Tracking | (설계에 없음) | 새로 추가. 대상 선택, 겉보기 위치, 추적 켜기/끄기. RA 모터 속도 보정값(`RA_DUTY_AT_SIDEREAL`)은 아직 0 |
 | Sleep | `(Sleep)` 표시 | 빈 화면. 디스플레이 전원은 끄지 않음. 나오면 커서가 Sleep 항목에 있음 |
 | 1 RA Speed | RRcmd/RRate 단위 DEG | RRate는 dps로 표시. RRcmd는 PWM 듀티 값 |
 

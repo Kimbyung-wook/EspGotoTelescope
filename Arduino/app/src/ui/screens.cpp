@@ -1,4 +1,5 @@
 #include "screens.h"
+#include "../astro/astro.h"
 
 /************************************/
 // Main menu
@@ -28,14 +29,14 @@ void RaSpeedScreen::onRotate(int delta, UiContext& ctx) {
   else          cursor_.move(delta);
 }
 
-void RaSpeedScreen::onClick(ScreenManager& mgr, UiContext& /*ctx*/) {
+void RaSpeedScreen::onClick(ScreenManager& mgr, UiContext& ctx) {
   if (editing_) {                          // finish editing, cursor back on RRcmd
     editing_ = false;
     cursor_.reset();
     return;
   }
   switch (cursor_.selected()) {
-    case 0: editing_ = true; break;        // RRcmd
+    case 0: editing_ = true; ctx.state.tracking = false; break;   // RRcmd : manual speed
     case 2: mgr.pop();       break;        // Quit
     default: break;                        // RRate : read only
   }
@@ -198,4 +199,65 @@ void GyroBiasCalibScreen::render(Frame& f, const UiContext& ctx, char /*blink*/)
   f.set(5, "bWx   %10.5f dps", b[0]);
   f.set(6, "bWy   %10.5f dps", b[1]);
   f.set(7, "bWz   %10.5f dps", b[2]);
+}
+
+/************************************/
+// Planet Tracking
+/************************************/
+void TargetMenuScreen::onEnter(UiContext& ctx) {
+  cursor_.reset();
+  cursor_.move(ctx.state.track_target);   // start on the current target
+}
+
+void TargetMenuScreen::onClick(ScreenManager& mgr, UiContext& ctx) {
+  const int sel = cursor_.selected();
+  if (sel >= astro::TARGET_COUNT) { mgr.pop(); return; }   // Quit
+  if (sel != ctx.state.track_target) ctx.state.tracking = false;   // new target: start stopped
+  ctx.state.track_target = sel;
+  mgr.push(&target_, ctx);
+}
+
+void TargetMenuScreen::render(Frame& f, const UiContext& ctx, char blink) {
+  f.set(1, "*%s", title_);
+  const int first = cursor_.first();
+  for (int row = 0; row < Frame::CONTENT_LINES; row++) {
+    const int i = first + row;
+    if (i >= ITEMS) { f.blank(Frame::CONTENT_FIRST + row); continue; }
+    if (i >= astro::TARGET_COUNT) {
+      f.set(Frame::CONTENT_FIRST + row, "%cQuit", cursor_.mark(i, blink));
+      continue;
+    }
+    const bool trk = ctx.state.tracking && i == ctx.state.track_target;
+    const char* name = astro::targetName(static_cast<astro::Target>(i));
+    if (trk) f.set(Frame::CONTENT_FIRST + row, "%c%-8s TRACKING", cursor_.mark(i, blink), name);
+    else     f.set(Frame::CONTENT_FIRST + row, "%c%s", cursor_.mark(i, blink), name);
+  }
+}
+
+void TargetScreen::onClick(ScreenManager& mgr, UiContext& ctx) {
+  if (cursor_.selected() == 0) ctx.state.tracking = !ctx.state.tracking;
+  else mgr.pop();
+}
+
+void TargetScreen::render(Frame& f, const UiContext& ctx, char blink) {
+  const Telemetry& t = ctx.tel;
+  const UiState& st = ctx.state;
+  f.set(1, "*%s", astro::targetName(static_cast<astro::Target>(st.track_target)));
+  const bool ok = t.target_valid && t.target_index == st.track_target;
+  if (ok) {
+    f.set(2, "R.A.  %10.5f DEG", t.target_ra_deg);
+    f.set(3, "DEC.  %10.5f DEG", t.target_dec_deg);
+    f.set(4, "ALT %6.2f AZ %6.2f", t.target_alt_deg, t.target_az_deg);
+    f.set(5, "HA %8.3f D%8.4f", t.target_ha_deg, t.target_dist);
+    f.set(6, "%cTrack %-3s %7.4f\"/s", cursor_.mark(0, blink), st.tracking ? "ON" : "OFF",
+          t.target_rate_arcsec_s);
+  } else {
+    f.set(2, "R.A.         ---");
+    f.set(3, "DEC.         ---");
+    f.set(4, "   no GPS fix");
+    f.blank(5);
+    f.set(6, "%cTrack %-3s", cursor_.mark(0, blink), st.tracking ? "ON" : "OFF");
+  }
+  f.set(7, "%cBack%s", cursor_.mark(1, blink),
+        (st.tracking && !t.ra_calibrated) ? "   (RA uncal)" : "");
 }

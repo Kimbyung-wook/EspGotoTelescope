@@ -35,6 +35,10 @@
 #define MOTOR_PWM   GPIO_D8 // speed (enable)
 #define MOTOR_IN1   GPIO_D0 // direction
 #define MOTOR_IN2   GPIO_D3 // direction
+// RRcmd (PWM duty) that turns the RA axis at the sidereal rate (15.041"/s).
+// Find it on the 1RA Speed screen by following a star. 0 = not calibrated:
+// Planet Tracking then computes the rate but does not drive the motor.
+#define RA_DUTY_AT_SIDEREAL 0.0f
 
 /************************************/
 // Devices

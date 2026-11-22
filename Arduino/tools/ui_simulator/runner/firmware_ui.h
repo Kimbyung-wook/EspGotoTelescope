@@ -9,10 +9,11 @@
 #include <memory>
 
 #include "ui_backend.h"
+#include "board_config.h"   // Arduino/app/src (only #defines)
 
 class TelescopeUi;         // Arduino/app/src/ui/telescope_ui.h
 class AttitudeEstimator;   // Arduino/app/src/estimation/attitude_estimator.h
-namespace astro { class MoonTracker; }   // Arduino/app/src/astro/moon_tracker.h
+namespace astro { class TargetTracker; }   // Arduino/app/src/astro/target_tracker.h
 struct UiContext;    // Arduino/app/src/ui/ui_context.h
 
 namespace sim {
@@ -27,6 +28,8 @@ class FirmwareUi : public UiBackend {
   static const int kBootFrames = 7 * kBootLineFrames + kBootHoldFrames;
   // ATT_EST_TAU_S in app.ino (not includable from the host build)
   static constexpr float kAttEstTauS = 1.0f;
+  // RA_DUTY_AT_SIDEREAL of board_config.h, taken from the firmware header itself
+  static constexpr float kRaDutyAtSidereal = RA_DUTY_AT_SIDEREAL;
 
   FirmwareUi();
   ~FirmwareUi() override;
@@ -48,7 +51,8 @@ class FirmwareUi : public UiBackend {
   std::unique_ptr<TelescopeUi> ui_;
   std::unique_ptr<UiContext> ctx_;
   std::unique_ptr<AttitudeEstimator> att_est_;
-  std::unique_ptr<astro::MoonTracker> moon_tracker_;
+  std::unique_ptr<astro::TargetTracker> moon_tracker_;
+  std::unique_ptr<astro::TargetTracker> target_tracker_;
   BootConfig boot_;
   int boot_frame_ = 0;
   int last_count_ = 0;

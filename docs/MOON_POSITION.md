@@ -188,13 +188,15 @@ Meeus, *Astronomical Algorithms* 예제 47.a(1992-04-12 0h)와 비교했습니�
 | 파일 | 내용 |
 |---|---|
 | `Arduino/app/src/astro/astro.{h,cpp}` | JD, GMST/LST(IAU 1982), 태양·달(Schlyter + 섭동항), 행성(Standish J2000 요소, trackingPlanet.m과 같은 값), 관측지 보정(WGS84 벡터 차), 고도·방위, `moonState()`(±30 s 중앙차분으로 추적 속도 계산) |
-| `astro/moon_tracker.h` | GPS 날짜 검사(2자리 연도 → 2000+), 1 s 주기로만 다시 계산, fix가 없으면 무효 |
-| `astro/moon_telemetry.h` | `Telemetry`의 GPS 값 → 달 값. `app.ino`와 UI 시뮬레이터가 함께 씀 |
+| `astro/target_tracker.h` | GPS 날짜 검사(2자리 연도 → 2000+), 대상(달·행성)별로 1 s 주기로만 다시 계산, 대상을 바꾸면 바로 계산, fix가 없으면 무효 |
+| `astro/target_telemetry.h` | `Telemetry`의 GPS 값 → 달 값 / 추적 대상 값, 추적 중 RA 모터 지령(`applyTracking`). `app.ino`와 UI 시뮬레이터가 함께 씀 |
 | `Arduino/test/test_astro.cpp` | PC 정확도 시험 (아래 표) |
 | `Arduino/tools/astro_bench/` | 실측 시험 스케치: 보드에서 같은 예제를 계산해 PC 값과 비교하고, 함수별 실행 시간(µs)을 Serial/OLED로 출력 |
 
 - 에페메리스 시간은 UT + ΔT(69 s, 고정)로 씁니다. ΔT를 빼먹으면 달이 약 38″(0.6′) 어긋납니다.
-- 행성은 J2000 좌표계 그대로라 세차(2026년 약 22′)가 남습니다. 지금은 달만 화면에 쓰고 행성은 시험용입니다.
+- 행성은 `planetApparent()`로 광행시간(빛이 오는 동안 행성이 움직인 만큼)과 세차(J2000 → 날짜 기준, Meeus 21.4)를 보정합니다. 장동(최대 약 17″)과 광행차(약 20″)는 넣지 않았습니다.
+- Standish 요소 자체의 오차 때문에 목성·토성은 수 분각까지 어긋날 수 있습니다. 저배율 파인더로 찾기에는 충분합니다.
+- 화면: `9 Axis for Moon`은 달만, `10 Planet Tracking`은 고른 대상(달, 수성, 금성, 화성, 목성, 토성)을 보여 줍니다. 태양은 망원경 안전 때문에 목록에 넣지 않았습니다.
 
 **PC 시험 결과 (기준값과의 차이)**
 
@@ -203,7 +205,11 @@ Meeus, *Astronomical Algorithms* 예제 47.a(1992-04-12 0h)와 비교했습니�
 | 달 Meeus 47.a (1992-04-12 0h TD) | RA 134.688470°, Dec 13.768368°, 368,409.7 km | RA −1.35′, Dec −0.24′, −327 km | 3′, 600 km |
 | 태양 Meeus 25.a | RA 198.38083°, Dec −7.78507° | 0.02′ 이하 | 2′ |
 | GMST Meeus 12.a / 12.b | 197.693195°, 128.7378734° | 1e-6° 이하 | 1e-5° |
-| 금성 Meeus 33.a (겉보기, 날짜 기준) | RA 316.172725°, Dec −18.888011° | RA +6.0′, Dec +1.7′ (세차·광행차) | 10′ |
+| 금성 Meeus 33.a, J2000 기하 위치 | RA 316.172725°, Dec −18.888011° | RA +6.0′, Dec +1.7′ (세차 미보정) | 10′ |
+| 금성 Meeus 33.a, `planetApparent` | 같음 | RA −0.07′, Dec −0.04′ | 1′ |
+| 세차 Meeus 21.b (θ Persei, 2028) | RA 41.547214°, Dec 49.348483° | 2e-5° 이하 | 2e-5° |
+| 목성·토성 대근접 2020-12-21 | 6.1′, 약 18 UT | 6.08′, 19 UT 무렵 | 1.5′, 1일 |
+| 행성 추적 속도 | 항성 속도 15.041″/s 근처 | 통과 | ±0.1″/s |
 | 화성 최근접 2003-08-27 | 0.3727 AU | 0.37293 AU | 0.002 AU |
 | 달 추적 속도 (2026-11, 서울, 6시간 간격 한 달) | 평균 14.49″/s | 통과 | ±0.05″/s, 범위 13.7–15.0 |
 
@@ -227,5 +233,5 @@ $env:SKETCH = 'tools/astro_bench'; bash Arduino/scripts/build.sh --library app/s
 
 **남은 일**
 
-- RA 모터: 추적 속도를 달 속도(`moon_rate_arcsec_s`)로 바꾸는 모드. 300:1 감속 모터의 속도 지령 환산이 필요합니다.
+- RA 모터 보정: 추적은 `RRcmd = RA_DUTY_AT_SIDEREAL × 추적속도 / 15.041`(개루프, 선형)로 모터 지령을 정합니다. `board_config.h`의 `RA_DUTY_AT_SIDEREAL`이 0이라 아직 모터는 움직이지 않습니다. 1 RA Speed 화면에서 별 하나를 따라가는 RRcmd 값을 찾아 넣어야 합니다. DC 모터는 PWM과 속도가 선형이 아니므로, 필요하면 여러 점을 측정해 표로 바꿉니다.
 - Yaw(방위) 추정이 없어 마운트가 달을 향하는지는 아직 판단하지 않습니다.

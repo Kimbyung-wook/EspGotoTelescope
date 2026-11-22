@@ -76,8 +76,8 @@ flowchart TB
 
   subgraph AST["천체 위치 (double)"]
     ASTRO["astro/astro"]
-    MTRK["astro/moon_tracker"]
-    MTEL["astro/moon_telemetry"]
+    MTRK["astro/target_tracker"]
+    MTEL["astro/target_telemetry"]
   end
 
   subgraph UI["UI"]
@@ -133,11 +133,11 @@ flowchart LR
   IMUDEV["ICM20948"] --> SEN
   SEN --> TEL["③ Telemetry 갱신<br/>imu · imu_corr(바이어스 제거)"]
   TEL --> ESTI["④ 자세 추정<br/>상보필터 τ = 1 s"]
-  ESTI --> MOON["④' 달 위치<br/>1 s마다, GPS fix 있을 때"]
+  ESTI --> MOON["④' 달 · 추적 대상 위치<br/>1 s마다, GPS fix 있을 때"]
   MOON --> UISTEP["⑤ ui.step<br/>Frame 8×21"]
   IN --> UISTEP
   UISTEP --> DISP["OLED 출력"]
-  UISTEP -- "UiState<br/>ra_speed_cmd · gyro_bias" --> OUT["⑥ 출력<br/>ra_motor.setSpeed"]
+  UISTEP -- "UiState<br/>ra_speed_cmd · gyro_bias<br/>track_target · tracking" --> OUT["⑥ 출력<br/>applyTracking → ra_motor.setSpeed"]
   UISTEP -. "gyro_bias" .-> TEL
   OUT --> WAIT["⑦ LoopTimer 대기<br/>yield()"]
 ```
@@ -172,12 +172,18 @@ classDiagram
   class GyroBiasCalibScreen
   class InfoScreen
   class GyroBiasCalibrator
+  class TargetMenuScreen
+  class TargetScreen
 
   TelescopeUi *-- ScreenManager
   TelescopeUi *-- MainMenuScreen
   TelescopeUi *-- RaSpeedScreen
   TelescopeUi *-- ImuCalibMenuScreen
   TelescopeUi *-- InfoScreen
+  TelescopeUi *-- TargetMenuScreen
+  Screen <|-- TargetMenuScreen
+  Screen <|-- TargetScreen
+  TargetMenuScreen *-- TargetScreen
   ScreenManager o-- Screen
   Screen <|-- MainMenuScreen
   Screen <|-- RaSpeedScreen

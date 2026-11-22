@@ -1,0 +1,20 @@
+Id	Description	Qty	Unit	Designators
+1	Connector, Adafruit Ultimate GPS v3, UART 115200 bps, 4 pins	1		GPS
+2	Connector, Battery pack, 3S Li-ion 12.6 V (assumed), 2 pins	1		BAT
+3	Connector, DC-DC buck, 12 V → 5 V (assumed), 4 pins	1		BUCK
+4	Connector, H-bridge motor driver, (assumed L298N style), 8 pins	1		DRV
+5	Connector, ICM20948 breakout, I2C, 4 pins	1		IMU
+6	Connector, NodeMCU v3, ESP8266 (ESP-12F), 13 pins	1		MCU
+7	Connector, RA DC geared motor, 300:1, 2 pins	1		MOT
+8	Connector, Rotary encoder, with push switch (assumed KY-040), 5 pins	1		ENC
+9	Connector, SSD1306 OLED, 128x64 I2C 0x3C, 4 pins	1		OLED
+10	Wire, 0.5 mm², bk	0	m	W_MOT, W_PWR_DRV, W_PWR_IN
+11	Wire, 0.5 mm², rd	0	m	W_MOT, W_PWR_DRV, W_PWR_IN
+12	Wire, bk	0	m	W_DRV_CTRL, W_ENC, W_GPS, W_IMU, W_OLED, W_PWR_MCU
+13	Wire, bu	0	m	W_GPS
+14	Wire, gn	0	m	W_IMU, W_OLED
+15	Wire, og	0	m	W_ENC, W_GPS, W_IMU, W_OLED
+16	Wire, rd	0	m	W_PWR_MCU
+17	Wire, vt	0	m	W_GPS
+18	Wire, wh	0	m	W_DRV_CTRL, W_ENC
+19	Wire, ye	0	m	W_IMU, W_OLED

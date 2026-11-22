@@ -1,0 +1,141 @@
+# Automatic Telescope - wiring (WireViz draft)
+#   Source of truth for MCU pins : Arduino/app/src/board_config.h
+#   Render : wireviz docs/architecture/wiring.yml   (needs Graphviz; on Korean Windows set PYTHONUTF8=1)
+#   Labels stay ASCII/English : Graphviz default font has no Hangul, and "->" breaks WireViz labels
+#
+# Assumptions to check against the real build (marked "(assumed)" in the diagram):
+#   - Power : 3S Li-ion pack (12.6 V full, the value shown on the status bar)
+#   - 12 V -> 5 V buck converter feeds NodeMCU VIN
+#   - Motor driver : generic H-bridge with EN(PWM)/IN1/IN2 (L298N style)
+#   - Rotary : KY-040 style module (CLK/DT/SW)
+
+metadata:
+  title: Automatic Telescope - Wiring (draft)
+
+options:
+  fontname: arial
+  bgcolor: WH
+  color_mode: short
+
+connectors:
+  BAT:
+    type: Battery pack
+    subtype: 3S Li-ion 12.6 V (assumed)
+    pinlabels: [V+, V-]
+
+  BUCK:
+    type: DC-DC buck
+    subtype: 12 V → 5 V (assumed)
+    pinlabels: [IN+, IN-, OUT+, OUT-]
+
+  MCU:
+    type: NodeMCU v3
+    subtype: ESP8266 (ESP-12F)
+    pinlabels: [VIN, GND, 3V3, D0, D1, D2, D3, D4, D6, D7, D8, RX, TX]
+    pincolors: [RD, BK, OG, WH, YE, GN, WH, WH, WH, WH, WH, BU, VT]
+    notes: >-
+      D3/D4 must be HIGH and D8 LOW at boot.
+      RX/TX = UART0, shared with USB (no debug print).
+
+  OLED:
+    type: SSD1306 OLED
+    subtype: 128x64 I2C 0x3C
+    pinlabels: [GND, VCC, SCL, SDA]
+
+  IMU:
+    type: ICM20948 breakout
+    subtype: I2C
+    pinlabels: [VIN, GND, SCL, SDA]
+
+  GPS:
+    type: Adafruit Ultimate GPS v3
+    subtype: UART 115200 bps
+    pinlabels: [VIN, GND, RX, TX]
+
+  ENC:
+    type: Rotary encoder
+    subtype: with push switch (assumed KY-040)
+    pinlabels: [VCC, GND, CLK, DT, SW]
+
+  DRV:
+    type: H-bridge motor driver
+    subtype: (assumed L298N style)
+    pinlabels: [VM, GND, 5V, EN, IN1, IN2, OUT1, OUT2]
+
+  MOT:
+    type: RA DC geared motor
+    subtype: "300:1"
+    pinlabels: [M+, M-]
+
+cables:
+  W_PWR_IN:
+    category: bundle
+    gauge: 0.5 mm2
+    colors: [RD, BK]
+  W_PWR_MCU:
+    category: bundle
+    colors: [RD, BK]
+  W_PWR_DRV:
+    category: bundle
+    gauge: 0.5 mm2
+    colors: [RD, BK]
+  W_OLED:
+    category: bundle
+    colors: [BK, OG, YE, GN]
+  W_IMU:
+    category: bundle
+    colors: [OG, BK, YE, GN]
+  W_GPS:
+    category: bundle
+    colors: [OG, BK, VT, BU]
+    notes: MCU TX → GPS RX, GPS TX → MCU RX
+  W_ENC:
+    category: bundle
+    colors: [OG, BK, WH, WH, WH]
+  W_DRV_CTRL:
+    category: bundle
+    colors: [BK, WH, WH, WH]
+  W_MOT:
+    category: bundle
+    gauge: 0.5 mm2
+    colors: [RD, BK]
+
+connections:
+  # Power
+  - - BAT: [V+, V-]
+    - W_PWR_IN: [1-2]
+    - BUCK: [IN+, IN-]
+  - - BUCK: [OUT+, OUT-]
+    - W_PWR_MCU: [1-2]
+    - MCU: [VIN, GND]
+  - - BAT: [V+, V-]
+    - W_PWR_DRV: [1-2]
+    - DRV: [VM, GND]
+
+  # I2C bus (shared by OLED and IMU) : D1 = SCL, D2 = SDA
+  - - MCU: [GND, 3V3, D1, D2]
+    - W_OLED: [1-4]
+    - OLED: [GND, VCC, SCL, SDA]
+  - - MCU: [3V3, GND, D1, D2]
+    - W_IMU: [1-4]
+    - IMU: [VIN, GND, SCL, SDA]
+
+  # GPS on UART0
+  - - MCU: [3V3, GND, TX, RX]
+    - W_GPS: [1-4]
+    - GPS: [VIN, GND, RX, TX]
+
+  # Rotary encoder : S1 = D6, S2 = D7, KEY = D4
+  - - MCU: [3V3, GND, D6, D7, D4]
+    - W_ENC: [1-5]
+    - ENC: [VCC, GND, CLK, DT, SW]
+
+  # Motor driver control : PWM = D8, IN1 = D0, IN2 = D3
+  - - MCU: [GND, D8, D0, D3]
+    - W_DRV_CTRL: [1-4]
+    - DRV: [GND, EN, IN1, IN2]
+
+  # Motor
+  - - DRV: [OUT1, OUT2]
+    - W_MOT: [1-2]
+    - MOT: [M+, M-]

@@ -4,6 +4,10 @@
 //   RA axis DC motor on an H-bridge
 /************************************/
 #include "src/board_config.h"
+
+#if defined(F_CPU) && F_CPU != 160000000L
+#warning "Build at 160 MHz (Arduino IDE: Tools > CPU Frequency > 160 MHz, or scripts/build.sh)"
+#endif
 #include "src/display/oled.h"
 #include "src/gps/gps.h"
 #include "src/util/tictok_us.h"
@@ -12,6 +16,7 @@
 #include "src/sensors/imu.h"
 #include "src/motor/ra_motor.h"
 #include "src/estimation/attitude_estimator.h"
+#include "src/astro/moon_telemetry.h"
 #include "src/ui/telescope_ui.h"
 
 /************************************/
@@ -28,6 +33,7 @@ Rotary  rotary(BUTTON_S1, BUTTON_S2, BUTTON_KEY);
 /************************************/
 AttitudeEstimator att_est;
 const float       ATT_EST_TAU_S = 1.0f;  // complementary filter crossover
+astro::MoonTracker moon_tracker(1000);   // Moon position once per second (double math, a few ms)
 
 /************************************/
 // UI
@@ -46,6 +52,7 @@ Tictok_us perform_main;
 Tictok_us perform_rest;
 Tictok_us perform_imu;
 Tictok_us perform_est;
+Tictok_us perform_astro;
 const float   hz             = MAIN_LOOP_HZ;
 LoopTimer     loop_timer((unsigned long)(1000000.0f / hz));
 
@@ -60,7 +67,9 @@ void setup() {
   // Display
   /************************************/
   monitor->setup_display();
-  bootLine(line, "1. Display is ON");
+  char cpu_line[DISP_LINE_ROW];
+  snprintf(cpu_line, sizeof(cpu_line), "1. Display ON %uMHz", ESP.getCpuFreqMHz());
+  bootLine(line, cpu_line);   // 160 MHz expected (Tools > CPU Frequency)
 
   /************************************/
   // IMU - ICM20948
@@ -117,6 +126,7 @@ void updateTelemetry(Telemetry& t) {
   t.lon_hemi     = g->lon;
   t.latitude     = ((double)g->latitude_fixed)  * 1E-7;
   t.longitude    = ((double)g->longitude_fixed) * 1E-7;
+  t.altitude_m   = g->altitude;
 
   t.imu           = imu.data();
   t.imu_corr      = withoutGyroBias(t.imu, ui_ctx.state.gyro_bias);
@@ -129,6 +139,7 @@ void updateTelemetry(Telemetry& t) {
   t.gps_us  = gps->perform_read.getdt();
   t.imu_us  = perform_imu.getdt();
   t.est_us  = perform_est.getdt();
+  t.astro_us = perform_astro.getdt();
 }
 
 void loop() {
@@ -153,6 +164,11 @@ void loop() {
   perform_est.toc();
   ui_ctx.tel.roll_est_deg  = att_est.rollDeg();
   ui_ctx.tel.pitch_est_deg = att_est.pitchDeg();
+
+  // Moon position (only on the frames where the 1 s period has passed)
+  perform_astro.tic();
+  const bool astro_ran = astro::updateMoonTelemetry(moon_tracker, ui_ctx.tel);
+  if (astro_ran) perform_astro.toc();
 
   // UI -> display
   frame.clear();

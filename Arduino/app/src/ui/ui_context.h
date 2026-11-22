@@ -14,7 +14,15 @@ struct Telemetry {
   int  hour = 0, minute = 0, seconds = 0, milliseconds = 0;
   int  fixquality = 0, satellites = 0;
   char lat_hemi = ' ', lon_hemi = ' ';
-  double latitude = 0.0, longitude = 0.0;   // [deg]
+  double latitude = 0.0, longitude = 0.0;   // [deg], signed (S/W negative)
+  float  altitude_m = 0.0f;                 // above mean sea level
+
+  // Moon (src/astro, recomputed about once per second while the GPS has a fix)
+  bool   moon_valid = false;
+  double moon_ra_deg = 0.0, moon_dec_deg = 0.0;   // topocentric, of date
+  double moon_ha_deg = 0.0;                       // hour angle, -180..180
+  double moon_alt_deg = 0.0, moon_az_deg = 0.0;   // az from north, east positive
+  double moon_rate_arcsec_s = 0.0;                // RA-axis tracking rate
 
   // IMU
   ImuData imu;                              // raw (gyro bias not removed)
@@ -27,7 +35,7 @@ struct Telemetry {
 
   // Health [us]
   float loop_hz = 10.0f;
-  unsigned long loop_us = 0, main_us = 0, disp_us = 0, gps_us = 0, imu_us = 0, est_us = 0;
+  unsigned long loop_us = 0, main_us = 0, disp_us = 0, gps_us = 0, imu_us = 0, est_us = 0, astro_us = 0;
 };
 
 /************************************/

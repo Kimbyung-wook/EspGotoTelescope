@@ -57,7 +57,7 @@ def main():
         check(c.hello["backend"] == "firmware", "backend is the firmware UI")
 
         f = c.step()
-        check(f["lines"][0] == "1. Display is ON", "boot starts with display line", f)
+        check(f["lines"][0] == "1. Display ON 160MHz", "boot starts with display line", f)
         for _ in range(100):
             f = c.step()
             if f["lines"][1] == "Main Menu":

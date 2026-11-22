@@ -80,7 +80,7 @@ const char* const kItems[10] = {
 void test_boot_then_main_menu() {
   Sim s;
   s.tick();
-  EXPECT_LINE(s, 0, "1. Display is ON");
+  EXPECT_LINE(s, 0, "1. Display ON 160MHz");
   EXPECT_LINE(s, 1, "");
   s.tick(sim::FirmwareUi::kBootLineFrames * 7);
   EXPECT_LINE(s, 1, "2. IMU is ON");
@@ -267,7 +267,15 @@ void test_imu_screens() {
   s.rotate(2);
   s.click();
   EXPECT_LINE(s, 1, "*9Axis for Moon");
-  EXPECT_LINE(s, 3, "PITCH   30.00001 DEG");
+  // Moon from src/astro: default GPS 2026-11-21 12:00:00 UT, Seoul (host values of moonState)
+  EXPECT_LINE(s, 4, "ALT  61.64 AZ 165.89");
+  EXPECT_LINE(s, 5, "-- Moon 14.7143\"/s");
+  EXPECT_LINE(s, 6, "R.A.    14.22977 DEG");
+  EXPECT_LINE(s, 7, "DEC.     9.86343 DEG");
+  s.send("{\"type\":\"sensors\",\"gps\":{\"fix\":0}}");
+  s.tick(1);
+  EXPECT_LINE(s, 5, "-- Moon: no GPS fix");
+  EXPECT_LINE(s, 6, "R.A.         ---");
 }
 
 void test_do_imu_calib_menu() {
@@ -392,7 +400,7 @@ void test_sleep_and_health() {
   s.rotate(-2);
   s.click();
   EXPECT_SCREEN(s, {"*8Health", "Loop 100000/ 10.0Hz", "MAIN  24300", "DISP  21800",
-                    "GPS     650", "IMU    1250", "EST     180"});
+                    "GPS     650", "IMU    1250", "EST     180 AST  4000"});
 }
 
 void test_protocol_messages() {
@@ -408,7 +416,7 @@ void test_protocol_messages() {
   s.tick(3);
   CHECK(s.replies.size() == 3);
   CHECK(s.replies[2].find("\"seq\":2,\"t_ms\":200") != std::string::npos);
-  CHECK(s.replies[0].find("\"lines\":[\"1. Display is ON\",\"\"") != std::string::npos);
+  CHECK(s.replies[0].find("\"lines\":[\"1. Display ON 160MHz\",\"\"") != std::string::npos);
   std::vector<std::string> r;
   CHECK(s.session.handleLine("{\"type\":\"quit\"}", r) == false);
 }

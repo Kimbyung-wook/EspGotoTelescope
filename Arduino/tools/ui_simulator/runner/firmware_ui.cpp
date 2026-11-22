@@ -5,6 +5,7 @@
 #include <cstring>
 
 // Firmware (read-only, include path Arduino/app/src)
+#include "astro/moon_telemetry.h"
 #include "estimation/attitude_estimator.h"
 #include "motor/ra_motor.h"
 #include "sensors/imu_data.h"
@@ -16,7 +17,7 @@ namespace {
 
 // Same lines as setup() in Arduino/app/app.ino (ICM20948 set to 16G/250dps/10Hz).
 void bootLines(const BootConfig& boot, const char* out[8]) {
-  out[0] = "1. Display is ON";
+  out[0] = "1. Display ON 160MHz";   // ESP.getCpuFreqMHz() at 160 MHz
   out[1] = boot.imu_ok ? "2. IMU is ON" : ">> IMU failed";
   out[2] = "Acc +-16G";
   out[3] = "Gyro 250 dps";
@@ -69,6 +70,7 @@ void fillTelemetry(unsigned long now_ms, const SensorState& s, const UiState& st
   t.gps_us = 650;
   t.imu_us = 1250;
   t.est_us = 180;
+  t.astro_us = 4000;   // MoonState, about 4 ms at 160 MHz (tools/astro_bench measures it)
 }
 
 }  // namespace
@@ -84,6 +86,7 @@ void FirmwareUi::begin(const BootConfig& boot, const SensorState&) {
   ui_.reset(new TelescopeUi());
   ctx_.reset(new UiContext());
   att_est_.reset(new AttitudeEstimator());
+  moon_tracker_.reset(new astro::MoonTracker(1000));
   att_est_->begin(kAttEstTauS, kFrameMs / 1000.0f);   // end of setup()
 }
 
@@ -114,6 +117,7 @@ void FirmwareUi::frame(unsigned long now_ms, const InputSnapshot& input,
   att_est_->update(ctx_->tel.imu_corr, kFrameMs / 1000.0f);
   ctx_->tel.roll_est_deg = att_est_->rollDeg();
   ctx_->tel.pitch_est_deg = att_est_->pitchDeg();
+  astro::updateMoonTelemetry(*moon_tracker_, ctx_->tel);
 
   ::Frame f;   // the firmware's frame type
   ui_->step(delta, input.clicked(), *ctx_, f);

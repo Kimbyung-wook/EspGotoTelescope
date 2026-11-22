@@ -46,7 +46,7 @@ SSD1306 OLED(128×64)와 로터리 엔코더 하나로 망원경을 조작하는
 전원을 켜면 장치를 하나씩 초기화하면서 결과를 한 줄씩 쌓아 보여줍니다. 실패한 장치는 `>>`로 시작하는 줄로 표시됩니다.
 
 ```
-1. Display is ON
+1. Display ON 160MHz  ← CPU 클럭 (ESP.getCpuFreqMHz)
 2. IMU is ON          (실패: >> IMU failed)
 Acc +-16G
 Gyro 250 dps
@@ -195,7 +195,7 @@ MAIN XXXXXX
 DISP XXXXXX
 GPS  XXXXXX
 IMU  XXXXXX
-EST  XXXXXX
+EST  XXXXXX AST XXXXX  ← AST: 마지막 달 위치 계산 시간
 ```
 
 ### 9 Axis for Moon — 마운트 자세와 목표(달) 좌표
@@ -209,6 +209,22 @@ Yaw   XXXX.XXXX DEG
 R.A.  XXXX.XXXX DEG
 DEC.  XXXX.XXXX DEG
 ```
+
+현재 코드의 화면 (GPS fix가 있을 때 / 없을 때):
+```
+T XX:XX:XX.X VXX.XX      T XX:XX:XX.X VXX.XX
+*9Axis for Moon          *9Axis for Moon
+ROLL  XXXX.XXXXX DEG     ROLL  XXXX.XXXXX DEG
+PITCH XXXX.XXXXX DEG     PITCH XXXX.XXXXX DEG
+ALT XXX.XX AZ XXX.XX     YAW          ---
+-- Moon XX.XXXX"/s       -- Moon: no GPS fix
+R.A.  XXXX.XXXXX DEG     R.A.         ---
+DEC.  XXXX.XXXXX DEG     DEC.         ---
+```
+- Roll/Pitch는 상보필터 추정값입니다.
+- Yaw 추정이 아직 없어서, 그 줄에 달의 고도(ALT)와 방위(AZ, 북쪽 0°, 동쪽 +)를 보여 줍니다.
+- `"/s`는 RA 축 추적 속도입니다(항성 15.041″/s, 달 평균 약 14.49″/s).
+- R.A./DEC.는 관측지 보정(시차)을 한 날짜 기준 좌표입니다. GPS 시각과 위치로 1초마다 다시 계산합니다.
 
 ### Sleep
 ```
@@ -225,7 +241,7 @@ T XX:XX:XX.X VXX.XX
 | 4 Mag/Alt | HEAD(방위) | 방위 대신 온도(Temp) 표시 |
 | 5 IMU Calib | 바이어스 값 | 자이로 바이어스는 Gyro Bias Calib 결과를 표시하고 자이로 측정값에 적용. 가속도 바이어스는 보정 기능이 없어 0 |
 | 7 Att.Estimator | Roll/Pitch/Yaw + R/Q/K + Exit, 스크롤 | 상보필터(τ=1 s) Roll/Pitch, 가속도 기반 Roll/Pitch(aR/aP), 바이어스 보정된 Wx/Wy/Wz를 표시. Yaw와 튜닝 값은 미구현 |
-| 9 Axis for Moon | 추정 자세 + 달 RA/Dec | 롤/피치는 가속도 값, Yaw·RA·Dec는 임시 고정값 |
+| 9 Axis for Moon | 추정 자세 + 달 RA/Dec | 롤/피치는 상보필터 값. Yaw 대신 달 고도·방위와 추적 속도. RA/Dec는 `src/astro`로 계산(GPS fix 없으면 `---`) |
 | Sleep | `(Sleep)` 표시 | 빈 화면. 디스플레이 전원은 끄지 않음. 나오면 커서가 Sleep 항목에 있음 |
 | 1 RA Speed | RRcmd/RRate 단위 DEG | RRate는 dps로 표시. RRcmd는 PWM 듀티 값 |
 

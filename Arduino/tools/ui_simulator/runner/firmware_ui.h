@@ -12,6 +12,7 @@
 
 class TelescopeUi;         // Arduino/app/src/ui/telescope_ui.h
 class AttitudeEstimator;   // Arduino/app/src/estimation/attitude_estimator.h
+namespace astro { class MoonTracker; }   // Arduino/app/src/astro/moon_tracker.h
 struct UiContext;    // Arduino/app/src/ui/ui_context.h
 
 namespace sim {
@@ -47,6 +48,7 @@ class FirmwareUi : public UiBackend {
   std::unique_ptr<TelescopeUi> ui_;
   std::unique_ptr<UiContext> ctx_;
   std::unique_ptr<AttitudeEstimator> att_est_;
+  std::unique_ptr<astro::MoonTracker> moon_tracker_;
   BootConfig boot_;
   int boot_frame_ = 0;
   int last_count_ = 0;

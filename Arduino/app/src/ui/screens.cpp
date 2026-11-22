@@ -135,18 +135,25 @@ void HealthScreen::render(Frame& f, const UiContext& ctx, char /*blink*/) {
   f.set(4, "DISP %6lu", t.disp_us);
   f.set(5, "GPS  %6lu", t.gps_us);
   f.set(6, "IMU  %6lu", t.imu_us);
-  f.set(7, "EST  %6lu", t.est_us);
+  f.set(7, "EST  %6lu AST %5lu", t.est_us, t.astro_us);
 }
 
 void MoonAxisScreen::render(Frame& f, const UiContext& ctx, char /*blink*/) {
   const Telemetry& t = ctx.tel;
   renderTitle(f);
-  f.set(2, "ROLL  %10.5f DEG", t.roll_acc_deg);
-  f.set(3, "PITCH %10.5f DEG", t.pitch_acc_deg);
-  f.set(4, "YAW   %10.5f DEG", 120.0012f);   // placeholder
-  f.set(5, "-- Moon --------");
-  f.set(6, "R.A.  %10.5f DEG",  37.0013f);   // placeholder
-  f.set(7, "DEC.  %10.5f DEG",-120.0014f);   // placeholder
+  f.set(2, "ROLL  %10.5f DEG", t.roll_est_deg);
+  f.set(3, "PITCH %10.5f DEG", t.pitch_est_deg);
+  if (!t.moon_valid) {
+    f.set(4, "YAW          ---");    // needs a magnetometer heading estimate
+    f.set(5, "-- Moon: no GPS fix");
+    f.set(6, "R.A.         ---");
+    f.set(7, "DEC.         ---");
+    return;
+  }
+  f.set(4, "ALT %6.2f AZ %6.2f", t.moon_alt_deg, t.moon_az_deg);
+  f.set(5, "-- Moon %7.4f\"/s", t.moon_rate_arcsec_s);
+  f.set(6, "R.A.  %10.5f DEG", t.moon_ra_deg);
+  f.set(7, "DEC.  %10.5f DEG", t.moon_dec_deg);
 }
 
 void SleepScreen::render(Frame& f, const UiContext& /*ctx*/, char /*blink*/) {

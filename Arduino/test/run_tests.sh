@@ -8,6 +8,7 @@ mkdir -p "$OUT"
 
 # Firmware sources that build on the host (no hardware libraries)
 SRCS=(
+  "$SRC/astro/astro.cpp"
   "$SRC/estimation/filter.cpp"
   "$SRC/estimation/attitude_estimator.cpp"
   "$SRC/input/rotary.cpp"

@@ -340,9 +340,10 @@ OLED를 끕니다(SSD1306 display off). 폰 원격 UI에는 상태바만 남은 
 | 파일 | 역할 |
 |---|---|
 | `src/ui/frame.h` | 한 화면 분량(8줄×22바이트) 버퍼. `set(row, fmt, ...)`은 줄 너비를 넘으면 잘라내고 `overflow`를 켬(테스트가 확인) |
-| `src/ui/screen.h` | `Screen` 인터페이스(`onEnter`/`onRotate`/`onClick`/`tick`/`render`), `MenuCursor`(메뉴 선택·스크롤), `PageCursor`(정보 줄 + 항목 화면의 스크롤) |
+| `src/ui/screen.h` | `Screen` 인터페이스(`onEnter`/`onRotate`/`onClick`/`tick`/`render`) |
 | `src/ui/screen_manager.*` | 화면 스택(push = 들어가기, pop = 나가기), 커서 깜박임, 매 프레임 `motor_inhibit` 초기화 |
-| `src/ui/screens.*` | 각 화면 클래스 |
+| `src/ui/screens/widgets.h` | `MenuCursor`(메뉴 선택·스크롤), `PageCursor`(정보 줄 + 항목 화면의 스크롤), `Choice`(한 줄 두 선택지), `PageScreen`(정보 줄 + 항목 화면의 기반, `renderPage`) |
+| `src/ui/screens/*` | 화면 클래스: `menu`, `status`(GPS..Health, Sleep), `ra_speed`, `calibration`(`CalibScreen<Calib>` 기반의 자이로·가속도 보정), `polar_align`, `target`(1Target 메뉴, Target), `settings`(Settings, Location, Time). `ui/screens.h`가 모두 include |
 | `src/ui/simplegoto_ui.*` | 화면들을 묶은 `SimpleGoToUi`와 상태바. 메인 루프는 프레임마다 `ui.step(회전량, 클릭, ctx, frame)`만 호출 |
 | `src/app/app_state.h` | 앱 전체 상태. `Telemetry`(측정·계산값, 메인 루프가 매 프레임 채움. `gps`, `obs`(쓰는 위치·시각), `moon`, `target`, `scope`, `imu`, `power`, `health`로 묶음), `UiState`(UI가 바꾸는 값: 저장하는 설정 `cfg`(`config::Settings` 한 벌), RA 속도 명령, 추적, 수동·폰 시계, 모터 정지·화면 끄기, 저장 요청) |
 | `src/app/core.h` | 메인 루프 한 프레임(`app::Core`: `begin`, `step`, `finish`). `app.ino`는 하드웨어 값을 `FrameInput`에 채워 넘기고, 시뮬레이터는 가짜 센서 값으로 똑같이 함 |

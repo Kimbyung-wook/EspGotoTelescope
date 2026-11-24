@@ -18,7 +18,13 @@ SRCS=(
   "$SRC/input/rotary.cpp"
   "$SRC/motor/ra_motor.cpp"
   "$SRC/ui/screen_manager.cpp"
-  "$SRC/ui/screens.cpp"
+  "$SRC/ui/screens/menu.cpp"
+  "$SRC/ui/screens/status.cpp"
+  "$SRC/ui/screens/ra_speed.cpp"
+  "$SRC/ui/screens/calibration.cpp"
+  "$SRC/ui/screens/polar_align.cpp"
+  "$SRC/ui/screens/target.cpp"
+  "$SRC/ui/screens/settings.cpp"
   "$SRC/ui/simplegoto_ui.cpp"
 )
 

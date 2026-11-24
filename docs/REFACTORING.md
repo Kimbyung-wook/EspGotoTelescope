@@ -194,7 +194,8 @@
 | 1 작은 정리 | `9c94e42` | 48 | 3466 | 1147 | 84 | 609 | `ui/screens.cpp` 632 | 309 | 2143 | 30343 / 30507 | 328276 / 383604 |
 | 2 앱 상태를 app/로 | `3522914` | 49 | 3474 | 1060 | 349 | 518 | `ui/screens.cpp` 632 | 309 | 2145 | 30343 / 30507 | 328836 / 384180 |
 | 3 상태 묶기, 설정 한 벌 | `a2c4080` | 49 | 3422 | 1060 | 296 | 518 | `ui/screens.cpp` 632 | 303 | 2160 | 30343 / 30507 | 328916 / 384244 |
-| 4 메인 루프 한 벌 | (이 커밋) | 53 | 3606 | 1060 | 414 | 518 | `ui/screens.cpp` 632 | 267 | 2178 | 30343 / 30507 | 329572 / 384772 |
+| 4 메인 루프 한 벌 | `4a45a9c` | 53 | 3606 | 1060 | 414 | 518 | `ui/screens.cpp` 632 | 267 | 2178 | 30343 / 30507 | 329572 / 384772 |
+| 5 화면 파일 나누기 | (이 커밋) | 67 | 3650 | 1104 | 414 | 518 | `astro/astro.cpp` 406 | 267 | 2178 | 30343 / 30507 | 330212 / 385396 |
 
 단계별 메모:
 - **1단계:** 원격 UI 빌드의 IROM이 16 B 늘었습니다. `utcFromGps`가 옮겨 가면서 인라인 결과가 달라진 정도입니다.
@@ -212,3 +213,10 @@
   - 부팅 문구는 `app/boot_text.h` 하나에 있습니다. IMU 범위는 `board_config.h`의 숫자(`IMU_ACCEL_RANGE_G` 등)로 설정하고, 글자는 `sensors/imu_ranges.h`에서 만듭니다. 그래서 시뮬레이터가 손으로 적어 두던 `"Acc +-16G"` 등이 없어졌습니다.
   - src LOC가 늘어난 것은 새 파일 4개(`core.*`, `boot_text.h`, `imu_ranges.h`) 때문입니다.
   - IROM +656 B(`Core::step`이 일반 함수가 됨, IMU 범위 변환). IRAM은 그대로입니다.
+- **5단계:**
+  - `ui/screens.cpp` 한 파일을 `ui/screens/` 아래 7개로 나눴습니다: `widgets`(커서, `Choice`, `PageScreen`), `menu`, `status`(GPS..Health, Sleep), `ra_speed`, `calibration`, `polar_align`, `target`, `settings`(Settings, Location, Time). `ui/screens.h`는 이들을 모두 include하는 헤더로 남겨서 `simplegoto_ui`와 테스트는 그대로입니다.
+  - `PageScreen`: 정보 줄 + 항목 화면 5개(Polar Align, Target, Settings, Location, Time)가 같은 그리기 반복문을 씁니다. 계획의 가상 `renderLine` 대신 `renderPage(람다)`로 했습니다. 화면마다 줄 그리기 전에 계산하는 값(Target의 안내 오차 등)을 람다가 그대로 쓸 수 있어서입니다. 표시 기호는 `markAt`/`editMarkAt`.
+  - 보정 화면 둘은 `CalibScreen<Calib>`를 물려받아 시작·회전·tick·클릭 흐름을 한 번만 씁니다. 화면마다 다른 것은 `render`와 결과를 설정에 넣는 `apply`뿐입니다.
+  - 계획과 다른 점: Sleep은 Info 화면이라 `status`에, RA Speed는 따로 `ra_speed`에 두었습니다.
+  - 화면 글자는 그대로입니다(시뮬레이터 280개, 단위 107개 통과). 가장 큰 파일은 이제 `astro/astro.cpp` 406줄입니다. ui LOC가 44줄 는 것은 헤더 7개의 include guard와 include 줄입니다.
+  - IROM +640 / +624 B, IRAM 그대로. 파일이 나뉘어 컴파일 단위 사이 인라인이 줄고, 템플릿·람다가 화면마다 따로 생긴 탓으로 봅니다(따로 재 보지는 않았습니다).

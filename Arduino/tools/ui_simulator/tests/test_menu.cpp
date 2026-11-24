@@ -89,7 +89,7 @@ void setRrcmd(Sim& s, int v) {
 void test_boot_then_main_menu() {
   Sim s;
   s.tick();
-  EXPECT_LINE(s, 0, "SimpleGoTo v0.3.0");
+  EXPECT_LINE(s, 0, "SimpleGoTo v0.3.1");
   EXPECT_LINE(s, 1, "");
   s.tick(sim::FirmwareUi::kBootLineFrames * 7);   // 8 lines: the screen is full
   EXPECT_LINE(s, 1, "1. Display ON 160MHz");
@@ -99,7 +99,7 @@ void test_boot_then_main_menu() {
   s.tick(sim::FirmwareUi::kBootLineFrames * 2);   // 10 lines: scrolled, line 0 stays
   EXPECT_SCREEN(s, {"Acc +-16G", "Gyro 250 dps", "Mag 10 Hz", "3. GPS is ON",
                     "4. Buttons are ON", "5. GPIO/PWM is ON", "6. Settings new"});
-  EXPECT_LINE(s, 0, "SimpleGoTo v0.3.0");
+  EXPECT_LINE(s, 0, "SimpleGoTo v0.3.1");
   s.tick(sim::FirmwareUi::kBootHoldFrames - 1);
   EXPECT_LINE(s, 7, "6. Settings new");   // boot log is still held
   s.tick();
@@ -511,7 +511,7 @@ void test_settings_survive_reset() {
 
   s.send("{\"type\":\"reset\"}");
   s.tick();
-  EXPECT_LINE(s, 0, "SimpleGoTo v0.3.0");
+  EXPECT_LINE(s, 0, "SimpleGoTo v0.3.1");
   s.boot();
   openMain(s, 4);
   EXPECT_LINE(s, 2, "Flash: loaded");
@@ -580,7 +580,7 @@ void test_protocol_messages() {
   s.tick(3);
   CHECK(s.replies.size() == 3);
   CHECK(s.replies[2].find("\"seq\":2,\"t_ms\":200") != std::string::npos);
-  CHECK(s.replies[0].find("\"lines\":[\"SimpleGoTo v0.3.0\",\"\"") != std::string::npos);
+  CHECK(s.replies[0].find("\"lines\":[\"SimpleGoTo v0.3.1\",\"\"") != std::string::npos);
   std::vector<std::string> r;
   CHECK(s.session.handleLine("{\"type\":\"quit\"}", r) == false);
 }

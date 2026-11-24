@@ -79,12 +79,12 @@ inline void updateLocationTime(Telemetry& t, UiState& st, loc::LastGpsRecorder& 
     t.jd_ut = astro::julianDate(u);
     t.clock_hour = t.hour; t.clock_minute = t.minute;
     t.clock_second = t.seconds; t.clock_ms = t.milliseconds;
-  } else if (st.manual_clock_valid) {     // set by the user on purpose: before the phone
-    t.time_source = loc::TIME_MANUAL;
-    runClock(t, st.manual_clock_jd, st.manual_clock_ms);
-  } else if (st.phone_clock_valid) {
+  } else if (st.phone_clock_valid) {      // network time of the phone: before a hand-set clock
     t.time_source = loc::TIME_PHONE;
     runClock(t, st.phone_clock_jd, st.phone_clock_ms);
+  } else if (st.manual_clock_valid) {
+    t.time_source = loc::TIME_MANUAL;
+    runClock(t, st.manual_clock_jd, st.manual_clock_ms);
   } else {
     t.time_source = loc::TIME_NONE;   // status bar keeps the GPS clock fields
     t.clock_hour = t.hour; t.clock_minute = t.minute;

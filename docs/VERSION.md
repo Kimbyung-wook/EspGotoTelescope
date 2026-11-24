@@ -4,10 +4,10 @@
 
 ```cpp
 #define SIMPLEGOTO_NAME    "SimpleGoTo"
-#define SIMPLEGOTO_VERSION "0.2.0"
+#define SIMPLEGOTO_VERSION "0.3.1"
 ```
 
-- 부팅 화면 첫 줄(`SimpleGoTo v0.2.0`)과 폰 원격 UI 페이지 맨 위에 나옵니다(접속 인사 `hello`의 `name`, `version`).
+- 부팅 화면 첫 줄(`SimpleGoTo v0.3.1`)과 폰 원격 UI 페이지 맨 위에 나옵니다(접속 인사 `hello`의 `name`, `version`).
 - PC 데모(`tools/ui_simulator/gui/web_bridge.py`)도 같은 파일을 읽어 보냅니다.
 
 ## 번호 규칙
@@ -20,6 +20,9 @@
 - 버전을 올리는 커밋은 메시지에 새 버전을 적습니다.
 
 ## 기록
+
+### 0.3.1 (2026-11-24)
+- 시각 순서를 GPS → 폰 시각 → 수동 시각으로 바꿈(0.3.0은 수동 시각이 폰 시각보다 앞).
 
 ### 0.3.0 (2026-11-24)
 - 전원 전압: A0 분압 측정(`VBAT_SENSE_ENABLE`, 기본 0), 거르기, 측정 전에는 `V --.--`.

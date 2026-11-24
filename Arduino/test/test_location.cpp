@@ -105,8 +105,13 @@ TEST(loc_manual_clock_runs_with_millis) {
   CHECK_NEAR(t.obs_lat_deg, -33.8688, 1e-12);
 }
 
-TEST(loc_phone_clock_after_gps_and_manual) {
+TEST(loc_time_order_gps_phone_manual) {
   Telemetry t; UiState st; LastGpsRecorder rec;
+  st.manual_clock_valid = true;                      // only a clock set by hand
+  st.manual_clock_jd = astro::julianDate({2026, 11, 25, 9, 0, 0.0});
+  st.manual_clock_ms = 0;
+  app::updateLocationTime(t, st, rec);
+  CHECK(t.time_source == TIME_MANUAL && t.clock_hour == 9);
   app::setPhoneClock(st, 1000, 1500000000UL, 0);     // 2017: phone clock not set, ignored
   CHECK(!st.phone_clock_valid);
   app::setPhoneClock(st, 1000, 1795575845UL, 600);   // 2026-11-25 03:04:05.600 UTC
@@ -114,15 +119,10 @@ TEST(loc_phone_clock_after_gps_and_manual) {
   CHECK_NEAR(st.phone_clock_jd, astro::julianDate({2026, 11, 25, 3, 4, 5.6}), 1e-8);
   t.now_ms = 3000;                                   // 2 s later
   app::updateLocationTime(t, st, rec);
-  CHECK(t.time_source == TIME_PHONE);
+  CHECK(t.time_source == TIME_PHONE);                // the phone wins over the hand-set clock
   CHECK(t.clock_hour == 3 && t.clock_minute == 4 && t.clock_second == 7);
   CHECK(t.clock_ms >= 599 && t.clock_ms <= 601);
   CHECK(std::strcmp(timeSourceText(t.time_source), "PHN") == 0);
-  st.manual_clock_valid = true;                      // a clock set by hand wins
-  st.manual_clock_jd = astro::julianDate({2026, 11, 25, 9, 0, 0.0});
-  st.manual_clock_ms = 3000;
-  app::updateLocationTime(t, st, rec);
-  CHECK(t.time_source == TIME_MANUAL && t.clock_hour == 9);
   gpsFix(t);                                         // and GPS wins over both
   app::updateLocationTime(t, st, rec);
   CHECK(t.time_source == TIME_GPS);

@@ -5,8 +5,8 @@
 /************************************/
 // Where and when the observer is (docs/REQUIREMENTS.md DES-LOC-01..04)
 //   position : GPS fix -> last GPS fix (saved) -> manual (saved), or manual only
-//   time     : GPS (with a fix) -> manual clock (set on the Time screen, not saved)
-//              -> phone clock (remote UI page, DES-LOC-05, not saved)
+//   time     : GPS (with a fix) -> phone clock (remote UI page, DES-LOC-05, not saved)
+//              -> manual clock (set on the Time screen, not saved)
 // Pure C++ (no Arduino calls).
 /************************************/
 namespace loc {

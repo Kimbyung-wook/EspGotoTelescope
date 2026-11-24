@@ -13,7 +13,7 @@ GUI(`gui/simulator.py`)와 UI 러너(`build/ui_runner.exe`)가 주고받는 메�
 |---|---|---|---|
 | `input` | `rotate`: 정수(+ = CW, − = CCW, 생략 시 0)<br>`click`: 클릭 횟수(생략 시 0) | 로터리 누적 카운트에 더하고 클릭 수를 쌓음 | 없음 |
 | `sensors` | `gps`: 객체(선택)<br>`imu`: 객체(선택)<br>`power`: `{"v": 전압}`(선택, 기본 12.60)<br>`remote`: `{"state": 0/1/2}`(선택, 기본 0) | 준 필드만 바꿈. 나머지는 이전 값 유지. `remote`는 상태바 Wi-Fi 표시(0 없음, 1 `w` AP 대기, 2 `W` 폰 접속) | 없음 |
-| `phone_time` | `unix_s`: Unix 초<br>`ms`: 밀리초(0~999) | 원격 UI 페이지가 보낸 폰 시각(DES-LOC-05). 다음 `tick`에서 UI에 넘김. GPS도 수동 시각도 없으면 상태바가 `P`로 바뀜 | 없음 |
+| `phone_time` | `unix_s`: Unix 초<br>`ms`: 밀리초(0~999) | 원격 UI 페이지가 보낸 폰 시각(DES-LOC-05). 다음 `tick`에서 UI에 넘김. GPS fix가 없으면 수동 시각보다 앞서 쓰고 상태바가 `P`로 바뀜 | 없음 |
 | `tick` | `n`: 프레임 수(기본 1, 1~1000) | 프레임 `n`개 실행 | `frame` `n`개 |
 | `reset` | `imu_ok`, `gps_ok`: bool(선택, 기본은 이전 값, 처음엔 true) | 재부팅: 시각 0, 로터리 카운트 0, 부팅 화면부터 다시 | 없음 |
 | `hello` | | | `hello` |

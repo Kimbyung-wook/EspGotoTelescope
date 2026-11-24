@@ -56,7 +56,7 @@ def main():
         check(c.hello["backend"] == "firmware", "backend is the firmware UI")
 
         f = c.step()
-        check(f["lines"][0] == "SimpleGoTo v0.3.0", "boot starts with the name and version", f)
+        check(f["lines"][0] == "SimpleGoTo v0.3.1", "boot starts with the name and version", f)
         for _ in range(100):
             f = c.step()
             if f["lines"][1] == "Main Menu":

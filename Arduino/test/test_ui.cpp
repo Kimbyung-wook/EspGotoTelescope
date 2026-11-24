@@ -1,3 +1,7 @@
+// Unit tests of the UI screens: one screen at a time, Telemetry/UiState set by hand,
+// checks of the frame lines and of UiState (requests, motor_inhibit, cfg).
+// The whole loop (sensors -> Core -> screen -> motor, boot, protocol, flash) is
+// tested by the simulator (tools/ui_simulator/tests/test_menu.cpp), not here.
 #include "test_main.h"
 #include "../app/src/ui/simplegoto_ui.h"
 #include "../app/src/location/location.h"
@@ -106,6 +110,11 @@ TEST(ui_main_menu_items_and_blink) {
   CHECK_STR(u.f.lines[2] + 1, "2Polar Align");
   CHECK_STR(u.f.lines[7] + 1, "Sleep");
   CHECK(u.cursorAt(7) != ' ');
+  u.step(-1);                                    // back up one: the window returns to the top
+  CHECK_STR(u.f.lines[2], " 1Target");
+  CHECK(u.cursorAt(7) != ' ' && u.has(7, "6RA Speed"));
+  u.step(-20);
+  CHECK(u.cursorAt(2) != ' ' && u.has(2, "1Target"));
 }
 
 TEST(ui_main_menu_clamps_at_both_ends) {
@@ -119,6 +128,12 @@ TEST(ui_main_menu_clamps_at_both_ends) {
 }
 
 // Rotations from the first item of each main screen to its Back/Quit
+static const char* const TITLE[SimpleGoToUi::MAIN_ITEMS] = {
+  "*1Target", "*2Polar Align", "*3Status", "*4Calibration", "*5Settings", "*6RA Speed", " ",
+};
+static const char* const ITEM[SimpleGoToUi::MAIN_ITEMS] = {
+  "1Target", "2Polar Align", "3Status", "4Calibration", "5Settings", "6RA Speed", "Sleep",
+};
 static const int TO_BACK[SimpleGoToUi::MAIN_ITEMS] = {
   5,   // Target menu : starts on Mercury, Quit is item 6
   1,   // Polar Align : Confirm, Back
@@ -133,11 +148,17 @@ TEST(ui_every_menu_item_opens_and_returns_to_same_item) {
   for (int item = 0; item < SimpleGoToUi::MAIN_ITEMS; item++) {
     UiFixture u;
     u.open(item);
+    CHECK_STR(u.f.lines[1], TITLE[item]);
     CHECK(u.ui.manager().depth() == 2);
     u.step(TO_BACK[item]);
+    if (item == SimpleGoToUi::MAIN_ITEMS - 1) { u.step(3); CHECK_STR(u.f.lines[1], " "); }   // Sleep ignores the dial
     u.click();                                   // back
     CHECK(u.ui.manager().depth() == 1);
+    CHECK_STR(u.f.lines[1], "Main Menu");
     CHECK(u.ui.mainMenu().selected() == item);
+    bool drawn = false;                          // the cursor is drawn on that item
+    for (int r = 2; r < Frame::LINES; r++) if (u.cursorAt(r) != ' ' && std::strcmp(u.f.lines[r] + 1, ITEM[item]) == 0) drawn = true;
+    CHECK(drawn);
   }
 }
 
@@ -194,6 +215,7 @@ TEST(ui_ra_speed_edit_changes_command) {
   u.step(-8);
   CHECK_NEAR(u.ctx.state.ra_speed_cmd, -3.0, 1e-6);
   CHECK(u.has(2, "-3.00000PWM"));
+  CHECK_STR(u.f.lines[4], " Exit");
   u.click();                                     // finish editing
   CHECK(!u.ui.raSpeed().editing());
   u.step(+1);                                    // now moves the cursor, not the speed
@@ -254,7 +276,11 @@ TEST(ui_gyro_calibration_shock_and_discard) {
 TEST(ui_accel_calibration_first_step_and_cancel) {
   UiFixture u;
   u.ctx.tel.imu.raw.az = 9.80665f;                   // Z up, but X+ is asked first
-  u.open(3); u.step(1); u.click();
+  u.open(3);
+  CHECK_STR(u.f.lines[2] + 1, "Gyro Bias");
+  CHECK_STR(u.f.lines[3], " Accel 6-pos");
+  CHECK_STR(u.f.lines[4], " Back");
+  u.step(1); u.click();
   CHECK_STR(u.f.lines[1], "*Accel Calib");
   CHECK_STR(u.f.lines[2], "Step 1/6 X+ up");
   CHECK_STR(u.f.lines[3], "Turn X+ up, hold");
@@ -264,6 +290,7 @@ TEST(ui_accel_calibration_first_step_and_cancel) {
   CHECK_STR(u.f.lines[3], "Hold still...");
   u.click();                                     // Cancel
   CHECK(u.ui.manager().depth() == 2);
+  CHECK(u.cursorAt(3) != ' ' && u.has(3, "Accel 6-pos"));   // back on the item
   CHECK(u.ctx.state.cfg.accel_scale[0] == 1.0f);
 }
 

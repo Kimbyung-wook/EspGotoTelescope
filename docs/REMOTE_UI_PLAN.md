@@ -79,11 +79,13 @@ Arduino/scripts/build.sh --build-property "compiler.cpp.extra_flags=-DREMOTE_UI_
 | 1 + lwIP `lm2n` (no features) | 63251 | 30483 | 39124 | 346432 |
 | 1 + lwIP `hb2f` (Higher Bandwidth) | 63251 | 30483 | 39200 | 356656 |
 | 1 + MMU `4816` (16KB cache + 48KB IRAM) | 46883 (/65536) | 30499 (/49152) | 39200 | 356656 |
+| 1 + `-DNO_SW_SERIAL` (Adafruit_GPS의 SoftwareSerial 제거) | 62615 | 29847 (−636) | 39200 | 355456 |
 
 - "IRAM 96%"의 65536에는 flash 명령 캐시 32768이 포함됩니다. 실제 IRAM 코드 여유는 32768 − 30483 = **약 2.2 KB**입니다.
 - **Wi-Fi SDK(lwIP, 802.11)의 IRAM 코드는 Wi-Fi를 쓰지 않아도 이미 링크되어 있습니다.** 그래서 원격 UI를 켜도 IRAM은 164 B만 늘었습니다. lwIP 변형은 IRAM에 영향이 없고, 기본값이 이미 "Lower Memory"입니다.
 - 남은 heap은 약 80192 − 39200 ≈ 41 KB(정적 기준). AP와 TCP 연결 몇 개에 필요한 동적 메모리(대략 15~20 KB)를 넣어도 여유가 있습니다. 실물에서 `ESP.getFreeHeap()`로 확인하면 좋습니다(3단계 상태 표시 후보).
 - IRAM이 더 필요해지면 MMU `4816`이 16 KB를 더 줍니다(대신 flash 캐시가 절반이라 flash 코드가 조금 느려질 수 있음 → Health로 확인).
+- 빈 스케치도 IRAM 코드 약 26.4 KB(32 KB의 80%)를 씁니다(SDK, Wi-Fi MAC 포함). 다른 IRAM 절감책: `-DNO_SW_SERIAL`(`compiler.cpp/c.extra_flags`, GPS가 하드웨어 UART0을 쓰므로 SoftwareSerial 불필요)로 약 0.6 KB. 자세한 분석은 `docs/IRAM.md`(다른 세션에서 작성 중)를 봅니다.
 
 호스트 테스트 (모두 통과): `Arduino/test/run_tests.sh` 70 tests 584 checks 0 failures, `tools/ui_simulator/run_tests.sh` 267 checks 0 failures, `tools/ui_simulator/build.sh` OK, `python gui/protocol_check.py` OK. (원격 UI 코드는 호스트 빌드에 들어가지 않습니다.)
 

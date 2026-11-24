@@ -12,6 +12,7 @@ FIRMWARE_SRCS=(
   "$APP_SRC/location/location.cpp"
   "$APP_SRC/astro/astro.cpp"
   "$APP_SRC/config/settings.cpp"
+  "$APP_SRC/app/core.cpp"
 )
 # stubs/ first so <Arduino.h> resolves to the simulator's own stub
 INCLUDES=(-I "$HERE/stubs" -I "$APP_SRC" -I "$HERE/runner")

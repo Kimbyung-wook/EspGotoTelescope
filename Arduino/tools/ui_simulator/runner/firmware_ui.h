@@ -1,9 +1,9 @@
 // UiBackend that runs the real firmware UI (Arduino/app/src/ui, SimpleGoToUi).
 //
 // It does on the PC what app.ino does on the board:
-//   setup(): the boot log lines (setup() itself is not host-buildable)
-//   loop():  rotary delta/click + updateTelemetry() -> AttitudeEstimator
-//            -> SimpleGoToUi::step() -> RaMotor output from UiState::ra_speed_cmd
+//   setup(): the boot log lines (app/boot_text.h; setup() itself is not host-buildable)
+//   loop():  rotary delta/click + readInputs() -> app::Core step() / finish()
+//            -> RaMotor output
 // Firmware sources are only read, never changed; see build.sh for the list.
 #pragma once
 #include <memory>
@@ -13,9 +13,7 @@
 
 class SimpleGoToUi;         // Arduino/app/src/ui/simplegoto_ui.h
 namespace config { class RamSettingsStore; }   // Arduino/app/src/config/settings.h
-class AttitudeEstimator;   // Arduino/app/src/estimation/attitude_estimator.h
-namespace astro { class TargetTracker; }   // Arduino/app/src/astro/target_tracker.h
-namespace loc { class LastGpsRecorder; }   // Arduino/app/src/location/location.h
+namespace app { class Core; }                  // Arduino/app/src/app/core.h
 struct UiContext;    // Arduino/app/src/app/app_state.h
 
 namespace sim {
@@ -30,9 +28,6 @@ class FirmwareUi : public UiBackend {
   static const int kBootLineFrames = 3;
   static const int kBootHoldFrames = 10;
   static const int kBootFrames = (kBootLines - 1) * kBootLineFrames + kBootHoldFrames;
-  // ATT_EST_TAU_S in app.ino (not includable from the host build)
-  static constexpr float kAttEstTauS = 1.0f;
-
   FirmwareUi();
   ~FirmwareUi() override;
 
@@ -44,20 +39,15 @@ class FirmwareUi : public UiBackend {
 
   // For tests
   bool booting() const { return boot_frame_ < kBootFrames; }
-  SimpleGoToUi& ui() { return *ui_; }
-  UiContext& context() { return *ctx_; }
+  SimpleGoToUi& ui();
+  UiContext& context();
   // Flash of the board: kept across begin() (reset = power cycle keeps the settings)
   config::RamSettingsStore& settingsStore() { return *store_; }
 
  private:
   void renderBoot(Frame& out);
 
-  std::unique_ptr<SimpleGoToUi> ui_;
-  std::unique_ptr<UiContext> ctx_;
-  std::unique_ptr<AttitudeEstimator> att_est_;
-  std::unique_ptr<astro::TargetTracker> moon_tracker_;
-  std::unique_ptr<astro::TargetTracker> target_tracker_;
-  std::unique_ptr<loc::LastGpsRecorder> last_gps_;
+  std::unique_ptr<app::Core> core_;
   std::unique_ptr<config::RamSettingsStore> store_;
   int settings_load_ = 0;    // config::LoadResult of the last begin()
   BootConfig boot_;

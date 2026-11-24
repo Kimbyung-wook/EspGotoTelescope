@@ -17,11 +17,9 @@
 #include "src/sensors/imu.h"
 #include "src/sensors/battery.h"
 #include "src/motor/ra_motor.h"
-#include "src/estimation/attitude_estimator.h"
-#include "src/app/loop_logic.h"
-#include "src/ui/simplegoto_ui.h"
+#include "src/app/core.h"
+#include "src/app/boot_text.h"
 #include "src/remote/remote_ui.h"
-#include "src/app/settings_binding.h"
 #include "src/config/eeprom_store.h"
 
 /************************************/
@@ -36,19 +34,11 @@ BatteryMonitor battery(VBAT_FULL_SCALE_V, VBAT_FILTER_ALPHA);
 unsigned long  battery_read_ms = 0;
 
 /************************************/
-// Estimation
+// Everything that is not hardware: estimation, location/time, astro, UI, settings
+// (src/app/core.h, the same code the UI simulator runs)
 /************************************/
-AttitudeEstimator att_est;
-const float       ATT_EST_TAU_S = 1.0f;  // complementary filter crossover
-astro::TargetTracker moon_tracker(astro::Target::Moon, 1000);     // Moon (lunar rate), once per second
-astro::TargetTracker target_tracker(astro::Target::Mercury, 1000); // 1Target, once per second
-loc::LastGpsRecorder last_gps;                                     // DES-LOC-02
-
-/************************************/
-// UI
-/************************************/
-SimpleGoToUi ui;
-UiContext   ui_ctx;
+const float hz = MAIN_LOOP_HZ;
+app::Core   core(hz, micros);
 Frame       frame;
 int         rotary_count_prev = 0;
 
@@ -65,9 +55,6 @@ static_assert(sizeof(frame.lines) == sizeof(monitor->msg), "Frame and OLED buffe
 Tictok_us perform_main;
 Tictok_us perform_rest;
 Tictok_us perform_imu;
-Tictok_us perform_est;
-Tictok_us perform_astro;
-const float   hz             = MAIN_LOOP_HZ;
 LoopTimer     loop_timer((unsigned long)(1000000.0f / hz));
 
 // One boot message per line; when the screen is full the lines scroll up
@@ -96,17 +83,17 @@ void setup() {
   // Display
   /************************************/
   monitor->setup_display();
-  bootLine(line, SIMPLEGOTO_NAME " v" SIMPLEGOTO_VERSION);
+  bootLine(line, boot::TITLE);
   char cpu_line[DISP_LINE_ROW];
-  snprintf(cpu_line, sizeof(cpu_line), "1. Display ON %uMHz", ESP.getCpuFreqMHz());
-  bootLine(line, cpu_line);   // 160 MHz expected (Tools > CPU Frequency)
+  boot::displayLine(cpu_line, sizeof(cpu_line), ESP.getCpuFreqMHz());
+  bootLine(line, cpu_line);
 
   /************************************/
   // IMU - ICM20948
   /************************************/
-  bootPending(line, "2. Intialize IMU");
+  bootPending(line, boot::IMU_PENDING);
   bool imu_on = imu.begin();
-  bootLine(line, imu_on ? "2. IMU is ON" : ">> IMU failed");
+  bootLine(line, imu_on ? boot::IMU_ON : boot::IMU_FAILED);
   bootLine(line, imu.accelRangeText());
   bootLine(line, imu.gyroRangeText());
   bootLine(line, imu.magRateText());
@@ -114,29 +101,29 @@ void setup() {
   /************************************/
   // GPS
   /************************************/
-  bootPending(line, "3. Intialize GPS");
+  bootPending(line, boot::GPS_PENDING);
   bool gps_on = gps->setup_gps();
-  bootLine(line, gps_on ? "3. GPS is ON" : ">> GPS is timeout");
+  bootLine(line, gps_on ? boot::GPS_ON : boot::GPS_TIMEOUT);
 
   /************************************/
   // Rotary encoder
   /************************************/
-  bootPending(line, "4. Intialize Buttons");
+  bootPending(line, boot::BUTTONS_PENDING);
   rotary.begin();
   rotary_count_prev = rotary.count();
-  bootLine(line, "4. Buttons are ON");
+  bootLine(line, boot::BUTTONS_ON);
 
   /************************************/
   // Motor
   /************************************/
   ra_motor.begin();
-  bootLine(line, "5. GPIO/PWM is ON");
+  bootLine(line, boot::MOTOR_ON);
 
   /************************************/
   // Settings : calibration, RA duty, tracking offset (defaults if none or bad)
   /************************************/
   settings_store.begin();
-  const config::LoadResult settings_result = app::loadSettings(settings_store, ui_ctx);
+  const config::LoadResult settings_result = core.begin(settings_store);   // also starts the estimator
   bootLine(line, config::loadText(settings_result));
 
 #if REMOTE_UI_ENABLE
@@ -144,110 +131,88 @@ void setup() {
   // Remote UI : Wi-Fi AP + web page + WebSocket
   /************************************/
   remote::begin();
-  bootLine(line, "7. WiFi AP " REMOTE_UI_AP_SSID);
+  bootLine(line, boot::WIFI_AP);
 #endif
 
-  att_est.begin(ATT_EST_TAU_S, 1.0f / hz);
   loop_timer.start(micros());
 }
 
-// Copy sensor values into the UI telemetry
-void updateTelemetry(Telemetry& t) {
+// Sensor values of this frame
+void readInputs(app::FrameInput& in) {
   const Adafruit_GPS* g = gps->gps_device;
-  t.now_ms       = millis();
-  t.gps.year         = g->year;
-  t.gps.month        = g->month;
-  t.gps.day          = g->day;
-  t.gps.hour         = g->hour;
-  t.gps.minute       = g->minute;
-  t.gps.seconds      = g->seconds;
-  t.gps.milliseconds = g->milliseconds;
-  t.gps.fixquality   = g->fixquality;
-  t.gps.satellites   = g->satellites;
-  t.gps.lat_hemi     = g->lat;
-  t.gps.lon_hemi     = g->lon;
-  t.gps.latitude     = ((double)g->latitude_fixed)  * 1E-7;
-  t.gps.longitude    = ((double)g->longitude_fixed) * 1E-7;
-  t.gps.altitude_m   = g->altitude;
+  in.now_ms           = millis();
+  in.gps.year         = g->year;
+  in.gps.month        = g->month;
+  in.gps.day          = g->day;
+  in.gps.hour         = g->hour;
+  in.gps.minute       = g->minute;
+  in.gps.seconds      = g->seconds;
+  in.gps.milliseconds = g->milliseconds;
+  in.gps.fixquality   = g->fixquality;
+  in.gps.satellites   = g->satellites;
+  in.gps.lat_hemi     = g->lat;
+  in.gps.lon_hemi     = g->lon;
+  in.gps.latitude     = ((double)g->latitude_fixed)  * 1E-7;
+  in.gps.longitude    = ((double)g->longitude_fixed) * 1E-7;
+  in.gps.altitude_m   = g->altitude;
 
-  t.imu.raw           = imu.data();
-  t.health.loop_hz = hz;
-  t.health.loop_us = perform_rest.getdt() + perform_main.getdt();
-  t.health.main_us = perform_main.getdt();
-  t.health.disp_us = monitor->perform_print.getdt();
-  t.health.gps_us  = gps->perform_read.getdt();
-  t.health.imu_us  = perform_imu.getdt();
-  t.health.est_us  = perform_est.getdt();
-  t.health.astro_us = perform_astro.getdt();
-  t.remote   = remote::state();   // status bar Wi-Fi mark
+  in.imu = imu.data();
+  in.health.loop_hz = hz;
+  in.health.loop_us = perform_rest.getdt() + perform_main.getdt();
+  in.health.main_us = perform_main.getdt();
+  in.health.disp_us = monitor->perform_print.getdt();
+  in.health.gps_us  = gps->perform_read.getdt();
+  in.health.imu_us  = perform_imu.getdt();   // est_us / astro_us: timed by core
+  in.remote = remote::state();                 // status bar Wi-Fi mark
 #if VBAT_SENSE_ENABLE
-  if (!battery.valid() || t.now_ms - battery_read_ms >= VBAT_PERIOD_MS) {
+  if (!battery.valid() || in.now_ms - battery_read_ms >= VBAT_PERIOD_MS) {
     battery.update(analogRead(A0));
-    battery_read_ms = t.now_ms;
+    battery_read_ms = in.now_ms;
   }
 #endif
-  t.power.valid = battery.valid();
-  t.power.volts       = battery.volts();
+  in.power.valid = battery.valid();
+  in.power.volts = battery.volts();
+  // Phone time from the remote UI page (DES-LOC-05)
+  in.phone_time = remote::takePhoneTime(in.phone_unix_s, in.phone_ms);
 }
 
 void loop() {
   perform_main.tic();
+  app::FrameInput in;
 
   // Inputs
   int  count = rotary.count();
-  int  delta = count - rotary_count_prev;
+  in.delta = count - rotary_count_prev;
   rotary_count_prev = count;
-  bool click = rotary.takeClick();
+  in.click = rotary.takeClick();
   // Phone (remote UI): dial steps add to the rotary, a click counts like the button
   int  remote_delta = 0;
   bool remote_click = false;
   remote::takeInput(remote_delta, remote_click);
-  delta += remote_delta;
-  click = click || remote_click;
+  in.delta += remote_delta;
+  in.click = in.click || remote_click;
 
   // Sensors
   gps->read_all();
   perform_imu.tic();
   imu.read();
   perform_imu.toc();
-  updateTelemetry(ui_ctx.tel);
-  app::correctImu(ui_ctx.tel, ui_ctx.state);
+  readInputs(in);
 
-  // Estimation
-  perform_est.tic();
-  att_est.update(ui_ctx.tel.imu.corr, 1.0f / hz);
-  perform_est.toc();
-  ui_ctx.tel.imu.roll_est_deg  = att_est.rollDeg();
-  ui_ctx.tel.imu.pitch_est_deg = att_est.pitchDeg();
+  // Estimation, position/time, astro, UI (src/app/core.h)
+  core.step(in, frame);
 
-  // Phone time from the remote UI page (DES-LOC-05), then position and time in use:
-  // GPS, last GPS fix, manual, phone (DES-LOC)
-  unsigned long phone_s = 0;
-  int phone_ms = 0;
-  if (remote::takePhoneTime(phone_s, phone_ms))
-    app::setPhoneClock(ui_ctx.state, ui_ctx.tel.now_ms, phone_s, phone_ms);
-  app::updateLocationTime(ui_ctx.tel, ui_ctx.state, last_gps);
-
-  // Moon and target (each only on the frames where its 1 s period has passed),
-  // then where the tube points (IMU on the tube, polar-aligned mount)
-  perform_astro.tic();
-  const bool astro_ran = app::updateAstro(moon_tracker, target_tracker, ui_ctx.tel, ui_ctx.state,
-                                          IMU_TUBE_OPTICAL_AXIS, IMU_TUBE_DEC_AXIS);
-  if (astro_ran) perform_astro.toc();
-
-  // UI -> display
-  frame.clear();
-  ui.step(delta, click, ui_ctx, frame);
-  monitor->setPower(!ui_ctx.state.display_off);   // Sleep: OLED off, phone still mirrors
-  if (!ui_ctx.state.display_off) {
+  // Display
+  monitor->setPower(core.displayOn());   // Sleep: OLED off, phone still mirrors
+  if (core.displayOn()) {
     memcpy(monitor->msg, frame.lines, sizeof(frame.lines));
     monitor->print();
   }
   remote::publish(frame);   // phone mirror (only when the lines changed)
-  app::serviceRequests(settings_store, ui_ctx);   // Save / Reset from the UI
 
-  // Outputs (tracking overrides the manual RRcmd; calibration / Polar Align stop the motor)
-  ra_motor.setSpeed(app::motorCommand(ui_ctx.tel, ui_ctx.state));
+  // Save / Reset from the UI, then the outputs (tracking overrides the manual RRcmd;
+  // calibration / Polar Align stop the motor)
+  ra_motor.setSpeed(core.finish(settings_store));
 
   perform_main.toc();
 

@@ -65,3 +65,23 @@ TEST(gps_utc_from_gps) {
   CHECK(u.year == 2026 && u.month == 11 && u.day == 22 && u.hour == 13 && u.minute == 5);
   CHECK_NEAR(u.second, 7.25, 1e-12);
 }
+
+#include "../app/src/sensors/imu_ranges.h"
+#include "../app/src/app/boot_text.h"
+#include <cstring>
+
+TEST(boot_texts_fit_the_screen) {
+  const char* all[] = {boot::TITLE, boot::IMU_PENDING, boot::IMU_ON, boot::IMU_FAILED,
+                       boot::GPS_PENDING, boot::GPS_ON, boot::GPS_TIMEOUT, boot::BUTTONS_PENDING,
+                       boot::BUTTONS_ON, boot::MOTOR_ON, boot::WIFI_AP,
+                       imuAccelRangeText(IMU_ACCEL_RANGE_G), imuGyroRangeText(IMU_GYRO_RANGE_DPS),
+                       imuMagRateText(IMU_MAG_RATE_HZ), imuMagRateText(1), imuGyroRangeText(2000)};
+  for (const char* s : all) CHECK(std::strlen(s) <= 21);
+  char line[22];
+  boot::displayLine(line, sizeof(line), 160);
+  CHECK_STR(line, "1. Display ON 160MHz");
+  CHECK_STR(imuAccelRangeText(16), "Acc +-16G");
+  CHECK_STR(imuGyroRangeText(250), "Gyro 250 dps");
+  CHECK_STR(imuMagRateText(10), "Mag 10 Hz");
+  CHECK_STR(imuAccelRangeText(3), "Acc ?");
+}

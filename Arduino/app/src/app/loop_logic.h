@@ -1,9 +1,7 @@
-// Per-frame steps of the main loop that do not touch hardware, shared by app.ino
-// and the UI simulator (tools/ui_simulator/runner/firmware_ui.cpp) so both run
-// the same logic:
-//   updateTelemetry (sensors -> Telemetry raw fields)
-//   correctImu -> attitude estimator -> updateLocationTime -> updateAstro
-//   -> SimpleGoToUi::step -> app::serviceRequests -> motorCommand
+// Per-frame steps of the main loop that do not touch hardware. app::Core (core.h)
+// calls them in order, on the board and in the UI simulator:
+//   correctImu -> attitude estimator -> setPhoneClock -> updateLocationTime
+//   -> updateAstro -> SimpleGoToUi::step -> app::serviceRequests -> motorCommand
 #pragma once
 #include "app_state.h"
 #include "sky.h"

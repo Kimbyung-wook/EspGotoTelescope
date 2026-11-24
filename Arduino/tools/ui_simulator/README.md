@@ -62,17 +62,17 @@ python gui/make_font.py   # 기본 경로: ~/Documents/Arduino/libraries/Adafrui
 
 ## 펌웨어 UI를 돌리는 방식
 
-`FirmwareUi`는 `app.ino`가 보드에서 하는 일을 PC에서 똑같이 합니다.
+`FirmwareUi`는 `app.ino`가 보드에서 하는 일을 PC에서 똑같이 합니다. 하드웨어가 아닌 부분(추정, 위치·시각, 천체, UI, 설정)은 둘 다 `app::Core`(`Arduino/app/src/app/core.h`)를 그대로 부르므로, 시뮬레이터가 하는 일은 가짜 센서 값을 `app::FrameInput`에 채우는 것뿐입니다.
 
 | `app.ino` | 시뮬레이터 (`runner/firmware_ui.cpp`) |
 |---|---|
-| `setup()`의 부팅 로그 | 같은 문구를 3프레임마다 한 줄씩 보여 주고 10프레임 유지 (`setup()`은 하드웨어 라이브러리 때문에 PC에서 빌드되지 않아 문구만 옮김). 부팅 중 회전·클릭은 버림 |
+| `setup()`의 부팅 로그 | 같은 문구(`app/boot_text.h`, IMU 범위는 `sensors/imu_ranges.h`)를 3프레임마다 한 줄씩 보여 주고 10프레임 유지. 부팅 중 회전·클릭은 버림 |
+| `core.begin(store)` | 그대로 호출(설정 읽기, 추정기 시작) |
 | `rotary.count()` 차이, `takeClick()` | 프로토콜 `input`을 모은 값 |
-| `updateTelemetry()` | 가짜 센서 값 → `Telemetry` (롤/피치는 `rollFromAccelDeg`/`pitchFromAccelDeg`, `imu_corr`는 `withoutGyroBias(imu, gyro_bias)`). Health 시간은 보드에서 잰 듯한 고정 값 (EST 180 us 등) |
-| `att_est.update(imu_corr, dt)` | 매 프레임 `AttitudeEstimator::update(imu_corr, 0.1f)` → `roll_est_deg`/`pitch_est_deg`. 시정수 `ATT_EST_TAU_S`는 `app.ino`에 있어 `firmware_ui.h`의 `kAttEstTauS`(1.0)로 복사해 둠 |
-| `ui.step(delta, click, ctx, frame)` | 그대로 호출, `Frame.lines`를 응답 8줄로 |
-| `ra_motor.setSpeed(ra_speed_cmd)` | `RaMotor::toOutput(ra_speed_cmd)` → IN1/IN2/PWM |
+| `readInputs()` | 가짜 센서 값 → `app::FrameInput`. Health 시간은 보드에서 잰 듯한 고정 값 (EST 180 us 등, `Core`에 시계를 주지 않음) |
+| `core.step(in, frame)` | 그대로 호출, `Frame.lines`를 응답 8줄로 |
+| `ra_motor.setSpeed(core.finish(store))` | `RaMotor::toOutput(core.finish(store))` → IN1/IN2/PWM |
 
 빌드에 쓰는 펌웨어 소스와 include 경로는 `sources.sh`에 있습니다. `Arduino.h`는 이 폴더의 `stubs/`(핀 함수는 빈 함수)를 씁니다. `Arduino/test/stubs`는 단위 테스트용이라 따로 둡니다. 펌웨어 UI에 화면이나 소스 파일이 늘면 `sources.sh`의 `FIRMWARE_SRCS`에 추가하고 `tests/test_menu.cpp`의 기대 화면을 맞춥니다.
 
-재부팅(`reset`)하면 `SimpleGoToUi`, `UiContext`, `AttitudeEstimator`를 새로 만들어 전원을 다시 켠 것처럼 처음부터 시작합니다.
+재부팅(`reset`)하면 `app::Core`를 새로 만들어 전원을 다시 켠 것처럼 처음부터 시작합니다.

@@ -80,6 +80,7 @@ flowchart TB
   end
 
   subgraph APPL["앱 로직 (순수 C++)"]
+    CORE["app/core"]
     LOOP["app/loop_logic"]
     STATE["app/app_state"]
     SKY["app/sky"]
@@ -108,7 +109,8 @@ flowchart TB
     L_ICM["Adafruit ICM20X"]
   end
 
-  APP --> CFG & OLED & GPS & IMU & ROT & MOT & ATT & LOOP & BIND & TUI & TT & LT
+  APP --> CFG & OLED & GPS & IMU & ROT & MOT & CORE & TT & LT
+  CORE --> LOOP & BIND & ATT & TUI
   LOOP --> SKY & TRK & STATE
   SKY --> MTRK --> ASTRO
   SKY & TRK & BIND --> STATE

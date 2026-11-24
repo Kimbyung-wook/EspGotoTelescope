@@ -47,6 +47,11 @@
 #define IMU_TUBE_OPTICAL_AXIS  1
 #define IMU_TUBE_DEC_AXIS      2
 
+// ICM20948 ranges set by Imu::begin() (texts on the boot screen: sensors/imu_ranges.h)
+#define IMU_ACCEL_RANGE_G    16     // 2 / 4 / 8 / 16
+#define IMU_GYRO_RANGE_DPS   250    // 250 / 500 / 1000 / 2000
+#define IMU_MAG_RATE_HZ      10     // 0 = shutdown, 1 = single shot, 10 / 20 / 50 / 100
+
 // Calibration shock limits (DES-CAL-02): a sample whose |w| or |a| is further than
 // this from the running mean spoils the measurement. Tune on the real mount.
 #define CAL_SHOCK_GYRO_DPS    2.0f   // [deg/s]

@@ -345,6 +345,8 @@ OLED를 끕니다(SSD1306 display off). 폰 원격 UI에는 상태바만 남은 
 | `src/ui/screens.*` | 각 화면 클래스 |
 | `src/ui/simplegoto_ui.*` | 화면들을 묶은 `SimpleGoToUi`와 상태바. 메인 루프는 프레임마다 `ui.step(회전량, 클릭, ctx, frame)`만 호출 |
 | `src/app/app_state.h` | 앱 전체 상태. `Telemetry`(측정·계산값, 메인 루프가 매 프레임 채움. `gps`, `obs`(쓰는 위치·시각), `moon`, `target`, `scope`, `imu`, `power`, `health`로 묶음), `UiState`(UI가 바꾸는 값: 저장하는 설정 `cfg`(`config::Settings` 한 벌), RA 속도 명령, 추적, 수동·폰 시계, 모터 정지·화면 끄기, 저장 요청) |
+| `src/app/core.h` | 메인 루프 한 프레임(`app::Core`: `begin`, `step`, `finish`). `app.ino`는 하드웨어 값을 `FrameInput`에 채워 넘기고, 시뮬레이터는 가짜 센서 값으로 똑같이 함 |
+| `src/app/boot_text.h` | 부팅 화면 문구(`app.ino`와 시뮬레이터가 같이 씀) |
 | `src/app/loop_logic.h` | 메인 루프의 순수 로직(`correctImu`, `updateLocationTime`, `updateAstro`, `motorCommand`). `app.ino`와 시뮬레이터가 같이 씀 |
 | `src/estimation/calibration.*` | 충격 감지, 자이로 30초 보정, 가속도 6방향 보정 |
 | `src/location/location.*` | 위치 출처 고르기, 거리, 직전 GPS 기록 |
@@ -354,7 +356,7 @@ OLED를 끕니다(SSD1306 display off). 폰 원격 UI에는 상태바만 남은 
 | `src/app/settings_binding.h` | 부팅 때 설정을 `UiState::cfg`로 읽기(`loadSettings`), UI의 저장·초기화 요청 처리(`serviceRequests`) |
 | `src/config/eeprom_store.h` | 보드 전용 `EepromSettingsStore`(ESP8266 `EEPROM`) |
 
-메인 루프 한 바퀴: 센서 읽기 → `correctImu`(보정값 적용) → 자세 추정 → `updateLocationTime`(위치·시각 출처) → `updateAstro`(1초마다 천체, 매 프레임 경통 지향) → `ui.step` → 설정 저장 요청 처리 → `motorCommand`(추적, 모터 정지).
+메인 루프 한 바퀴: 센서 읽기(`app.ino`) → `core.step`: `correctImu`(보정값 적용) → 자세 추정 → `updateLocationTime`(위치·시각 출처) → `updateAstro`(1초마다 천체, 매 프레임 경통 지향) → `ui.step` → (화면 표시) → `core.finish`: 설정 저장 요청 처리 → `motorCommand`(추적, 모터 정지).
 
 UI 코드는 하드웨어에 의존하지 않아서 PC에서도 빌드됩니다. 단위 테스트(`Arduino/test/test_ui.cpp`)와 UI 시뮬레이터가 같은 코드를 씁니다.
 

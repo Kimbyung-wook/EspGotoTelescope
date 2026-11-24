@@ -1,68 +1,63 @@
 #include "gps.h"
 #include "gps_link.h"
 
-GPS::GPS(HardwareSerial* SerialPort){
-  gps_device = new Adafruit_GPS(SerialPort);
-  last_recv = 0;
-  timeout_gps_failed = 3000; // [ms]
-  gps_connection = false;
-}
-GPS::~GPS(){
-  delete(gps_device);
-  gps_device = NULL;
-}
+Gps::Gps(HardwareSerial* port) : device_(port) {}
 
-int GPS::setup_gps(){
-  /************************************/
-  // GPS Setting
-  /************************************/
-  // 9600 NMEA is the default baud rate for Adafruit MTK GPS's- some use 4800
+bool Gps::begin() {
+  // 9600 NMEA is the default baud rate for Adafruit MTK GPS's (some use 4800)
   delay(1000);
-  gps_device->begin(9600);
-  gps_device->sendCommand(PMTK_SET_BAUD_115200);
-  gps_device->sendCommand(PMTK_SET_BAUD_115200);
+  device_.begin(9600);
+  device_.sendCommand(PMTK_SET_BAUD_115200);
+  device_.sendCommand(PMTK_SET_BAUD_115200);
   delay(200);
-  gps_device->sendCommand(PMTK_SET_BAUD_115200);
-  delay(200);
-
-  gps_device->begin(115200);
-  gps_device->sendCommand(PMTK_SET_NMEA_OUTPUT_RMCGGA);
-  //gps_device->sendCommand(PMTK_SET_NMEA_OUTPUT_RMCONLY);
-  gps_device->sendCommand(PMTK_SET_NMEA_UPDATE_5HZ); // 5 Hz update rate
+  device_.sendCommand(PMTK_SET_BAUD_115200);
   delay(200);
 
-  // Verification : wait for the first valid NMEA sentence
-  unsigned long last_setup = millis();
-  while(true){
-    gps_device->read();
-    if(gps_device->newNMEAreceived() && gps_device->parse(gps_device->lastNMEA()))
-      return true;
-    if(millis() - last_setup > timeout_gps_failed)
-      return false;
+  device_.begin(115200);
+  device_.sendCommand(PMTK_SET_NMEA_OUTPUT_RMCGGA);
+  device_.sendCommand(PMTK_SET_NMEA_UPDATE_5HZ);
+  delay(200);
+
+  // Wait for the first valid NMEA sentence
+  const unsigned long start = millis();
+  while (true) {
+    device_.read();
+    if (device_.newNMEAreceived() && device_.parse(device_.lastNMEA())) return true;
+    if (millis() - start > LINK_TIMEOUT_MS) return false;
     yield();
   }
 }
 
-int GPS::read_all(){
-  perform_read.tic();
-  /************************************/
-  // GPS Parser : drain the UART buffer and parse every complete sentence
-  // Outputs
-  //   Adafruit_GPS GPS : GPS Data
-  /************************************/
+bool Gps::read() {
+  read_time_.start();
   char c = 0;
-  do{
-    c = gps_device->read();
-    if(gps_device->newNMEAreceived()){
-      last_recv = millis();
-      gps_device->parse(gps_device->lastNMEA()); // a broken sentence is just skipped
+  do {
+    c = device_.read();
+    if (device_.newNMEAreceived()) {
+      last_recv_ms_ = millis();
+      device_.parse(device_.lastNMEA());     // a broken sentence is just skipped
     }
-  }while(c);
+  } while (c);
+  link_alive_ = gpsLinkAlive(last_recv_ms_, millis(), LINK_TIMEOUT_MS);
+  read_time_.stop();
+  return link_alive_;
+}
 
-  // Check GPS Timeout : connected while NMEA arrives within the timeout
-  gps_connection = gpsLinkAlive(last_recv, millis(), timeout_gps_failed);
-
-  perform_read.toc();
-
-  return gps_connection;
+GpsRaw Gps::data() const {
+  GpsRaw g;
+  g.year         = device_.year;
+  g.month        = device_.month;
+  g.day          = device_.day;
+  g.hour         = device_.hour;
+  g.minute       = device_.minute;
+  g.seconds      = device_.seconds;
+  g.milliseconds = device_.milliseconds;
+  g.fixquality   = device_.fixquality;
+  g.satellites   = device_.satellites;
+  g.lat_hemi     = device_.lat;
+  g.lon_hemi     = device_.lon;
+  g.latitude     = ((double)device_.latitude_fixed)  * 1E-7;
+  g.longitude    = ((double)device_.longitude_fixed) * 1E-7;
+  g.altitude_m   = device_.altitude;
+  return g;
 }

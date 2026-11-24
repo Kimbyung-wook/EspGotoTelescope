@@ -2,70 +2,31 @@
 #ifndef _FILTER_H_
 #define _FILTER_H_
 
-// Fixed-step filters : dt is set in initialize(). The dt argument of update()
-// is kept for API compatibility and is not used.
-class LPF{
-public:
-  LPF(){};
-  ~LPF(){};
+// Fixed-step 1st-order filters: the step dt is set in initialize().
 
+// x_k = gamma * x_(k-1) + (1 - gamma) * u_k,  gamma = exp(-dt/tau)
+class LPF {
 public:
-  void initialize(float tau_in = 1.0f, float dt_in = 0.1f);
-  void setTau(float tau_in);
-  float getTau();
-  float getState();
-  float update(float u_in, float dt_in = 0.1f);
-
+  void initialize(float tau, float dt);
+  float update(float u);           // starts from the first input (no slow start-up)
+  float state() const { return x_; }
 private:
-  float x;
-  float x_prev;
-  float tau;
-  float gamma; // exp(-dt/tau)
-  bool  first = true;
-  float dt;
+  float x_ = 0.0f;
+  float gamma_ = 0.0f;
+  bool  first_ = true;
 };
 
-class HPF{
+// Angle from a low band (absolute, noisy: tilt from gravity) and a high band
+// (rate, drifting: gyro), crossing over at tau:
+//   x = LPF(x_low) + LPF(rate * tau)
+class ComplementaryFilter {
 public:
-  HPF(){};
-  ~HPF(){};
-
-public:
-  void initialize(float tau_in = 1.0f, float dt_in = 0.1f);
-  void setTau(float tau_in);
-  float getTau();
-  float getState();
-  float update(float u_in, float dt_in = 0.1f);
-
+  void initialize(float tau, float dt);
+  float update(float x_low, float rate_high);
 private:
-  float x;
-  float x_prev;
-  float u_prev;
-  float tau;
-  float gamma; // exp(-dt/tau)
-  bool  first = true;
-  float dt;
-};
-
-class ComplementaryFilter{
-public:
-  ComplementaryFilter(){};
-  ~ComplementaryFilter(){};
-
-public:
-  void initialize(float tau_in = 1.0f, float dt_in = 0.1f);
-  float update(float x_low, float x_high, float dt_in);
-  void setTau(float tau_in);
-  float getTau();
-  float getXhigh();
-  float getXlow();
-
-private:
-  float x;
-  float tau;
-  float dt;
-  LPF lpf_L;
-  LPF lpf_H;
+  float tau_ = 1.0f;
+  LPF low_;
+  LPF high_;
 };
 
 #endif // _FILTER_H_

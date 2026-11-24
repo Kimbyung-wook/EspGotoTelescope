@@ -11,7 +11,7 @@
 #endif
 #include "src/display/oled.h"
 #include "src/gps/gps.h"
-#include "src/util/tictok_us.h"
+#include "src/util/stopwatch_us.h"
 #include "src/util/loop_timer.h"
 #include "src/input/rotary.h"
 #include "src/sensors/imu.h"
@@ -25,8 +25,8 @@
 /************************************/
 // Devices
 /************************************/
-OLED*   monitor = new OLED();
-GPS*    gps     = new GPS(&GPS_PORT);
+Oled    oled;
+Gps     gps(&GPS_PORT);
 Imu     imu;
 RaMotor ra_motor(MOTOR_PWM, MOTOR_IN1, MOTOR_IN2);
 Rotary  rotary(BUTTON_S1, BUTTON_S2, BUTTON_KEY);
@@ -47,25 +47,25 @@ int         rotary_count_prev = 0;
 /************************************/
 config::EepromSettingsStore settings_store;
 
-static_assert(sizeof(frame.lines) == sizeof(monitor->msg), "Frame and OLED buffers must match");
+static_assert(Frame::LINES == Oled::ROWS && Frame::COLS == Oled::COLS, "Frame and OLED lines must match");
 
 /************************************/
 // Performance and simple scheduler
 /************************************/
-Tictok_us perform_main;
-Tictok_us perform_rest;
-Tictok_us perform_imu;
-LoopTimer     loop_timer((unsigned long)(1000000.0f / hz));
+StopwatchUs perform_main;
+StopwatchUs perform_rest;
+StopwatchUs perform_imu;
+LoopTimer   loop_timer((unsigned long)(1000000.0f / hz));
 
-// One boot message per line; when the screen is full the lines scroll up
-// (line 0, the name and version, stays).
+// One boot message per line (in 'frame'); when the screen is full the lines scroll
+// up (line 0, the name and version, stays).
 void bootLine(int& line, const char* text) {
-  if (line >= DISP_LINE_COLUMN) {
-    memmove(monitor->msg[1], monitor->msg[2], (DISP_LINE_COLUMN - 2) * DISP_LINE_ROW);
-    line = DISP_LINE_COLUMN - 1;
+  if (line >= Frame::LINES) {
+    memmove(frame.lines[1], frame.lines[2], (Frame::LINES - 2) * Frame::COLS);
+    line = Frame::LINES - 1;
   }
-  snprintf(monitor->msg[line++], DISP_LINE_ROW, "%s", text);
-  monitor->print();
+  snprintf(frame.lines[line++], Frame::COLS, "%s", text);
+  oled.print(frame.lines);
 }
 
 // Shows a "starting ..." text on the next line without moving to it
@@ -82,9 +82,9 @@ void setup() {
   /************************************/
   // Display
   /************************************/
-  monitor->setup_display();
+  oled.begin();      // nothing to show if it fails
   bootLine(line, boot::TITLE);
-  char cpu_line[DISP_LINE_ROW];
+  char cpu_line[Frame::COLS];
   boot::displayLine(cpu_line, sizeof(cpu_line), ESP.getCpuFreqMHz());
   bootLine(line, cpu_line);
 
@@ -102,7 +102,7 @@ void setup() {
   // GPS
   /************************************/
   bootPending(line, boot::GPS_PENDING);
-  bool gps_on = gps->setup_gps();
+  bool gps_on = gps.begin();
   bootLine(line, gps_on ? boot::GPS_ON : boot::GPS_TIMEOUT);
 
   /************************************/
@@ -139,30 +139,16 @@ void setup() {
 
 // Sensor values of this frame
 void readInputs(app::FrameInput& in) {
-  const Adafruit_GPS* g = gps->gps_device;
-  in.now_ms           = millis();
-  in.gps.year         = g->year;
-  in.gps.month        = g->month;
-  in.gps.day          = g->day;
-  in.gps.hour         = g->hour;
-  in.gps.minute       = g->minute;
-  in.gps.seconds      = g->seconds;
-  in.gps.milliseconds = g->milliseconds;
-  in.gps.fixquality   = g->fixquality;
-  in.gps.satellites   = g->satellites;
-  in.gps.lat_hemi     = g->lat;
-  in.gps.lon_hemi     = g->lon;
-  in.gps.latitude     = ((double)g->latitude_fixed)  * 1E-7;
-  in.gps.longitude    = ((double)g->longitude_fixed) * 1E-7;
-  in.gps.altitude_m   = g->altitude;
+  in.now_ms = millis();
+  in.gps = gps.data();
 
   in.imu = imu.data();
   in.health.loop_hz = hz;
-  in.health.loop_us = perform_rest.getdt() + perform_main.getdt();
-  in.health.main_us = perform_main.getdt();
-  in.health.disp_us = monitor->perform_print.getdt();
-  in.health.gps_us  = gps->perform_read.getdt();
-  in.health.imu_us  = perform_imu.getdt();   // est_us / astro_us: timed by core
+  in.health.loop_us = perform_rest.last() + perform_main.last();
+  in.health.main_us = perform_main.last();
+  in.health.disp_us = oled.printUs();
+  in.health.gps_us  = gps.readUs();
+  in.health.imu_us  = perform_imu.last();   // est_us / astro_us: timed by core
   in.remote = remote::state();                 // status bar Wi-Fi mark
 #if VBAT_SENSE_ENABLE
   if (!battery.valid() || in.now_ms - battery_read_ms >= VBAT_PERIOD_MS) {
@@ -177,7 +163,7 @@ void readInputs(app::FrameInput& in) {
 }
 
 void loop() {
-  perform_main.tic();
+  perform_main.start();
   app::FrameInput in;
 
   // Inputs
@@ -193,36 +179,33 @@ void loop() {
   in.click = in.click || remote_click;
 
   // Sensors
-  gps->read_all();
-  perform_imu.tic();
+  gps.read();
+  perform_imu.start();
   imu.read();
-  perform_imu.toc();
+  perform_imu.stop();
   readInputs(in);
 
   // Estimation, position/time, astro, UI (src/app/core.h)
   core.step(in, frame);
 
   // Display
-  monitor->setPower(core.displayOn());   // Sleep: OLED off, phone still mirrors
-  if (core.displayOn()) {
-    memcpy(monitor->msg, frame.lines, sizeof(frame.lines));
-    monitor->print();
-  }
+  oled.setPower(core.displayOn());   // Sleep: OLED off, phone still mirrors
+  if (core.displayOn()) oled.print(frame.lines);
   remote::publish(frame);   // phone mirror (only when the lines changed)
 
   // Save / Reset from the UI, then the outputs (tracking overrides the manual RRcmd;
   // calibration / Polar Align stop the motor)
   ra_motor.setSpeed(core.finish(settings_store));
 
-  perform_main.toc();
+  perform_main.stop();
 
   /************************************/
   // Simple scheduler : wait for the next period
   /************************************/
-  perform_rest.tic();
+  perform_rest.start();
   while (!loop_timer.due(micros())) {
     remote::poll();   // HTTP / WebSocket (empty when REMOTE_UI_ENABLE is 0)
     yield();
   }
-  perform_rest.toc();
+  perform_rest.stop();
 }

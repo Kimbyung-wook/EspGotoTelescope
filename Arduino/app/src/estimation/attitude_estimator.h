@@ -13,7 +13,7 @@ class AttitudeEstimator {
 public:
   void begin(float tau_s, float dt_s);
   // d : body-frame IMU data with the gyro bias already removed
-  void update(const ImuData& d, float dt_s);
+  void update(const ImuData& d);   // one step of dt_s (begin)
   float rollDeg()  const { return roll_deg_; }
   float pitchDeg() const { return pitch_deg_; }
 

@@ -1,6 +1,7 @@
 #pragma once
 #ifndef _APP_STATE_H_
 #define _APP_STATE_H_
+#include "../gps/gps_data.h"
 #include "../sensors/imu_data.h"
 #include "../config/settings.h"
 
@@ -11,15 +12,7 @@
 /************************************/
 // Values the UI shows (filled by the main loop every frame)
 /************************************/
-// GPS receiver output as it arrives (Adafruit_GPS fields)
-struct GpsRaw {
-  int  year = 0, month = 0, day = 0;        // 2-digit year (26 = 2026)
-  int  hour = 0, minute = 0, seconds = 0, milliseconds = 0;
-  int  fixquality = 0, satellites = 0;
-  char lat_hemi = ' ', lon_hemi = ' ';
-  double latitude = 0.0, longitude = 0.0;   // [deg], signed (S/W negative)
-  float  altitude_m = 0.0f;                 // above mean sea level
-};
+// GpsRaw (GPS receiver output): src/gps/gps_data.h
 
 // Position and time in use (src/location, DES-LOC-01, DES-LOC-04), filled every frame
 struct ObserverState {

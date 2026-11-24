@@ -1,48 +1,30 @@
 #pragma once
 #ifndef _OLED_H_
 #define _OLED_H_
-// Display Library
 #include <SPI.h>
 #include <Wire.h>
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>
-
-#include "../util/tictok_us.h"
-#include "../board_config.h"
+#include "../util/stopwatch_us.h"
 
 /************************************/
-// Display Settings
+// SSD1306 128x64 on I2C: 8 text lines of 21 characters
 /************************************/
-#define DISP_LINE_ROW 22
-#define DISP_LINE_COLUMN 8
+class Oled {
+public:
+  static const int ROWS = 8;
+  static const int COLS = 22;      // 21 characters + null
 
-#define SCREEN_WIDTH 128 // OLED display width, in pixels
-#define SCREEN_HEIGHT 64 // OLED display height, in pixels
+  Oled();
+  bool begin();                    // false when the display does not answer
+  void print(const char lines[ROWS][COLS]);
+  void setPower(bool on);          // display on/off (Sleep), sent only on a change
+  unsigned long printUs() const { return print_time_.last(); }
 
-// Declaration for an SSD1306 display connected to I2C (SDA, SCL pins)
-// The pins for I2C are defined by the Wire-library. 
-#define OLED_RESET     -1 // Reset pin # (or -1 if sharing Arduino reset pin)
-#define SCREEN_ADDRESS OLED_I2C_ADDRESS
-
-class OLED{
-  public: // Functions
-    OLED();
-    ~ OLED();
-    
-  public : // Variables
-    int setup_display();
-    void print();
-    void setPower(bool on);   // SSD1306 display on/off (Sleep), sent only on a change
-
-  public:
-    char msg[DISP_LINE_COLUMN][DISP_LINE_ROW];
-    Tictok_us perform_print;
-
-  private:
-    Adafruit_SSD1306 display_device;
-    bool power_on = true;
-
-
+private:
+  Adafruit_SSD1306 device_;
+  StopwatchUs print_time_;
+  bool power_on_ = true;
 };
 
 #endif // _OLED_H_

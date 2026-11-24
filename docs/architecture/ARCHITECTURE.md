@@ -99,7 +99,8 @@ flowchart TB
   subgraph COMMON["공통"]
     CFG["board_config"]
     IMUD["sensors/imu_data"]
-    TT["util/tictok_us"]
+    GPSD["gps/gps_data"]
+    TT["util/stopwatch_us"]
     LT["util/loop_timer"]
   end
 
@@ -115,14 +116,14 @@ flowchart TB
   SKY --> MTRK --> ASTRO
   SKY & TRK & BIND --> STATE
   OLED --> L_SSD & TT & CFG
-  GPS --> L_GPS & GPSL & TT
+  GPS --> L_GPS & GPSL & GPSD & TT
   IMU --> L_ICM & IMUD
   ROT --> ROTD
   ATT --> FLT & IMUD
   TUI --> SCRS --> MGR --> SCR
   SCRS --> BIAS & TRK
   SCR --> FRM & STATE
-  STATE --> IMUD
+  STATE --> IMUD & GPSD
 ```
 
 - UI, 추정, 천체 위치 모듈은 하드웨어 라이브러리를 쓰지 않습니다. 그래서 PC에서 단위시험(`Arduino/test`)과 GUI 시뮬레이터(`Arduino/tools/ui_simulator`)로 그대로 빌드할 수 있습니다.
@@ -138,7 +139,7 @@ flowchart LR
   end
 
   DEC -- "count · click" --> IN["① 입력<br/>delta · click"]
-  GPSDEV["GPS UART"] --> SEN["② 센서<br/>gps.read_all · imu.read"]
+  GPSDEV["GPS UART"] --> SEN["② 센서<br/>gps.read · imu.read"]
   IMUDEV["ICM20948"] --> SEN
   SEN --> TEL["③ Telemetry 갱신<br/>imu · imu_corr(바이어스 제거)"]
   TEL --> ESTI["④ 자세 추정<br/>상보필터 τ = 1 s"]

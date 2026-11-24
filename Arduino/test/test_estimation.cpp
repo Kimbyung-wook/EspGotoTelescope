@@ -160,7 +160,7 @@ TEST(attitude_estimator_settles_on_gravity_tilt) {
   const float g = 9.80665f, r = 10.0f * 3.14159265f / 180.0f;
   ImuData d; d.ay = g * std::sin(r); d.az = g * std::cos(r);
   AttitudeEstimator est; est.begin(1.0f, 0.1f);
-  for (int k = 0; k < 200; k++) est.update(d, 0.1f);
+  for (int k = 0; k < 200; k++) est.update(d);
   CHECK_NEAR(est.rollDeg(), 10.0, 1e-2);
   CHECK_NEAR(est.pitchDeg(), 0.0, 1e-2);
 }
@@ -169,9 +169,9 @@ TEST(attitude_estimator_settles_on_gravity_tilt) {
 TEST(attitude_estimator_follows_gyro_short_term) {
   ImuData d; d.az = 9.80665f;          // accelerometer still says level
   AttitudeEstimator est; est.begin(10.0f, 0.1f);
-  est.update(d, 0.1f);
+  est.update(d);
   d.wy = 10.0f;                         // 10 dps for 1 s
-  for (int k = 0; k < 10; k++) est.update(d, 0.1f);
+  for (int k = 0; k < 10; k++) est.update(d);
   CHECK(est.pitchDeg() > 8.0f);
   CHECK(est.pitchDeg() < 10.5f);
 }

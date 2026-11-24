@@ -60,7 +60,7 @@ GUI(`gui/simulator.py`)와 UI 러너(`build/ui_runner.exe`)가 주고받는 메�
 |---|---|
 | `seq` | 부팅 뒤 프레임 번호(0부터). `reset`해도 계속 늘어남 |
 | `t_ms` | 이 프레임의 시뮬레이션 시각(부팅 뒤 ms) |
-| `lines` | 화면 8줄, 줄당 최대 21자. 펌웨어 `monitor->msg[0..7]`에 해당. 빈 줄은 `""` |
+| `lines` | 화면 8줄, 줄당 최대 21자. 펌웨어 `frame.lines[0..7]`(OLED에 그대로 나감)에 해당. 빈 줄은 `""` |
 | `motor.in1`, `motor.in2` | H-브리지 입력 핀 레벨 0/1 (`MOTOR_IN1`, `MOTOR_IN2`) |
 | `motor.pwm` | `MOTOR_PWM` 듀티 0~255 |
 

@@ -35,7 +35,7 @@ void Core::step(const FrameInput& in, Frame& frame) {
 
   // Estimation
   const unsigned long est_start = micros_ ? micros_() : 0;
-  att_est_.update(t.imu.corr, 1.0f / loop_hz_);
+  att_est_.update(t.imu.corr);
   if (micros_) est_us_ = micros_() - est_start;
   t.imu.roll_est_deg = att_est_.rollDeg();
   t.imu.pitch_est_deg = att_est_.pitchDeg();

@@ -47,6 +47,16 @@
 #define IMU_TUBE_OPTICAL_AXIS  1
 #define IMU_TUBE_DEC_AXIS      2
 
+// Calibration shock limits (DES-CAL-02): a sample whose |w| or |a| is further than
+// this from the running mean spoils the measurement. Tune on the real mount.
+#define CAL_SHOCK_GYRO_DPS    2.0f   // [deg/s]
+#define CAL_SHOCK_ACCEL_MPS2  0.5f   // [m/s^2]
+
+// Polar alignment (DES-PA-04): both errors inside these for PA_OK_HOLD_MS -> OK
+#define PA_ALT_TOL_DEG  0.5f
+#define PA_AZ_TOL_DEG   2.0f
+#define PA_OK_HOLD_MS   2000
+
 /************************************/
 // Devices
 /************************************/

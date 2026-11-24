@@ -1,5 +1,6 @@
-// Fill the Moon / tracking-target fields of Telemetry from the GPS fields
-// (shared by app.ino and the UI simulator).
+// Fill the Moon / tracking-target / tube fields of Telemetry from the position and
+// time in use (Telemetry::obs_*, jd_ut; see src/app/loop_logic.h), and the RA motor
+// command while tracking. Shared by app.ino and the UI simulator.
 #pragma once
 #include "target_tracker.h"
 #include "../ui/ui_context.h"
@@ -8,16 +9,14 @@
 namespace astro {
 
 namespace detail {
+inline bool known(const Telemetry& t) { return t.loc_source != 0 && t.time_source != 0; }
+inline Observer observer(const Telemetry& t) { return Observer{t.obs_lat_deg, t.obs_lon_deg, t.obs_alt_m}; }
 inline bool trackerUpdate(TargetTracker& tr, const Telemetry& t) {
-  UtcTime utc;
-  const bool date_ok = utcFromGps(t.year, t.month, t.day, t.hour, t.minute, t.seconds,
-                                  t.milliseconds, utc);
-  const Observer obs{t.latitude, t.longitude, t.altitude_m};
-  return tr.update(t.now_ms, t.fixquality > 0, date_ok ? &utc : nullptr, obs);
+  return tr.updateJd(t.now_ms, known(t), t.jd_ut, observer(t));
 }
 }  // namespace detail
 
-// Moon screen. Returns true when a new state was computed in this call.
+// Moon (also the lunar tracking rate). Returns true when a new state was computed.
 inline bool updateMoonTelemetry(TargetTracker& tracker, Telemetry& t) {
   tracker.setTarget(Target::Moon);
   const bool fresh = detail::trackerUpdate(tracker, t);
@@ -34,7 +33,7 @@ inline bool updateMoonTelemetry(TargetTracker& tracker, Telemetry& t) {
   return fresh;
 }
 
-// Planet Tracking screen: the target chosen in UiState::track_target.
+// Target screen: the target chosen in UiState::track_target.
 inline bool updateTargetTelemetry(TargetTracker& tracker, int target_index, Telemetry& t) {
   if (target_index < 0 || target_index >= TARGET_COUNT) target_index = 0;
   tracker.setTarget(static_cast<Target>(target_index));
@@ -61,14 +60,34 @@ inline float trackingDuty(double rate_arcsec_s, float duty_at_sidereal) {
   return (float)(duty_at_sidereal * rate_arcsec_s / SIDEREAL_RATE_ARCSEC_S);
 }
 
-// While tracking is on, drive the RA motor at the target rate plus the user offset
-// (Planet Tracking > Offset). Before calibration (duty_at_sidereal 0) only the
-// offset drives the motor, so the offset can be used to find the sidereal duty.
-// Keeps the last command if the GPS drops out for a moment.
+// Tracking rate of the chosen mode (DES-TRK-01). Lunar needs the Moon position.
+inline bool trackingRate(const Telemetry& t, const UiState& st, double& rate_arcsec_s) {
+  if (st.track_mode == UiState::TRACK_LUNAR) {
+    if (!t.moon_valid) return false;
+    rate_arcsec_s = t.moon_rate_arcsec_s;
+    return true;
+  }
+  rate_arcsec_s = SIDEREAL_RATE_ARCSEC_S;
+  return true;
+}
+
+// Direction of the tracking command (DES-MOT-02): -1 in the southern hemisphere,
+// flipped again by the motor_reverse setting.
+inline float trackingSign(const Telemetry& t, const UiState& st) {
+  float s = (t.loc_source != 0 && t.obs_lat_deg < 0.0) ? -1.0f : 1.0f;
+  return st.motor_reverse ? -s : s;
+}
+
+// While tracking is on, drive the RA motor at the tracking rate plus the user
+// offset (Target > Offset). The tube itself is followed (DES-TRK-02), so the
+// sidereal rate works without a position. Before calibration (duty_at_sidereal 0)
+// only the offset drives the motor, so the offset can be used to find the sidereal
+// duty. Keeps the last command if the lunar rate is missing for a moment.
 inline bool applyTracking(const Telemetry& t, UiState& st, float duty_at_sidereal) {
   if (!st.tracking) return false;
-  if (!t.target_valid || t.target_index != st.track_target) return false;
-  st.ra_speed_cmd = trackingDuty(t.target_rate_arcsec_s, duty_at_sidereal) + st.track_offset;
+  double rate = 0.0;
+  if (!trackingRate(t, st, rate)) return false;
+  st.ra_speed_cmd = trackingSign(t, st) * (trackingDuty(rate, duty_at_sidereal) + st.track_offset);
   return true;
 }
 
@@ -93,21 +112,24 @@ inline void upInTubeFromRollPitch(double roll_deg, double pitch_deg, int optical
   up[2] = ub[0] * z[0] + ub[1] * z[1] + ub[2] * z[2];
 }
 
-// Telescope RA/Dec from the estimated roll/pitch, every frame (a few trig calls).
+// Tube altitude (always), telescope RA/Dec and the Polaris hour angle (when the
+// position and time are known), every frame (a few trig calls).
 // The mirror ambiguity is resolved toward the chosen target.
 inline bool updateScopeTelemetry(Telemetry& t, int optical_axis, int dec_axis) {
-  UtcTime utc;
-  t.scope_valid = false;
-  if (t.fixquality <= 0 ||
-      !utcFromGps(t.year, t.month, t.day, t.hour, t.minute, t.seconds, t.milliseconds, utc))
-    return false;
   double up[3];
   upInTubeFromRollPitch(t.roll_est_deg, t.pitch_est_deg, optical_axis, dec_axis, up);
-  const double lst = lstDeg(julianDate(utc), t.longitude);
+  const double u0 = up[0] > 1.0 ? 1.0 : (up[0] < -1.0 ? -1.0 : up[0]);
+  t.tube_alt_deg = asin(u0) * 57.29577951308232;
+  t.scope_valid = false;
+  t.polaris_valid = false;
+  if (!detail::known(t)) return false;
+  const double lst = lstDeg(t.jd_ut, t.obs_lon_deg);
+  t.polaris_ha_deg = polarisHaDeg(t.jd_ut, t.obs_lon_deg);
+  t.polaris_valid = t.obs_lat_deg > 0.0;            // Polaris: northern sky only
   const double hint_ra = t.target_valid ? t.target_ra_deg : lst;          // else: the meridian
-  const double hint_dec = t.target_valid ? t.target_dec_deg : t.latitude - 45.0;
+  const double hint_dec = t.target_valid ? t.target_dec_deg : t.obs_lat_deg - 45.0;
   Equatorial q;
-  if (!pointingFromUp(up, t.latitude, lst, hint_ra, hint_dec, q)) return false;
+  if (!pointingFromUp(up, t.obs_lat_deg, lst, hint_ra, hint_dec, q)) return false;
   t.scope_ra_deg = q.ra_deg;
   t.scope_dec_deg = q.dec_deg;
   t.scope_valid = true;

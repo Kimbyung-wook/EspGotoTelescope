@@ -77,10 +77,10 @@ TEST(settings_corruption_is_detected) {
 }
 
 TEST(settings_older_shorter_payload_keeps_new_fields_default) {
-  // An image whose payload ends before guide_tolerance_deg (last 4 bytes)
+  // An image whose payload ends before guide_tolerance_deg (f32 + manual_set u8 at the end)
   uint8_t img[STORE_SIZE];
   const size_t n = encode(sample(), img, sizeof(img));
-  const uint16_t short_size = (uint16_t)(n - HEADER_SIZE - 4);
+  const uint16_t short_size = (uint16_t)(n - HEADER_SIZE - 5);
   img[6] = (uint8_t)short_size; img[7] = (uint8_t)(short_size >> 8);
   const uint32_t crc = crc32(img + HEADER_SIZE, short_size);
   for (int i = 0; i < 4; i++) img[8 + i] = (uint8_t)(crc >> (8 * i));

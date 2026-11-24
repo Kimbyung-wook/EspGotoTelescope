@@ -396,31 +396,45 @@ class Simulator:
 
 # ------------------------------------------------------------ scripted tour
 TOUR = [
-    # (action, arg, screenshot name or None)
+    # (action, arg, screenshot name or None); rotations are relative to the cursor
     ("wait", 3, "00_boot_partial"),
     ("wait_title", "Main Menu", "01_main_menu"),
     ("window", None, "window_main_menu"),
-    ("click", None, "02_ra_speed"),
-    ("click", None, None), ("rotate", 25, "03_ra_speed_edit"),
+    # 1Target : Mars, tracking on, page scrolled up, back to the list, Quit
+    ("click", None, "02_target_menu"),
+    ("rotate", 2, None), ("click", None, "03_target_mars"),
+    ("click", None, "04_target_tracking"), ("rotate", -2, "05_target_top"),
+    ("rotate", 5, None), ("click", None, "06_target_menu_tracking"),
+    ("rotate", 3, None), ("click", None, None),
+    # 2Polar Align
+    ("rotate", 1, None), ("click", None, "07_polar_align"), ("rotate", 1, None), ("click", None, None),
+    # 3Status and its screens
+    ("rotate", 1, None), ("click", None, "08_status_menu"),
+    ("click", None, "09_status_gps"), ("click", None, None),
+    ("preset", "tilt", None),
+    ("rotate", 1, None), ("click", None, "10_status_acc_gyro"), ("click", None, None),
+    ("rotate", 1, None), ("click", None, "11_status_mag_temp"), ("click", None, None),
+    ("rotate", 1, None), ("click", None, "12_status_imu_calib"), ("click", None, None),
+    ("rotate", 1, None), ("click", None, "13_att_estimator"), ("click", None, None),
+    ("rotate", 1, None), ("click", None, "14_health"), ("click", None, None),
+    ("rotate", 1, None), ("click", None, None),
+    # 4Calibration : Gyro and Accel (cancelled)
+    ("rotate", 1, None), ("click", None, "15_calib_menu"),
+    ("click", None, "16_gyro_calib"), ("click", None, None),
+    ("rotate", 1, None), ("click", None, "17_accel_calib"), ("click", None, None),
+    ("rotate", 1, None), ("click", None, None),
+    # 5Settings, Location, Time
+    ("rotate", 1, None), ("click", None, "18_settings"),
+    ("rotate", 1, None), ("click", None, "19_location"), ("rotate", 10, None), ("click", None, None),
+    ("rotate", 1, None), ("click", None, "20_time"), ("rotate", 10, None), ("click", None, None),
+    ("rotate", 10, "21_settings_end"), ("click", None, None),
+    # 6RA Speed
+    ("rotate", 1, None), ("click", None, "22_ra_speed"),
+    ("click", None, None), ("rotate", 25, "23_ra_speed_edit"),
     ("window", None, "window_ra_speed_edit"),
     ("click", None, None), ("rotate", 2, None), ("click", None, None),
-    ("rotate", 1, None), ("click", None, "04_status_gps"), ("click", None, None),
-    ("preset", "tilt", None),
-    ("rotate", 1, None), ("click", None, "05_status_acc_gyro"), ("click", None, None),
-    ("rotate", 1, None), ("click", None, "06_status_mag_alt"), ("click", None, None),
-    ("rotate", 1, None), ("click", None, "07_status_imu_calib"), ("click", None, None),
-    ("rotate", 1, None), ("click", None, "08_do_imu_calib"),
-    ("rotate", 2, None), ("click", None, "09_calib_gyro_bias"), ("click", None, None),
-    ("rotate", 3, "10_do_imu_calib_quit"), ("click", None, "11_main_after_calib"),
-    ("rotate", 1, None), ("click", None, "12_att_estimator"), ("click", None, None),
-    ("rotate", 1, None), ("click", None, "13_health"), ("click", None, None),
-    ("rotate", 1, None), ("click", None, "14_axis_for_moon"), ("click", None, None),
-    ("rotate", 1, None), ("click", None, "15_planet_menu"),
-    ("rotate", 2, None), ("click", None, "16_planet_mars"), ("click", None, "17_planet_mars_tracking"),
-    ("rotate", 1, None), ("click", None, None), ("rotate", 5, "18_planet_offset_edit"), ("click", None, None),
-    ("rotate", 1, None), ("click", None, None), ("rotate", 3, None), ("click", None, None),
-    ("rotate", 1, None), ("click", None, "19_settings"), ("rotate", 3, None), ("click", None, None),
-    ("rotate", 1, None), ("click", None, "20_sleep"), ("click", None, "21_back_to_main"),
+    # Sleep
+    ("rotate", 1, None), ("click", None, "24_sleep"), ("click", None, "25_back_to_main"),
 ]
 
 

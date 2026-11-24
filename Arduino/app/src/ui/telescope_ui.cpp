@@ -1,41 +1,48 @@
 #include "telescope_ui.h"
+#include "../location/location.h"
 
-static const char* const MAIN_MENU_LABELS[MainMenuScreen::ITEMS] = {
-  "1RA Speed",
-  "2Status - GPS",
-  "3Status - Acc/Gyro",
-  "4Status - Mag/Alt",
-  "5Status - IMUCalib",
-  "6Do IMU Calib.",
-  "7Att.Estimator",
-  "8Health",
-  "9Axis for Moon",
-  "10Planet Tracking",
-  "11Settings",
+static const char* const MAIN_LABELS[TelescopeUi::MAIN_ITEMS] = {
+  "1Target",
+  "2Polar Align",
+  "3Status",
+  "4Calibration",
+  "5Settings",
+  "6RA Speed",
   "Sleep",
 };
 
+static const char* const STATUS_LABELS[TelescopeUi::STATUS_ITEMS] = {
+  "GPS", "Acc/Gyro", "Mag/Temp", "IMU Calib", "Att.Estimator", "Health", "Back",
+};
+
+static const char* const CALIB_LABELS[TelescopeUi::CALIB_ITEMS] = {
+  "Gyro Bias", "Accel 6-pos", "Back",
+};
+
 TelescopeUi::TelescopeUi()
-  : ra_speed_(MAIN_MENU_LABELS[0]),
-    gps_(MAIN_MENU_LABELS[1]),
-    acc_gyro_(MAIN_MENU_LABELS[2]),
-    mag_temp_(MAIN_MENU_LABELS[3]),
-    imu_calib_status_(MAIN_MENU_LABELS[4]),
-    imu_calib_menu_(MAIN_MENU_LABELS[5]),
-    att_est_(MAIN_MENU_LABELS[6]),
-    health_(MAIN_MENU_LABELS[7]),
-    moon_axis_(MAIN_MENU_LABELS[8]),
-    target_menu_(MAIN_MENU_LABELS[9]),
-    settings_(MAIN_MENU_LABELS[10]),
-    targets_{&ra_speed_, &gps_, &acc_gyro_, &mag_temp_, &imu_calib_status_,
-             &imu_calib_menu_, &att_est_, &health_, &moon_axis_, &target_menu_, &settings_, &sleep_},
-    main_(MAIN_MENU_LABELS, targets_),
+  : target_menu_(MAIN_LABELS[0]),
+    polar_align_(MAIN_LABELS[1]),
+    gps_(STATUS_LABELS[0]),
+    acc_gyro_(STATUS_LABELS[1]),
+    mag_temp_(STATUS_LABELS[2]),
+    imu_calib_status_(STATUS_LABELS[3]),
+    att_est_(STATUS_LABELS[4]),
+    health_(STATUS_LABELS[5]),
+    status_targets_{&gps_, &acc_gyro_, &mag_temp_, &imu_calib_status_, &att_est_, &health_, nullptr},
+    status_(MAIN_LABELS[2], STATUS_LABELS, status_targets_, STATUS_ITEMS),
+    calib_targets_{&gyro_calib_, &accel_calib_, nullptr},
+    calib_(MAIN_LABELS[3], CALIB_LABELS, calib_targets_, CALIB_ITEMS),
+    settings_(MAIN_LABELS[4]),
+    ra_speed_(MAIN_LABELS[5]),
+    main_targets_{&target_menu_, &polar_align_, &status_, &calib_, &settings_, &ra_speed_, &sleep_},
+    main_("Main Menu", MAIN_LABELS, main_targets_, MAIN_ITEMS, true),
     mgr_(&main_) {}
 
 void TelescopeUi::step(int rotate_delta, bool click, UiContext& ctx, Frame& f) {
   const Telemetry& t = ctx.tel;
-  f.set(0, "T %2d:%2d:%2d.%1d V %5.2f",
-        t.hour % 100, t.minute % 100, t.seconds % 100, (t.milliseconds / 100) % 10, t.voltage);
+  // 'T' GPS time, 'M' manual clock (DES-LOC-04)
+  f.set(0, "%c %2d:%2d:%2d.%1d V %5.2f", t.time_source == loc::TIME_MANUAL ? 'M' : 'T',
+        t.clock_hour % 100, t.clock_minute % 100, t.clock_second % 100, (t.clock_ms / 100) % 10, t.voltage);
   // Wi-Fi mark in column 20 (the time/voltage text above is 20 characters)
   if (t.remote != Telemetry::REMOTE_OFF && strlen(f.lines[0]) == Frame::COLS - 2)
     f.lines[0][Frame::COLS - 2] = t.remote == Telemetry::REMOTE_CONNECTED ? 'W' : 'w';

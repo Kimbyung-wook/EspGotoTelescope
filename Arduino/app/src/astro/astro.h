@@ -68,6 +68,8 @@ double julianDate(const UtcTime& t);           // Gregorian calendar -> JD (UT)
 inline double ttFromUt(double jd_ut) { return jd_ut + DELTA_T_S / 86400.0; }
 double gmstDeg(double jd_ut);                  // Greenwich mean sidereal time, 0..360
 double lstDeg(double jd_ut, double lon_deg);   // local mean sidereal time, 0..360
+// JD (UT) -> calendar date and time (Meeus 7.3); false for jd < 0
+bool utcFromJd(double jd_ut, UtcTime& out);
 
 // ---- angles
 double wrap360(double deg);
@@ -122,6 +124,24 @@ bool poseCandidatesFromUp(const double up[3], double lat_deg, MountPose out[2]);
 // Picks the candidate closest to a hint direction (normally the chosen target).
 bool pointingFromUp(const double up[3], double lat_deg, double lst_deg,
                     double hint_ra_deg, double hint_dec_deg, Equatorial& out);
+
+// ---- pointing guidance (DES-PNT-04)
+// Target minus tube: dRA (deg, wrapped -180..180, positive = target further east,
+// turn the tube east) and dDec (deg, positive = turn north).
+void guideOffsets(double scope_ra_deg, double scope_dec_deg, double target_ra_deg,
+                  double target_dec_deg, double& dra_deg, double& ddec_deg);
+// Both offsets inside tol (dRA measured on the sky: dRA * cos(dec))
+bool onTarget(double dra_deg, double ddec_deg, double dec_deg, double tol_deg);
+
+// ---- polar alignment (DES-AST-02, DES-PA-03)
+// Polaris (alpha UMi), J2000, precessed to the date
+Equatorial polarisOfDate(double jd_ut);
+// Hour angle of Polaris, -180..180
+double polarisHaDeg(double jd_ut, double lon_deg);
+// Where Polaris sits around the pole as a clock hand (12 = above the pole, seen
+// with the naked eye facing north; an inverting polar scope shows it 6 h away).
+// Returns 0 < hours <= 12.
+double polarisClockHours(double ha_deg);
 
 using MoonState = TargetState;
 inline MoonState moonState(double jd_ut, const Observer& obs) {

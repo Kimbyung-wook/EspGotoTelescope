@@ -13,11 +13,10 @@ import sys
 import oled_render
 from runner_client import DEFAULT_RUNNER, RunnerClient
 
-TITLES = ["*1RA Speed", "*2Status - GPS", "*3Status - Acc/Gyro", "*4Status - Mag/Alt",
-          "*5Status - IMUCalib", "*6Do IMU Calib.", "*7Att.Estimator", "*8Health",
-          "*9Axis for Moon", "*10Planet Tracking", "*11Settings", " "]   # Sleep blanks the title line
-# rotations from the first row to Quit; None = info screen (click leaves)
-EXIT_ROTATE = [2, None, None, None, None, 5, None, None, None, 5, 3, None]
+TITLES = ["*1Target", "*2Polar Align", "*3Status", "*4Calibration", "*5Settings",
+          "*6RA Speed", " "]   # Sleep blanks the title line
+# rotations from the first row to Back/Quit; None = click leaves
+EXIT_ROTATE = [5, 1, 6, 2, 7, 2, None]
 
 failures = 0
 verbose = False
@@ -57,14 +56,14 @@ def main():
         check(c.hello["backend"] == "firmware", "backend is the firmware UI")
 
         f = c.step()
-        check(f["lines"][0] == "SimpleGoTo v0.1.0", "boot starts with the name and version", f)
+        check(f["lines"][0] == "SimpleGoTo v0.2.0", "boot starts with the name and version", f)
         for _ in range(100):
             f = c.step()
             if f["lines"][1] == "Main Menu":
                 break
         check(f["lines"][1] == "Main Menu", "main menu after boot", f)
         check_frame_shape(f)
-        check(f["lines"][2][1:] == "1RA Speed" and f["lines"][2][0] in ">-",
+        check(f["lines"][2][1:] == "1Target" and f["lines"][2][0] in ">-",
               "cursor on first item", f)
 
         for k, title in enumerate(TITLES):
@@ -84,6 +83,7 @@ def main():
             c.step()
 
         # RA speed edit drives the motor
+        c.rotate(5); c.step()
         c.click(); c.step()
         c.click(); c.step()
         c.rotate(-30)
@@ -95,13 +95,16 @@ def main():
         c.click()
         f = c.step()
         check(f["lines"][1] == "Main Menu", "leave RA speed", f)
+        c.rotate(-20); c.step()
 
         # sensor values reach the screen
         c.sensors(gps={"hour": 23, "minute": 59, "seconds": 58, "milliseconds": 900},
                   imu={"wz": -12.5})
         c.rotate(2); c.step()
+        c.click(); c.step()                  # 3Status
+        c.rotate(1); c.step()
         c.click()
-        f = c.step()
+        f = c.step()                         # Acc/Gyro
         check(f["lines"][0] == "T 23:59:58.9 V 12.60", "status bar shows GPS time", f)
         check(f["lines"][7] == "Wz     -12.50000 dps", "Wz on Acc/Gyro screen", f)
         c.click(); c.step()

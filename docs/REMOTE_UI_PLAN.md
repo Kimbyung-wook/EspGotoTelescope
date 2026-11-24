@@ -102,9 +102,9 @@ Arduino/scripts/build.sh --build-property "compiler.cpp.extra_flags=-DREMOTE_UI_
    - 평균: Wi-Fi 끔 / AP 켬 / 폰 접속 중. 피크는 오실로스코프나 피크 홀드가 있으면 측정(송신 피크 300 mA 이상 예상).
    - 레귤레이터 발열, 접속 순간 OLED 깜빡임·리셋이 없는지 확인.
    - 필요하면 `REMOTE_UI_TX_DBM`을 바꿔(예: 0, 10, 17) 비교.
-3. **지자기 간섭 (4 Status-Mag/Alt 화면)**
+3. **지자기 간섭 (3Status > Mag/Temp 화면)**
    - 가대를 고정한 채 `Mx/My/Mz`를 Wi-Fi 끔 → AP 켬 → 폰 접속·버튼 연타 순으로 각각 30초 관찰, 평균과 흔들림(최대−최소)을 적습니다.
-   - 9 Axis for Moon 화면의 Yaw가 함께 흔들리는지도 봅니다.
+   - 방위(Yaw)가 들어가면(DES-MAG) 그것도 함께 흔들리는지 봅니다.
    - 차이가 크면 `REMOTE_UI_TX_DBM`을 낮춰 다시 잽니다.
 4. **폰 접속 절차**
    1. 부팅 화면에 `7. WiFi AP SimpleGoTo`가 나오는지 확인.

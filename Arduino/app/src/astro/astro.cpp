@@ -94,6 +94,33 @@ double gmstDeg(double jd_ut) {
 
 double lstDeg(double jd_ut, double lon_deg) { return wrap360(gmstDeg(jd_ut) + lon_deg); }
 
+bool utcFromJd(double jd_ut, UtcTime& out) {
+  if (!(jd_ut >= 0.0)) return false;
+  const double j = jd_ut + 0.5;
+  const double Z = floor(j);
+  const double F = j - Z;
+  double A = Z;
+  if (Z >= 2299161.0) {
+    const double alpha = floor((Z - 1867216.25) / 36524.25);
+    A = Z + 1 + alpha - floor(alpha / 4.0);
+  }
+  const double B = A + 1524.0;
+  const double C = floor((B - 122.1) / 365.25);
+  const double D = floor(365.25 * C);
+  const double E = floor((B - D) / 30.6001);
+  const int month = (int)(E < 14 ? E - 1 : E - 13);
+  out.month = month;
+  out.year = (int)(month > 2 ? C - 4716 : C - 4715);
+  out.day = (int)(B - D - floor(30.6001 * E));
+  double s = F * 86400.0;
+  if (s >= 86400.0) s = 86399.999;
+  out.hour = (int)(s / 3600.0);
+  s -= out.hour * 3600.0;
+  out.minute = (int)(s / 60.0);
+  out.second = s - out.minute * 60.0;
+  return true;
+}
+
 double obliquityDeg(double jd_tt) { return 23.4393 - 3.563e-7 * (jd_tt - JD_SCHLYTER0); }
 
 Ecliptic sunEcliptic(double jd_tt) {
@@ -386,6 +413,37 @@ bool pointingFromUp(const double up[3], double lat_deg, double lst_deg,
   out.dec_deg = c[best].dec_deg;
   out.dist = 0.0;
   return true;
+}
+
+// ---- guidance
+void guideOffsets(double scope_ra_deg, double scope_dec_deg, double target_ra_deg,
+                  double target_dec_deg, double& dra_deg, double& ddec_deg) {
+  dra_deg = wrap180(target_ra_deg - scope_ra_deg);
+  ddec_deg = target_dec_deg - scope_dec_deg;
+}
+
+bool onTarget(double dra_deg, double ddec_deg, double dec_deg, double tol_deg) {
+  return fabs(dra_deg * cosd(dec_deg)) <= tol_deg && fabs(ddec_deg) <= tol_deg;
+}
+
+// ---- Polaris
+Equatorial polarisOfDate(double jd_ut) {
+  // alpha UMi J2000 (Hipparcos): RA 02h31m49.09s, Dec +89d15'50.8"
+  const Equatorial j2000{(2.0 + 31.0 / 60.0 + 49.09 / 3600.0) * 15.0,
+                         89.0 + 15.0 / 60.0 + 50.8 / 3600.0, 0.0};
+  return precessFromJ2000(j2000, ttFromUt(jd_ut));
+}
+
+double polarisHaDeg(double jd_ut, double lon_deg) {
+  return wrap180(lstDeg(jd_ut, lon_deg) - polarisOfDate(jd_ut).ra_deg);
+}
+
+double polarisClockHours(double ha_deg) {
+  // HA 0: above the pole (12 o'clock). Facing north the sky turns counterclockwise,
+  // a quarter turn (HA 6 h) every 3 clock hours.
+  double h = fmod(12.0 - wrap360(ha_deg) / 30.0, 12.0);
+  if (h <= 0.0) h += 12.0;
+  return h;
 }
 
 }  // namespace astro

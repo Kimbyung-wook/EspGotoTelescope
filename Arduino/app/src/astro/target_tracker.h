@@ -38,8 +38,13 @@ class TargetTracker {
   // and the date is valid. Returns true when a new state was computed.
   bool update(unsigned long now_ms, bool has_fix, const UtcTime* utc, const Observer& obs) {
     if (!has_fix || utc == nullptr) { valid_ = false; return false; }
+    return updateJd(now_ms, true, julianDate(*utc), obs);
+  }
+  // Same with the time as a JD (UT); 'known' = position and time are known
+  bool updateJd(unsigned long now_ms, bool known, double jd_ut, const Observer& obs) {
+    if (!known) { valid_ = false; return false; }
     if (computed_once_ && (unsigned long)(now_ms - last_ms_) < period_ms_) return false;
-    state_ = targetState(target_, julianDate(*utc), obs);
+    state_ = targetState(target_, jd_ut, obs);
     last_ms_ = now_ms;
     computed_once_ = true;
     valid_ = true;

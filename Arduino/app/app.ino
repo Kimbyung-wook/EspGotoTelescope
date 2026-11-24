@@ -17,7 +17,7 @@
 #include "src/sensors/imu.h"
 #include "src/motor/ra_motor.h"
 #include "src/estimation/attitude_estimator.h"
-#include "src/astro/target_telemetry.h"
+#include "src/app/loop_logic.h"
 #include "src/ui/telescope_ui.h"
 #include "src/remote/remote_ui.h"
 #include "src/config/settings_binding.h"
@@ -37,8 +37,9 @@ Rotary  rotary(BUTTON_S1, BUTTON_S2, BUTTON_KEY);
 /************************************/
 AttitudeEstimator att_est;
 const float       ATT_EST_TAU_S = 1.0f;  // complementary filter crossover
-astro::TargetTracker moon_tracker(astro::Target::Moon, 1000);     // 9Axis for Moon, once per second
-astro::TargetTracker target_tracker(astro::Target::Mercury, 1000); // 10Planet Tracking, once per second
+astro::TargetTracker moon_tracker(astro::Target::Moon, 1000);     // Moon (lunar rate), once per second
+astro::TargetTracker target_tracker(astro::Target::Mercury, 1000); // 1Target, once per second
+loc::LastGpsRecorder last_gps;                                     // DES-LOC-02
 
 /************************************/
 // UI
@@ -170,9 +171,6 @@ void updateTelemetry(Telemetry& t) {
   t.altitude_m   = g->altitude;
 
   t.imu           = imu.data();
-  t.imu_corr      = withoutGyroBias(t.imu, ui_ctx.state.gyro_bias);
-  t.roll_acc_deg  = rollFromAccelDeg(t.imu);
-  t.pitch_acc_deg = pitchFromAccelDeg(t.imu);
   t.loop_hz = hz;
   t.loop_us = perform_rest.getdt() + perform_main.getdt();
   t.main_us = perform_main.getdt();
@@ -205,6 +203,7 @@ void loop() {
   imu.read();
   perform_imu.toc();
   updateTelemetry(ui_ctx.tel);
+  app::correctImu(ui_ctx.tel, ui_ctx.state);
 
   // Estimation
   perform_est.tic();
@@ -213,14 +212,15 @@ void loop() {
   ui_ctx.tel.roll_est_deg  = att_est.rollDeg();
   ui_ctx.tel.pitch_est_deg = att_est.pitchDeg();
 
-  // Moon and tracking target (each only on the frames where its 1 s period has passed)
+  // Position and time in use: GPS, last GPS fix, manual (DES-LOC)
+  app::updateLocationTime(ui_ctx.tel, ui_ctx.state, last_gps);
+
+  // Moon and target (each only on the frames where its 1 s period has passed),
+  // then where the tube points (IMU on the tube, polar-aligned mount)
   perform_astro.tic();
-  bool astro_ran = astro::updateMoonTelemetry(moon_tracker, ui_ctx.tel);
-  astro_ran |= astro::updateTargetTelemetry(target_tracker, ui_ctx.state.track_target, ui_ctx.tel);
+  const bool astro_ran = app::updateAstro(moon_tracker, target_tracker, ui_ctx.tel, ui_ctx.state,
+                                          IMU_TUBE_OPTICAL_AXIS, IMU_TUBE_DEC_AXIS);
   if (astro_ran) perform_astro.toc();
-  ui_ctx.tel.ra_calibrated = ui_ctx.state.ra_duty_at_sidereal != 0.0f;
-  // Where the tube points (IMU on the tube, polar-aligned mount)
-  astro::updateScopeTelemetry(ui_ctx.tel, IMU_TUBE_OPTICAL_AXIS, IMU_TUBE_DEC_AXIS);
 
   // UI -> display
   frame.clear();
@@ -230,9 +230,8 @@ void loop() {
   remote::publish(frame);   // phone mirror (only when the lines changed)
   config::serviceRequests(settings_store, settings, ui_ctx);   // Save / Reset from the UI
 
-  // Outputs (tracking overrides the manual RRcmd while it is on)
-  astro::applyTracking(ui_ctx.tel, ui_ctx.state, ui_ctx.state.ra_duty_at_sidereal);
-  ra_motor.setSpeed(ui_ctx.state.ra_speed_cmd);
+  // Outputs (tracking overrides the manual RRcmd; calibration / Polar Align stop the motor)
+  ra_motor.setSpeed(app::motorCommand(ui_ctx.tel, ui_ctx.state));
 
   perform_main.toc();
 

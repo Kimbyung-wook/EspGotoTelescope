@@ -39,12 +39,15 @@ struct Settings {
   // Motor and tracking (DES-MOT-01, DES-MOT-02, DES-TRK-01)
   float   ra_duty_at_sidereal;   // RRcmd that turns the RA axis at 15.041"/s, 0 = not set
   uint8_t motor_reverse;         // 1 = swap the motor direction
-  uint8_t track_mode;            // reserved for DES-TRK-01 (0 = sidereal)
+  uint8_t track_mode;            // DES-TRK-01 : 0 = sidereal, 1 = lunar
   float   track_offset;          // [PWM duty]
   int8_t  track_target;          // astro::Target index
 
   // Guidance (DES-PNT-04)
   float guide_tolerance_deg;
+
+  // Added after the first layout (still version 1: older images leave it 0)
+  uint8_t manual_set;            // 1 = manual_lat/lon/alt were entered (DES-LOC-01)
 };
 
 enum LocationMode : uint8_t { LOCATION_AUTO = 0, LOCATION_MANUAL = 1 };

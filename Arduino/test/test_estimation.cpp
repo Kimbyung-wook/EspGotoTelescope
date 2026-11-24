@@ -1,58 +1,148 @@
 #include "test_main.h"
-#include "../app/src/estimation/bias_calibrator.h"
+#include "../app/src/estimation/calibration.h"
 #include "../app/src/estimation/attitude_estimator.h"
 
-static void feed(GyroBiasCalibrator& c, unsigned long from_ms, unsigned long to_ms,
-                 float wx, float wy, float wz) {
-  const float w[3] = {wx, wy, wz};
-  for (unsigned long t = from_ms; t < to_ms; t += 100) c.update(t, w);
+using namespace cal;
+
+namespace {
+ImuData still(float wx = 0.3f, float wy = -0.2f, float wz = 0.1f) {
+  ImuData d; d.az = GRAVITY; d.wx = wx; d.wy = wy; d.wz = wz;
+  return d;
+}
+// Pose with axis (0 x, 1 y, 2 z) pointing up (sign +1) or down (-1), reading
+// v = s * g * sign + b on that axis
+ImuData pose(int axis, float sign, const float b[3], const float s[3]) {
+  ImuData d;
+  float v[3] = {b[0], b[1], b[2]};
+  v[axis] += s[axis] * GRAVITY * sign;
+  d.ax = v[0]; d.ay = v[1]; d.az = v[2];
+  return d;
+}
+void feedAccel(AccelCalibration& c, unsigned long& ms, unsigned long dur, const ImuData& d) {
+  for (unsigned long end = ms + dur; ms < end; ms += 100) c.update(ms, d);
+}
 }
 
-TEST(bias_calibrator_phases_follow_time) {
-  GyroBiasCalibrator c;
-  CHECK(c.phase() == GyroBiasCalibrator::IDLE);
-  c.start(5000);
-  const float w[3] = {0, 0, 0};
-  CHECK(c.update(5000,  w) == GyroBiasCalibrator::READY);
-  CHECK(c.update(6000,  w) == GyroBiasCalibrator::COARSE);
-  CHECK(c.update(11000, w) == GyroBiasCalibrator::FINE);
-  CHECK(c.update(21000, w) == GyroBiasCalibrator::DONE);
-  CHECK(c.done());
+TEST(cal_shock_detector_flags_a_jump) {
+  ShockDetector s(2.0f, 0.5f);
+  CHECK(!s.update(still()));
+  CHECK(!s.update(still(0.4f, -0.2f, 0.1f)));        // small noise
+  CHECK(s.update(still(5.0f, 0.0f, 0.0f)));          // |w| jumps by more than 2 dps
+  ImuData bump = still(); bump.az = GRAVITY + 1.0f;  // |a| by more than 0.5
+  CHECK(s.update(bump));
 }
 
-TEST(bias_calibrator_ready_phase_is_mean) {
-  GyroBiasCalibrator c; c.start(0);
-  const float a[3] = {1, 2, 3}, b[3] = {3, 4, 5};
-  c.update(0, a); c.update(100, b);
-  CHECK_NEAR(c.bias()[0], 2.0, 1e-6);
-  CHECK_NEAR(c.bias()[1], 3.0, 1e-6);
-  CHECK_NEAR(c.bias()[2], 4.0, 1e-6);
-}
-
-TEST(bias_calibrator_converges_to_constant_rate) {
-  GyroBiasCalibrator c; c.start(0);
-  feed(c, 0, 17000, 0.5f, -0.25f, 0.125f);
-  CHECK(c.done());
-  CHECK_NEAR(c.bias()[0],  0.5,   1e-5);
-  CHECK_NEAR(c.bias()[1], -0.25,  1e-5);
-  CHECK_NEAR(c.bias()[2],  0.125, 1e-5);
-}
-
-TEST(bias_calibrator_averages_out_noise) {
-  GyroBiasCalibrator c; c.start(0);
-  const float w0[3] = {1.2f, 0, 0}, w1[3] = {0.8f, 0, 0};
+TEST(cal_gyro_settle_measure_result) {
+  GyroCalibration c;
+  CHECK(c.state() == GyroCalibration::IDLE);
+  c.start(1000);
+  c.update(1500, still(9.0f, 9.0f, 9.0f));           // inside the 1 s settle : ignored
+  CHECK(c.state() == GyroCalibration::SETTLE);
   int k = 0;
-  for (unsigned long t = 0; t < 16000; t += 100, k++) c.update(t, (k & 1) ? w1 : w0);
-  CHECK_NEAR(c.bias()[0], 1.0, 0.01);
+  for (unsigned long ms = 2000; ms <= 32000; ms += 100, k++) {
+    const float n = (k & 1) ? 0.01f : -0.01f;         // noise +-0.01
+    c.update(ms, still(0.3f + n, -0.2f, 0.1f));
+    if (ms == 14000) CHECK(c.elapsedS() == 12);
+  }
+  CHECK(c.state() == GyroCalibration::RESULT);
+  CHECK(c.samples() == 301);
+  CHECK_NEAR(c.bias(0), 0.3, 1e-4);
+  CHECK_NEAR(c.bias(1), -0.2, 1e-5);
+  CHECK_NEAR(c.stddev(0), 0.01, 1e-3);
+  CHECK_NEAR(c.stddev(1), 0.0, 1e-6);
 }
 
-TEST(bias_calibrator_freezes_after_done) {
-  GyroBiasCalibrator c; c.start(0);
-  feed(c, 0, 16100, 1.0f, 1.0f, 1.0f);
-  CHECK(c.done());
-  const float big[3] = {100, 100, 100};
-  c.update(20000, big);
-  CHECK_NEAR(c.bias()[0], 1.0, 1e-5);
+TEST(cal_gyro_shock_fails_and_retry_starts_over) {
+  GyroCalibration c;
+  c.start(0);
+  for (unsigned long ms = 1000; ms < 5000; ms += 100) c.update(ms, still());
+  CHECK(c.state() == GyroCalibration::MEASURE);
+  c.update(5000, still(10.0f, 0.0f, 0.0f));           // someone touched the mount
+  CHECK(c.state() == GyroCalibration::FAILED);
+  c.update(5100, still());                            // stays failed
+  CHECK(c.state() == GyroCalibration::FAILED);
+  c.start(6000);
+  CHECK(c.state() == GyroCalibration::SETTLE);
+  CHECK(c.samples() == 0);
+}
+
+TEST(cal_accel_solve_bias_and_scale) {
+  const float up[3] = {9.90f, 9.70f, 9.80665f + 0.2f}, down[3] = {-9.70f, -9.90f, -9.80665f + 0.2f};
+  float b[3], s[3];
+  CHECK(AccelCalibration::solve(up, down, b, s));
+  CHECK_NEAR(b[0], 0.1, 1e-5);
+  CHECK_NEAR(b[1], -0.1, 1e-5);
+  CHECK_NEAR(b[2], 0.2, 1e-5);
+  CHECK_NEAR(s[0], 19.6 / (2 * 9.80665), 1e-5);
+  CHECK_NEAR(s[2], 1.0, 1e-5);
+  const float bad_up[3] = {12.0f, 9.8f, 9.8f};       // scale 1.12
+  CHECK(!AccelCalibration::solve(bad_up, down, b, s));
+}
+
+TEST(cal_accel_pose_check) {
+  const float b[3] = {0, 0, 0}, s[3] = {1, 1, 1};
+  CHECK(AccelCalibration::poseOk(0, pose(0, +1, b, s)));
+  CHECK(!AccelCalibration::poseOk(1, pose(0, +1, b, s)));   // X- wanted
+  CHECK(AccelCalibration::poseOk(5, pose(2, -1, b, s)));
+  ImuData tilted = pose(2, +1, b, s); tilted.ax = 5.0f;     // half way
+  CHECK(!AccelCalibration::poseOk(4, tilted));
+}
+
+TEST(cal_accel_six_positions_and_correction) {
+  const float b[3] = {0.12f, -0.08f, 0.25f}, s[3] = {1.01f, 0.99f, 1.02f};
+  AccelCalibration c;
+  unsigned long ms = 0;
+  c.start(ms);
+  CHECK(c.state() == AccelCalibration::ORIENT && c.step() == 0);
+  feedAccel(c, ms, 2000, pose(2, +1, b, s));          // wrong pose: waits
+  CHECK(c.state() == AccelCalibration::ORIENT && c.step() == 0);
+  for (int step = 0; step < AccelCalibration::STEPS; step++) {
+    const ImuData d = pose(step / 2, step % 2 == 0 ? 1.0f : -1.0f, b, s);
+    feedAccel(c, ms, 600, d);
+    CHECK(c.state() == AccelCalibration::SETTLE);
+    feedAccel(c, ms, 6000, d);
+    CHECK(c.step() == step + 1);
+  }
+  CHECK(c.state() == AccelCalibration::RESULT);
+  for (int i = 0; i < 3; i++) {
+    CHECK_NEAR(c.bias(i), b[i], 1e-4);
+    CHECK_NEAR(c.scale(i), s[i], 1e-5);
+  }
+  float cb[3], cs[3];
+  for (int i = 0; i < 3; i++) { cb[i] = c.bias(i); cs[i] = c.scale(i); }
+  const ImuData level = withAccelCalibration(pose(2, +1, b, s), cb, cs);
+  CHECK_NEAR(level.ax, 0.0, 1e-4);
+  CHECK_NEAR(level.az, GRAVITY, 1e-4);
+}
+
+TEST(cal_accel_shock_redoes_only_that_step) {
+  const float b[3] = {0, 0, 0}, s[3] = {1, 1, 1};
+  AccelCalibration c;
+  unsigned long ms = 0;
+  c.start(ms);
+  feedAccel(c, ms, 7000, pose(0, +1, b, s));          // X+ done
+  CHECK(c.step() == 1);
+  const ImuData xm = pose(0, -1, b, s);
+  feedAccel(c, ms, 3000, xm);                         // X- measuring
+  CHECK(c.state() == AccelCalibration::MEASURE);
+  ImuData knock = xm; knock.wx = 20.0f;
+  c.update(ms, knock); ms += 100;
+  CHECK(c.state() == AccelCalibration::ORIENT);
+  CHECK(c.step() == 1);                               // same step, not from the start
+  CHECK(c.shockInStep());
+  feedAccel(c, ms, 7000, xm);
+  CHECK(c.step() == 2);
+  CHECK(!c.shockInStep());
+}
+
+TEST(cal_accel_bad_result_fails) {
+  const float b[3] = {1.5f, 0, 0}, s[3] = {1, 1, 1};  // bias 1.5 m/s^2 > 1
+  AccelCalibration c;
+  unsigned long ms = 0;
+  c.start(ms);
+  for (int step = 0; step < AccelCalibration::STEPS; step++)
+    feedAccel(c, ms, 7000, pose(step / 2, step % 2 == 0 ? 1.0f : -1.0f, b, s));
+  CHECK(c.state() == AccelCalibration::FAILED);
 }
 
 TEST(bias_removed_from_gyro_only) {

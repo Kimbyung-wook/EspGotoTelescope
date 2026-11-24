@@ -43,12 +43,12 @@ struct Sim {
   int depth() { return ui.ui().manager().depth(); }
 };
 
-// '?' in the pattern matches the blinking cursor ('>' or '-').
+// '?' in the pattern matches the blinking cursor ('>' or '-') or a literal '?'.
 bool lineMatches(const char* got, const char* pattern) {
   size_t n = std::strlen(pattern);
   if (std::strlen(got) != n) return false;
   for (size_t i = 0; i < n; i++) {
-    if (pattern[i] == '?') { if (got[i] != '>' && got[i] != '-') return false; }
+    if (pattern[i] == '?') { if (got[i] != '>' && got[i] != '-' && got[i] != '?') return false; }
     else if (pattern[i] != got[i]) return false;
   }
   return true;
@@ -70,18 +70,26 @@ void expectScreen(Sim& s, const char* const (&pat)[7], int src_line) {
 }
 #define EXPECT_SCREEN(s, ...) do { const char* const _p[7] = __VA_ARGS__; expectScreen(s, _p, __LINE__); } while (0)
 
-const char* const kItems[12] = {
-  "1RA Speed", "2Status - GPS", "3Status - Acc/Gyro", "4Status - Mag/Alt",
-  "5Status - IMUCalib", "6Do IMU Calib.", "7Att.Estimator", "8Health",
-  "9Axis for Moon", "10Planet Tracking", "11Settings", "Sleep",
+const int kMain = 7;
+const char* const kItems[kMain] = {
+  "1Target", "2Polar Align", "3Status", "4Calibration", "5Settings", "6RA Speed", "Sleep",
 };
+
+// Main menu item k -> its screen (cursor starts on the first item)
+void openMain(Sim& s, int k) { s.rotate(-20); s.rotate(k); s.click(); }
+// RA Speed: set RRcmd to v and go back to the main menu
+void setRrcmd(Sim& s, int v) {
+  openMain(s, 5);
+  s.click(); s.rotate(v); s.click();
+  s.rotate(2); s.click();
+}
 
 /******************************************************************/
 
 void test_boot_then_main_menu() {
   Sim s;
   s.tick();
-  EXPECT_LINE(s, 0, "SimpleGoTo v0.1.0");
+  EXPECT_LINE(s, 0, "SimpleGoTo v0.2.0");
   EXPECT_LINE(s, 1, "");
   s.tick(sim::FirmwareUi::kBootLineFrames * 7);   // 8 lines: the screen is full
   EXPECT_LINE(s, 1, "1. Display ON 160MHz");
@@ -91,14 +99,14 @@ void test_boot_then_main_menu() {
   s.tick(sim::FirmwareUi::kBootLineFrames * 2);   // 10 lines: scrolled, line 0 stays
   EXPECT_SCREEN(s, {"Acc +-16G", "Gyro 250 dps", "Mag 10 Hz", "3. GPS is ON",
                     "4. Buttons are ON", "5. GPIO/PWM is ON", "6. Settings new"});
-  EXPECT_LINE(s, 0, "SimpleGoTo v0.1.0");
+  EXPECT_LINE(s, 0, "SimpleGoTo v0.2.0");
   s.tick(sim::FirmwareUi::kBootHoldFrames - 1);
   EXPECT_LINE(s, 7, "6. Settings new");   // boot log is still held
   s.tick();
   CHECK(!s.ui.booting());
   EXPECT_LINE(s, 0, "T 12: 0: 0.0 V 12.60");
-  EXPECT_SCREEN(s, {"Main Menu", "?1RA Speed", " 2Status - GPS", " 3Status - Acc/Gyro",
-                    " 4Status - Mag/Alt", " 5Status - IMUCalib", " 6Do IMU Calib."});
+  EXPECT_SCREEN(s, {"Main Menu", "?1Target", " 2Polar Align", " 3Status",
+                    " 4Calibration", " 5Settings", " 6RA Speed"});
   CHECK(s.motor().in1 == 0 && s.motor().in2 == 0 && s.motor().pwm == 0);
 }
 
@@ -114,7 +122,7 @@ void test_input_ignored_during_boot() {
   Sim s;
   s.send("{\"type\":\"input\",\"rotate\":3,\"click\":1}");
   s.boot();
-  EXPECT_LINE(s, 2, "?1RA Speed");
+  EXPECT_LINE(s, 2, "?1Target");
   CHECK(s.depth() == 1);
 }
 
@@ -127,7 +135,7 @@ void test_reset_restarts_ui() {
   s.send("{\"type\":\"reset\"}");
   s.boot();
   CHECK(s.depth() == 1);
-  EXPECT_LINE(s, 2, "?1RA Speed");
+  EXPECT_LINE(s, 2, "?1Target");
 }
 
 void test_cursor_blinks() {
@@ -143,33 +151,32 @@ void test_main_menu_scrolls() {
   Sim s;
   s.boot();
   s.rotate(5);   // cursor reaches the last visible row
-  EXPECT_SCREEN(s, {"Main Menu", " 1RA Speed", " 2Status - GPS", " 3Status - Acc/Gyro",
-                    " 4Status - Mag/Alt", " 5Status - IMUCalib", "?6Do IMU Calib."});
+  EXPECT_LINE(s, 7, "?6RA Speed");
   s.rotate(1);   // one more step scrolls the list by one line
-  EXPECT_SCREEN(s, {"Main Menu", " 2Status - GPS", " 3Status - Acc/Gyro", " 4Status - Mag/Alt",
-                    " 5Status - IMUCalib", " 6Do IMU Calib.", "?7Att.Estimator"});
+  EXPECT_SCREEN(s, {"Main Menu", " 2Polar Align", " 3Status", " 4Calibration",
+                    " 5Settings", " 6RA Speed", "?Sleep"});
   s.rotate(10);  // clamps at the last item
-  EXPECT_SCREEN(s, {"Main Menu", " 7Att.Estimator", " 8Health", " 9Axis for Moon",
-                    " 10Planet Tracking", " 11Settings", "?Sleep"});
-  s.rotate(-1);  // the selected item stays on the bottom row while scrolling back
-  EXPECT_LINE(s, 2, " 6Do IMU Calib.");
-  EXPECT_LINE(s, 7, "?11Settings");
+  EXPECT_LINE(s, 7, "?Sleep");
+  s.rotate(-1);
+  EXPECT_LINE(s, 2, " 1Target");
+  EXPECT_LINE(s, 7, "?6RA Speed");
   s.rotate(-20);
-  EXPECT_LINE(s, 2, "?1RA Speed");
+  EXPECT_LINE(s, 2, "?1Target");
 }
 
 // Every main menu item can be entered and left; the cursor comes back to it.
 void test_enter_and_leave_every_screen() {
-  struct Item { const char* title; int exit_rotate; };   // rotations to Quit; -1 = click leaves
-  const Item items[12] = {
-    {"*1RA Speed", 2}, {"*2Status - GPS", -1}, {"*3Status - Acc/Gyro", -1},
-    {"*4Status - Mag/Alt", -1}, {"*5Status - IMUCalib", -1}, {"*6Do IMU Calib.", 5},
-    {"*7Att.Estimator", -1}, {"*8Health", -1}, {"*9Axis for Moon", -1},
-    {"*10Planet Tracking", 5},   // cursor starts on Mercury (1); Quit is item 6
-    {"*11Settings", 3},          // RAduty = RRcmd, Save, Reset defaults, Back
-    {" ", -1},
+  struct Item { const char* title; int exit_rotate; };   // rotations to Back/Quit; -1 = click leaves
+  const Item items[kMain] = {
+    {"*1Target", 5},         // cursor starts on Mercury (1); Quit is item 6
+    {"*2Polar Align", 1},    // Confirm, Back
+    {"*3Status", 6},         // 6 screens, Back
+    {"*4Calibration", 2},    // Gyro, Accel, Back
+    {"*5Settings", 7},       // 8 items
+    {"*6RA Speed", 2},       // RRcmd, RRate, Quit
+    {" ", -1},               // Sleep
   };
-  for (int k = 0; k < 12; k++) {
+  for (int k = 0; k < kMain; k++) {
     Sim s;
     s.boot();
     s.rotate(k);
@@ -181,7 +188,7 @@ void test_enter_and_leave_every_screen() {
       s.rotate(items[k].exit_rotate);
       s.click();
     } else {
-      s.rotate(3);   // info screens ignore rotation
+      s.rotate(3);   // Sleep ignores rotation
       EXPECT_LINE(s, 1, items[k].title);
       s.click();
     }
@@ -202,8 +209,9 @@ void test_ra_speed_edit_drives_motor() {
   Sim s;
   s.send("{\"type\":\"sensors\",\"imu\":{\"ax\":0.5}}");
   s.boot();
+  s.rotate(5);
   s.click();
-  EXPECT_SCREEN(s, {"*1RA Speed", "?RRcmd    0.00000DEG", " RRate    0.00000DPS", " Quit",
+  EXPECT_SCREEN(s, {"*6RA Speed", "?RRcmd    0.00000DEG", " RRate    0.00000DPS", " Quit",
                     " ROL    0.00000  DEG", " LAT N 37.566500DEG", " PIT   -2.91874  DEG"});
   s.click();   // RRcmd -> edit mode
   EXPECT_LINE(s, 1, "*Set RA Speed");
@@ -219,11 +227,11 @@ void test_ra_speed_edit_drives_motor() {
   s.rotate(300);
   CHECK(s.motor().pwm == 255);   // duty limited by RaMotor
   s.click();   // finish editing, cursor back on RRcmd
-  EXPECT_LINE(s, 1, "*1RA Speed");
+  EXPECT_LINE(s, 1, "*6RA Speed");
   EXPECT_LINE(s, 2, "?RRcmd  300.00000DEG");
   s.rotate(1);   // RRate is read-only
   s.click();
-  EXPECT_LINE(s, 1, "*1RA Speed");
+  EXPECT_LINE(s, 1, "*6RA Speed");
   EXPECT_LINE(s, 3, "?RRate    0.00000DPS");
   s.rotate(1);
   s.click();   // Quit
@@ -237,14 +245,40 @@ void test_gps_screen_shows_sensor_values() {
   s.send("{\"type\":\"sensors\",\"gps\":{\"year\":26,\"month\":3,\"day\":9,\"hour\":21,"
          "\"minute\":5,\"seconds\":7,\"milliseconds\":450,\"lat\":-33.5,\"lon\":-70.25,"
          "\"fix\":2,\"sats\":11}}");
-  s.rotate(1);
+  openMain(s, 2);
+  EXPECT_SCREEN(s, {"*3Status", "?GPS", " Acc/Gyro", " Mag/Temp", " IMU Calib",
+                    " Att.Estimator", " Health"});
   s.click();
   EXPECT_LINE(s, 0, "T 21: 5: 7.4 V 12.60");
-  EXPECT_SCREEN(s, {"*2Status - GPS", "Date: 2026/03/09", "Time:   21:05:07.450", " DGPS Sat 11",
-                    " ", " S -33.50000000 DEG", " W -70.25000000 DEG"});
+  EXPECT_SCREEN(s, {"*GPS", "Date: 2026/03/09", "Time:   21:05:07.450", " DGPS Sat 11",
+                    "Pos GPS  Time GPS", " S -33.50000000 DEG", " W -70.25000000 DEG"});
   s.send("{\"type\":\"sensors\",\"gps\":{\"fix\":0,\"sats\":0}}");
   s.tick();
   EXPECT_LINE(s, 4, "NoFix Sat  0");
+  EXPECT_LINE(s, 5, "Pos ---  Time ---");   // no last fix yet (30 s needed)
+}
+
+// DES-LOC-02: a fix held for 30 s is kept (saved once); without GPS it is used,
+// also after a power cycle.
+void test_last_gps_fix_is_kept() {
+  Sim s;
+  s.boot();
+  openMain(s, 2);
+  s.click();                 // GPS
+  s.tick(290);
+  CHECK(s.ui.settingsStore().writes == 0);
+  s.tick(20);                // past 30 s of fix
+  CHECK(s.ui.settingsStore().writes == 1);
+  s.tick(400);               // once per power-on
+  CHECK(s.ui.settingsStore().writes == 1);
+  s.send("{\"type\":\"sensors\",\"gps\":{\"fix\":0,\"sats\":0}}");
+  s.tick();
+  EXPECT_LINE(s, 5, "Pos LAST Time ---");
+  s.send("{\"type\":\"reset\"}");
+  s.boot();
+  openMain(s, 2);
+  s.click();
+  EXPECT_LINE(s, 5, "Pos LAST Time ---");
 }
 
 void test_imu_screens() {
@@ -252,90 +286,95 @@ void test_imu_screens() {
   s.boot();
   s.send("{\"type\":\"sensors\",\"imu\":{\"ax\":-4.903325,\"ay\":0,\"az\":8.492806,"
          "\"wx\":1.25,\"wy\":-0.5,\"wz\":15,\"mx\":0,\"my\":-30,\"mz\":-40,\"temp\":25.5}}");
-  s.rotate(2);
+  openMain(s, 2);
+  s.rotate(1);
   s.click();
   // Firmware math is single-precision float: asinf(0.5) -> 30.00001 deg below.
-  EXPECT_SCREEN(s, {"*3Status - Acc/Gyro", "Ax      -4.90333 mpss", "Ay       0.00000 mpss",
+  EXPECT_SCREEN(s, {"*Acc/Gyro", "Ax      -4.90333 mpss", "Ay       0.00000 mpss",
                     "Az       8.49281 mpss", "Wx       1.25000 dps", "Wy      -0.50000 dps",
                     "Wz      15.00000 dps"});
   s.click();
   s.rotate(1);
   s.click();
-  EXPECT_SCREEN(s, {"*4Status - Mag/Alt", "Mx      0.00000 uT", "My    -30.00000 uT",
+  EXPECT_SCREEN(s, {"*Mag/Temp", "Mx      0.00000 uT", "My    -30.00000 uT",
                     "Mz    -40.00000 uT", "Temp   25.50000 'c ", " ", " "});
   s.click();
-  s.rotate(3);
+  s.rotate(2);
   s.click();
   // estimator output is checked in test_att_estimator_*; here the raw rows
-  EXPECT_LINE(s, 1, "*7Att.Estimator");
+  EXPECT_LINE(s, 1, "*Att.Estimator");
   EXPECT_LINE(s, 4, "aR    0.00 aP   30.00");
   EXPECT_LINE(s, 5, "Wx        1.25000 DPS");
   EXPECT_LINE(s, 6, "Wy       -0.50000 DPS");
   EXPECT_LINE(s, 7, "Wz       15.00000 DPS");
-  s.click();
-  s.rotate(2);
-  s.click();
-  EXPECT_LINE(s, 1, "*9Axis for Moon");
-  // Moon from src/astro: default GPS 2026-11-21 12:00:00 UT, Seoul (host values of moonState)
-  EXPECT_LINE(s, 4, "ALT  61.64 AZ 165.89");
-  EXPECT_LINE(s, 5, "-- Moon 14.7143\"/s");
-  EXPECT_LINE(s, 6, "R.A.    14.22977 DEG");
-  EXPECT_LINE(s, 7, "DEC.     9.86343 DEG");
-  s.send("{\"type\":\"sensors\",\"gps\":{\"fix\":0}}");
-  s.tick(1);
-  EXPECT_LINE(s, 5, "-- Moon: no GPS fix");
-  EXPECT_LINE(s, 6, "R.A.         ---");
 }
 
-void test_do_imu_calib_menu() {
+// Moon from src/astro: default GPS 2026-11-21 12:00:00 UT, Seoul (host values of moonState)
+void test_moon_target() {
   Sim s;
   s.boot();
-  s.rotate(5);
-  s.click();
-  EXPECT_SCREEN(s, {"*6Do IMU Calib.", "?Acc. Bias Calib", " Acc. Scale Calib",
-                    " Gyro Bias Calib", " Gyro Scale Calib", " ", " Quit"});
-  s.rotate(1);
-  s.click();   // Acc. Scale: not implemented, stays
-  EXPECT_LINE(s, 1, "*6Do IMU Calib.");
-  EXPECT_LINE(s, 3, "?Acc. Scale Calib");
-  s.rotate(3);   // the blank row is a cursor position too
-  EXPECT_LINE(s, 6, "?");
-  s.click();
-  EXPECT_LINE(s, 1, "*6Do IMU Calib.");
-  s.rotate(1);
-  EXPECT_LINE(s, 7, "?Quit");
-  s.click();
-  EXPECT_LINE(s, 1, "Main Menu");
-  EXPECT_LINE(s, 7, "?6Do IMU Calib.");
-  s.click();   // entering again starts at the first row
-  EXPECT_LINE(s, 2, "?Acc. Bias Calib");
+  openMain(s, 0);
+  s.rotate(-1);
+  s.click();                 // Moon : lunar rate by default
+  s.tick();
+  EXPECT_LINE(s, 6, "ALT +61.64 AZ 165.89");
+  EXPECT_LINE(s, 7, "?Track OFF 14.7143\"/s");
+  s.rotate(-2);              // scroll up to the target lines
+  EXPECT_LINE(s, 1, "*Moon");
+  EXPECT_LINE(s, 2, "R.A.    14.22977 DEG");
+  EXPECT_LINE(s, 3, "DEC.     9.86343 DEG");
+  s.send("{\"type\":\"sensors\",\"gps\":{\"fix\":0}}");
+  s.tick(1);
+  EXPECT_LINE(s, 1, "*Moon    no loc/time");
+  EXPECT_LINE(s, 2, "R.A.         ---");
 }
 
+void test_calibration_menu() {
+  Sim s;
+  s.boot();
+  openMain(s, 3);
+  EXPECT_SCREEN(s, {"*4Calibration", "?Gyro Bias", " Accel 6-pos", " Back", " ", " ", " "});
+  s.rotate(1);
+  s.click();
+  EXPECT_LINE(s, 1, "*Accel Calib");
+  EXPECT_LINE(s, 2, "Step 1/6 X+ up");
+  s.click();                 // Cancel
+  EXPECT_LINE(s, 3, "?Accel 6-pos");
+  s.rotate(1);
+  s.click();                 // Back
+  EXPECT_LINE(s, 1, "Main Menu");
+  EXPECT_LINE(s, 5, "?4Calibration");
+}
+
+// DES-CAL-03 and DES-SYS-02: the motor stops while calibrating, then runs again.
 void test_gyro_bias_calibration() {
   Sim s;
   s.boot();
+  setRrcmd(s, 40);
+  CHECK(s.motor().pwm == 40);
   s.send("{\"type\":\"sensors\",\"imu\":{\"wx\":0.5,\"wy\":-0.25,\"wz\":0.125}}");
-  s.rotate(5);
+  openMain(s, 3);
   s.click();
-  s.rotate(2);
-  s.click();
-  EXPECT_LINE(s, 1, "Calib Gyro Bias Ready");
+  EXPECT_LINE(s, 1, "*Gyro Calib");
+  EXPECT_LINE(s, 2, "Keep still  0/30 s");
   CHECK(s.depth() == 3);
-  s.tick(10);
-  EXPECT_LINE(s, 1, "Calib Gyro Bias ing.1");
-  s.tick(50);
-  EXPECT_LINE(s, 1, "Calib Gyro Bias ing.2");
-  s.tick(100);
-  EXPECT_LINE(s, 1, "Calib Gyro Bias Done.");
-  EXPECT_LINE(s, 5, "bWx      0.50000 dps");
-  EXPECT_LINE(s, 2, "Wx  0.50000-> 0.00000");
-  s.click();
-  EXPECT_LINE(s, 4, "?Gyro Bias Calib");   // back on the item we came from
+  CHECK(s.motor().pwm == 0);
+  s.tick(160);
+  EXPECT_LINE(s, 2, "Measuring 15/30 s");
+  s.tick(160);
+  EXPECT_LINE(s, 2, "Done. Apply?");
+  EXPECT_LINE(s, 3, "bWx   +0.50000 dps");
+  EXPECT_LINE(s, 7, "?Apply   Discard");
+  CHECK(s.motor().pwm == 0);
+  s.click();                 // Apply
+  EXPECT_LINE(s, 2, "?Gyro Bias");   // back on the item we came from
+  CHECK(s.motor().pwm == 40);
+  s.rotate(2);
+  s.click();                 // Back
+  openMain(s, 2);
   s.rotate(3);
-  s.click();   // Quit
-  s.rotate(-1);
-  s.click();   // 5 Status - IMUCalib shows the new bias
-  EXPECT_LINE(s, 1, "*5Status - IMUCalib");
+  s.click();                 // IMU Calib shows the new bias
+  EXPECT_LINE(s, 1, "*IMU Calib");
   EXPECT_LINE(s, 6, "bWy    -0.25000 dps");
 }
 
@@ -348,15 +387,16 @@ double valueOf(const char* line) {
   return v;
 }
 
+void openAttEst(Sim& s) { openMain(s, 2); s.rotate(4); s.click(); }
+
 // The complementary filter (tau 1 s) starts at the first accelerometer tilt
 // and then follows a tilt step with a 1 s time constant.
 void test_att_estimator_converges() {
   Sim s;
   s.send("{\"type\":\"sensors\",\"imu\":{\"wx\":0,\"wy\":0,\"wz\":0}}");
   s.boot();
-  s.rotate(6);
-  s.click();
-  EXPECT_LINE(s, 1, "*7Att.Estimator");
+  openAttEst(s);
+  EXPECT_LINE(s, 1, "*Att.Estimator");
   EXPECT_LINE(s, 3, "PITCH     0.00000 DEG");   // level
   s.send("{\"type\":\"sensors\",\"imu\":{\"ax\":-4.903325,\"az\":8.492806}}");
   s.tick(1);
@@ -376,95 +416,114 @@ void test_att_estimator_uses_gyro_bias() {
   Sim s;
   s.send("{\"type\":\"sensors\",\"imu\":{\"wx\":0.5,\"wy\":-0.25,\"wz\":0.125}}");
   s.boot();
-  s.rotate(6);
-  s.click();
+  openAttEst(s);
   EXPECT_LINE(s, 5, "Wx        0.50000 DPS");   // no bias yet
   s.click();
-  s.rotate(-1);
-  s.click();     // 6 Do IMU Calib.
-  s.rotate(2);
-  s.click();     // Gyro Bias Calib
-  s.tick(170);   // past "Done."
-  EXPECT_LINE(s, 1, "Calib Gyro Bias Done.");
+  s.rotate(10); s.click();   // Back
+  openMain(s, 3);
+  s.click();                 // Gyro Bias
+  s.tick(320);
+  EXPECT_LINE(s, 2, "Done. Apply?");
   s.click();
-  s.rotate(3);
-  s.click();     // Quit
-  s.rotate(1);
-  s.click();     // 7 Att.Estimator
-  EXPECT_LINE(s, 1, "*7Att.Estimator");
+  s.rotate(2); s.click();    // Back
+  openAttEst(s);
+  EXPECT_LINE(s, 1, "*Att.Estimator");
   EXPECT_LINE(s, 5, "Wx        0.00000 DPS");
   EXPECT_LINE(s, 6, "Wy        0.00000 DPS");
   EXPECT_LINE(s, 7, "Wz        0.00000 DPS");
 }
 
-// Planet Tracking with the default GPS (2026-11-21 12:00:00 UT, Seoul); values from targetState().
-// RA_DUTY_AT_SIDEREAL is 0 (not calibrated), so only the Offset moves the motor.
-void test_planet_tracking() {
+// DES-PA: the tube altitude against the latitude; the motor is stopped meanwhile.
+void test_polar_align() {
   Sim s;
   s.boot();
-  s.rotate(9);
-  s.click();
-  EXPECT_LINE(s, 1, "*10Planet Tracking");
+  setRrcmd(s, 30);
+  openMain(s, 1);
+  CHECK(s.motor().pwm == 0);
+  EXPECT_LINE(s, 1, "*2Polar Align");
+  EXPECT_LINE(s, 2, "ALT  +0.00 LAT +37.57");   // default IMU: level tube
+  EXPECT_LINE(s, 3, "dALT -37.57 UP");
+  EXPECT_LINE(s, 4, "dAZ    --- no mag");
+  EXPECT_LINE(s, 6, "State: adjust");
+  EXPECT_LINE(s, 7, "?(Confirm: wait OK)");
+  s.rotate(-1);              // scroll up to the first line
+  EXPECT_LINE(s, 2, "Dec 90: tube // axis");
+  s.rotate(2);
+  s.click();                 // Back
+  EXPECT_LINE(s, 1, "Main Menu");
+  CHECK(s.motor().pwm == 30);
+}
+
+// Target with the default GPS (2026-11-21 12:00:00 UT, Seoul); values from targetState().
+// RA_DUTY_AT_SIDEREAL is 0 (not calibrated), so only the Offset moves the motor.
+void test_target_tracking() {
+  Sim s;
+  s.boot();
+  openMain(s, 0);
+  EXPECT_LINE(s, 1, "*1Target");
   EXPECT_LINE(s, 3, "?Mercury");
   s.rotate(2);
   s.click();
   EXPECT_LINE(s, 1, "*Mars    computing...");   // the first frame after choosing
   s.tick(1);
   // T.R.A./T.DEC.: the default IMU is level, so the tube points at the horizon; of the two
-  // mirror answers the one nearer Mars (north horizon, Dec = 90 - lat) is shown.
-  EXPECT_SCREEN(s, {"*Mars", "R.A.   151.06717 DEG", "DEC.    14.04876 DEG", "T.R.A. 187.48143 DEG",
-                    "T.DEC.  52.43350 DEG", "?Track OFF 15.0234\"/s", " Offset     +0.0 PWM"});
-  s.click();   // Track on
-  EXPECT_LINE(s, 6, "?Track ON  15.0234\"/s");
+  // mirror answers the one nearer Mars (north horizon, Dec = 90 - lat) is shown. '?': the
+  // mount is not confirmed polar aligned.
+  EXPECT_SCREEN(s, {"*Mars", "T.R.A. 187.48143 DEG?", "T.DEC.  52.43350 DEG?",
+                    "dRA   -145.66 min W", "dDEC   -38.38 deg S", "ALT -28.09 AZ  40.75",
+                    "?Track OFF 15.0411\"/s"});
+  s.rotate(-2);
+  EXPECT_LINE(s, 2, "R.A.   151.06717 DEG");
+  EXPECT_LINE(s, 3, "DEC.    14.04876 DEG");
+  s.rotate(2);
+  s.click();   // Track on (sidereal rate, DES-TRK-02)
+  EXPECT_LINE(s, 7, "?Track ON  15.0411\"/s");
   CHECK(s.motor().pwm == 0);   // not calibrated and no offset: the motor stays still
-  s.rotate(1);
+  s.rotate(2);
   s.click();   // edit Offset
   s.rotate(20);
   EXPECT_LINE(s, 7, "?Offset    +20.0 PWM");
-  CHECK(s.motor().pwm != 0);   // the offset alone drives the motor
+  CHECK(s.motor().pwm == 20);  // the offset alone drives the motor
   s.click();   // done
-  s.rotate(1);   // Back: the page scrolls up one line (R.A. goes off the top)
-  EXPECT_LINE(s, 2, "DEC.    14.04876 DEG");
-  EXPECT_LINE(s, 6, " Offset    +20.0 PWM");
+  s.rotate(1);
   EXPECT_LINE(s, 7, "?Back   (RA uncal)");
   s.click();   // Back to the target list
   EXPECT_LINE(s, 5, "?Mars     TRACKING");
+  CHECK(s.motor().pwm == 20);
 }
 
 // Settings survive a reset (power cycle): the simulator keeps its "flash" across begin().
 void test_settings_survive_reset() {
   Sim s;
   s.boot();
-  s.click();                 // 1RA Speed
-  s.click();                 // edit RRcmd
-  s.rotate(40);
-  s.click();                 // done
-  s.rotate(2);
-  s.click();                 // Quit
-  s.rotate(10);
-  s.click();                 // 11Settings
-  EXPECT_SCREEN(s, {"*11Settings", "Flash: defaults", "RAduty      +0.0 PWM", "?RAduty = RRcmd",
-                    " Save", " Reset defaults", " Back"});
+  setRrcmd(s, 40);
+  openMain(s, 4);
+  EXPECT_SCREEN(s, {"*5Settings", "Flash: defaults", "RAduty      +0.0 PWM", "?RAduty = RRcmd",
+                    " Location >", " Time >", " Motor dir Normal"});
   s.click();                 // RAduty = RRcmd -> saved by the main loop after this frame
   s.tick();
   EXPECT_LINE(s, 2, "Flash: saved");
   EXPECT_LINE(s, 3, "RAduty     +40.0 PWM");
   CHECK(s.ui.settingsStore().writes == 1);
+  s.rotate(3);
+  s.click();                 // Motor dir
+  EXPECT_LINE(s, 7, "?Motor dir Reverse");
 
   s.send("{\"type\":\"reset\"}");
   s.tick();
-  EXPECT_LINE(s, 0, "SimpleGoTo v0.1.0");
+  EXPECT_LINE(s, 0, "SimpleGoTo v0.2.0");
   s.boot();
-  s.rotate(10);
-  s.click();
+  openMain(s, 4);
   EXPECT_LINE(s, 2, "Flash: loaded");
   EXPECT_LINE(s, 3, "RAduty     +40.0 PWM");
+  EXPECT_LINE(s, 7, " Motor dir Normal");   // not saved: only RAduty was
 
-  s.rotate(2);
+  s.rotate(6);
   s.click();                 // Reset defaults?
-  CHECK(std::strcmp(s.line(6) + 1, "Reset? click again") == 0);   // literal "?" : skip the cursor only
+  CHECK(std::strcmp(s.line(7) + 1, "Reset? click again") == 0);   // literal "?" : skip the cursor only
   s.click();                 // confirmed
   s.tick();
+  s.rotate(-10);
   EXPECT_LINE(s, 2, "Flash: saved");
   EXPECT_LINE(s, 3, "RAduty      +0.0 PWM");
 }
@@ -472,15 +531,16 @@ void test_settings_survive_reset() {
 void test_sleep_and_health() {
   Sim s;
   s.boot();
-  s.rotate(11);
+  s.rotate(6);
   s.click();
   EXPECT_SCREEN(s, {" ", " ", " ", " ", " ", " ", " "});
   EXPECT_LINE(s, 0, "T 12: 0: 0.0 V 12.60");   // status bar stays
   s.click();
   EXPECT_LINE(s, 7, "?Sleep");
-  s.rotate(-4);
+  openMain(s, 2);
+  s.rotate(5);
   s.click();
-  EXPECT_SCREEN(s, {"*8Health", "Loop 100000/ 10.0Hz", "MAIN  24300", "DISP  21800",
+  EXPECT_SCREEN(s, {"*Health", "Loop 100000/ 10.0Hz", "MAIN  24300", "DISP  21800",
                     "GPS     650", "IMU    1250", "EST     180 AST  4000"});
 }
 
@@ -497,7 +557,7 @@ void test_protocol_messages() {
   s.tick(3);
   CHECK(s.replies.size() == 3);
   CHECK(s.replies[2].find("\"seq\":2,\"t_ms\":200") != std::string::npos);
-  CHECK(s.replies[0].find("\"lines\":[\"SimpleGoTo v0.1.0\",\"\"") != std::string::npos);
+  CHECK(s.replies[0].find("\"lines\":[\"SimpleGoTo v0.2.0\",\"\"") != std::string::npos);
   std::vector<std::string> r;
   CHECK(s.session.handleLine("{\"type\":\"quit\"}", r) == false);
 }
@@ -510,9 +570,11 @@ int main() {
     T(test_boot_then_main_menu), T(test_boot_failures), T(test_input_ignored_during_boot),
     T(test_reset_restarts_ui), T(test_cursor_blinks), T(test_main_menu_scrolls),
     T(test_enter_and_leave_every_screen), T(test_ra_speed_edit_drives_motor),
-    T(test_gps_screen_shows_sensor_values), T(test_imu_screens), T(test_do_imu_calib_menu),
-    T(test_gyro_bias_calibration), T(test_att_estimator_converges),
-    T(test_att_estimator_uses_gyro_bias), T(test_sleep_and_health), T(test_settings_survive_reset), T(test_planet_tracking), T(test_protocol_messages),
+    T(test_gps_screen_shows_sensor_values), T(test_last_gps_fix_is_kept), T(test_imu_screens),
+    T(test_moon_target), T(test_calibration_menu), T(test_gyro_bias_calibration),
+    T(test_att_estimator_converges), T(test_att_estimator_uses_gyro_bias), T(test_polar_align),
+    T(test_target_tracking), T(test_settings_survive_reset), T(test_sleep_and_health),
+    T(test_protocol_messages),
 #undef T
   };
   for (auto& t : tests) {

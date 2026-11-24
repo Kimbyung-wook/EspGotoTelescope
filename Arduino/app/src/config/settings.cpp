@@ -68,6 +68,7 @@ void fields(Io& io, S& s) {
   io.f32(s.track_offset);
   io.i8(s.track_target);
   io.f32(s.guide_tolerance_deg);
+  io.u8(s.manual_set);
 }
 
 // Writer takes values, Reader takes references : small adapters for fields()
@@ -147,6 +148,9 @@ int sanitize(Settings& s) {
   n += fix(s.utc_offset_min, d.utc_offset_min, -12 * 60.0, 14 * 60.0);
   n += fix(s.ra_duty_at_sidereal, d.ra_duty_at_sidereal, -1023.0, 1023.0);
   if (s.motor_reverse > 1) { s.motor_reverse = 0; n++; }
+  if (s.track_mode > 1) { s.track_mode = 0; n++; }
+  if (s.manual_set > 1) { s.manual_set = 0; n++; }
+  if (s.last_month > 12 || s.last_day > 31) { s.last_gps_valid = 0; s.last_month = s.last_day = 0; n++; }
   n += fix(s.track_offset, d.track_offset, -1023.0, 1023.0);
   n += fix(s.track_target, d.track_target, 0.0, 15.0);
   n += fix(s.guide_tolerance_deg, d.guide_tolerance_deg, 0.05, 20.0);

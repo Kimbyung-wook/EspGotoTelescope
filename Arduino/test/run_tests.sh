@@ -12,6 +12,8 @@ SRCS=(
   "$SRC/config/settings.cpp"
   "$SRC/estimation/filter.cpp"
   "$SRC/estimation/attitude_estimator.cpp"
+  "$SRC/estimation/calibration.cpp"
+  "$SRC/location/location.cpp"
   "$SRC/input/rotary.cpp"
   "$SRC/motor/ra_motor.cpp"
   "$SRC/ui/screen_manager.cpp"

@@ -5,7 +5,7 @@
 #include <cstring>
 
 // Firmware (read-only, include path Arduino/app/src)
-#include "astro/target_telemetry.h"
+#include "app/loop_logic.h"
 #include "config/settings_binding.h"
 #include "estimation/attitude_estimator.h"
 #include "motor/ra_motor.h"
@@ -64,9 +64,6 @@ void fillTelemetry(unsigned long now_ms, const SensorState& s, const UiState& st
   t.imu.my = (float)m.my;
   t.imu.mz = (float)m.mz;
   t.imu.temperature = (float)m.temperature;
-  t.imu_corr = withoutGyroBias(t.imu, st.gyro_bias);
-  t.roll_acc_deg = rollFromAccelDeg(t.imu);
-  t.pitch_acc_deg = pitchFromAccelDeg(t.imu);
 
   // Health: typical numbers from the board (the simulator does not time it)
   t.loop_hz = 10.0f;
@@ -95,6 +92,7 @@ void FirmwareUi::begin(const BootConfig& boot, const SensorState&) {
   att_est_.reset(new AttitudeEstimator());
   moon_tracker_.reset(new astro::TargetTracker(astro::Target::Moon, 1000));
   target_tracker_.reset(new astro::TargetTracker(astro::Target::Mercury, 1000));
+  last_gps_.reset(new loc::LastGpsRecorder());
   // setup(): settings after the motor, before the main loop
   const config::LoadResult r = config::load(*store_, *settings_);
   config::applyToUi(*settings_, ctx_->state);
@@ -131,14 +129,14 @@ void FirmwareUi::frame(unsigned long now_ms, const InputSnapshot& input,
   }
 
   fillTelemetry(now_ms, sensors, ctx_->state, ctx_->tel);
+  app::correctImu(ctx_->tel, ctx_->state);
   // Estimation, as in loop()
   att_est_->update(ctx_->tel.imu_corr, kFrameMs / 1000.0f);
   ctx_->tel.roll_est_deg = att_est_->rollDeg();
   ctx_->tel.pitch_est_deg = att_est_->pitchDeg();
-  astro::updateMoonTelemetry(*moon_tracker_, ctx_->tel);
-  astro::updateTargetTelemetry(*target_tracker_, ctx_->state.track_target, ctx_->tel);
-  ctx_->tel.ra_calibrated = ctx_->state.ra_duty_at_sidereal != 0.0f;
-  astro::updateScopeTelemetry(ctx_->tel, IMU_TUBE_OPTICAL_AXIS, IMU_TUBE_DEC_AXIS);
+  app::updateLocationTime(ctx_->tel, ctx_->state, *last_gps_);
+  app::updateAstro(*moon_tracker_, *target_tracker_, ctx_->tel, ctx_->state,
+                   IMU_TUBE_OPTICAL_AXIS, IMU_TUBE_DEC_AXIS);
 
   ::Frame f;   // the firmware's frame type
   ui_->step(delta, input.clicked(), *ctx_, f);
@@ -149,8 +147,7 @@ void FirmwareUi::frame(unsigned long now_ms, const InputSnapshot& input,
   }
 
   config::serviceRequests(*store_, *settings_, *ctx_);   // Save / Reset from the UI
-  astro::applyTracking(ctx_->tel, ctx_->state, ctx_->state.ra_duty_at_sidereal);
-  ::MotorOutput m = RaMotor::toOutput(ctx_->state.ra_speed_cmd);
+  ::MotorOutput m = RaMotor::toOutput(app::motorCommand(ctx_->tel, ctx_->state));
   motor.in1 = m.in1;
   motor.in2 = m.in2;
   motor.pwm = m.duty;

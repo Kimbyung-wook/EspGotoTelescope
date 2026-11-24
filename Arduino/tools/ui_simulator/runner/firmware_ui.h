@@ -15,6 +15,7 @@ class TelescopeUi;         // Arduino/app/src/ui/telescope_ui.h
 namespace config { struct Settings; class RamSettingsStore; }   // Arduino/app/src/config/settings.h
 class AttitudeEstimator;   // Arduino/app/src/estimation/attitude_estimator.h
 namespace astro { class TargetTracker; }   // Arduino/app/src/astro/target_tracker.h
+namespace loc { class LastGpsRecorder; }   // Arduino/app/src/location/location.h
 struct UiContext;    // Arduino/app/src/ui/ui_context.h
 
 namespace sim {
@@ -56,6 +57,7 @@ class FirmwareUi : public UiBackend {
   std::unique_ptr<AttitudeEstimator> att_est_;
   std::unique_ptr<astro::TargetTracker> moon_tracker_;
   std::unique_ptr<astro::TargetTracker> target_tracker_;
+  std::unique_ptr<loc::LastGpsRecorder> last_gps_;
   std::unique_ptr<config::RamSettingsStore> store_;
   std::unique_ptr<config::Settings> settings_;
   int settings_load_ = 0;    // config::LoadResult of the last begin()

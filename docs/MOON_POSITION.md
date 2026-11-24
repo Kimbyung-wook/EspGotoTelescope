@@ -1,6 +1,6 @@
 # 달·행성 위치 계산 정리
 
-`9 Axis for Moon` 기능을 위해 GPS 시각과 위치로 달의 적경(RA)과 적위(Dec)를 구하는 방법을 정리한 문서입니다. `reference/`의 MATLAB 코드를 검토한 결과와 조사한 자료를 함께 담았습니다.
+달 추적(지금의 `1Target` > Moon, 예전 `9 Axis for Moon`)을 위해 GPS 시각과 위치로 달의 적경(RA)과 적위(Dec)를 구하는 방법을 정리한 문서입니다. `reference/`의 MATLAB 코드를 검토한 결과와 조사한 자료를 함께 담았습니다.
 
 ---
 
@@ -196,7 +196,7 @@ Meeus, *Astronomical Algorithms* 예제 47.a(1992-04-12 0h)와 비교했습니�
 - 에페메리스 시간은 UT + ΔT(69 s, 고정)로 씁니다. ΔT를 빼먹으면 달이 약 38″(0.6′) 어긋납니다.
 - 행성은 `planetApparent()`로 광행시간(빛이 오는 동안 행성이 움직인 만큼)과 세차(J2000 → 날짜 기준, Meeus 21.4)를 보정합니다. 장동(최대 약 17″)과 광행차(약 20″)는 넣지 않았습니다.
 - Standish 요소 자체의 오차 때문에 목성·토성은 수 분각까지 어긋날 수 있습니다. 저배율 파인더로 찾기에는 충분합니다.
-- 화면: `9 Axis for Moon`은 달만, `10 Planet Tracking`은 고른 대상(달, 수성, 금성, 화성, 목성, 토성)을 보여 줍니다. 태양은 망원경 안전 때문에 목록에 넣지 않았습니다.
+- 화면: `1Target`에서 대상(달, 수성, 금성, 화성, 목성, 토성)을 고르면 그 대상의 좌표와 안내를 보여 줍니다(v0.2.0 전에는 `9 Axis for Moon`과 `10 Planet Tracking`으로 나뉘어 있었습니다). 태양은 망원경 안전 때문에 목록에 넣지 않았습니다.
 
 **PC 시험 결과 (기준값과의 차이)**
 
@@ -233,5 +233,5 @@ $env:SKETCH = 'tools/astro_bench'; bash Arduino/scripts/build.sh --library app/s
 
 **남은 일**
 
-- RA 모터 보정: 추적은 `RRcmd = RA_DUTY_AT_SIDEREAL × 추적속도 / 15.041`(개루프, 선형)로 모터 지령을 정합니다. 여기에 사용자 Offset(10 Planet Tracking > Offset, PWM)을 더합니다. `board_config.h`의 `RA_DUTY_AT_SIDEREAL`이 0이라 아직은 Offset만으로 모터가 돕니다. 별 하나를 따라가는 Offset 값을 찾아 `RA_DUTY_AT_SIDEREAL`에 넣어야 합니다. DC 모터는 PWM과 속도가 선형이 아니므로, 필요하면 여러 점을 측정해 표로 바꿉니다.
+- RA 모터 보정: 추적은 `RRcmd = RA_DUTY_AT_SIDEREAL × 추적속도 / 15.041`(개루프, 선형)로 모터 지령을 정합니다. 여기에 사용자 Offset(1Target 대상 화면 > Offset, PWM)을 더합니다. 기본값(`board_config.h`의 `RA_DUTY_AT_SIDEREAL`)이 0이라 보정 전에는 Offset만으로 모터가 돕니다. 별 하나를 따라가는 값을 6RA Speed에서 찾아 5Settings의 `RAduty = RRcmd`로 저장합니다. DC 모터는 PWM과 속도가 선형이 아니므로, 필요하면 여러 점을 측정해 표로 바꿉니다.
 - Yaw(방위) 추정이 없어 마운트가 달을 향하는지는 아직 판단하지 않습니다.

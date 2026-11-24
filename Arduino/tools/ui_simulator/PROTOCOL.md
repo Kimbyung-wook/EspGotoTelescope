@@ -50,7 +50,7 @@ GUI(`gui/simulator.py`)와 UI 러너(`build/ui_runner.exe`)가 주고받는 메�
 
 ```json
 {"type":"frame","seq":34,"t_ms":3400,
- "lines":["T 12: 0: 3.4 V 12.60","Main Menu",">1RA Speed"," 2Status - GPS"," 3Status - Acc/Gyro"," 4Status - Mag/Alt"," 5Status - IMUCalib"," 6Do IMU Calib."],
+ "lines":["T 12: 0: 3.4 V 12.60","Main Menu",">1Target"," 2Polar Align"," 3Status"," 4Calibration"," 5Settings"," 6RA Speed"],
  "motor":{"in1":0,"in2":0,"pwm":0}}
 ```
 (실제로는 한 줄입니다.)

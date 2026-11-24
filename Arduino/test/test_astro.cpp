@@ -164,6 +164,13 @@ TEST(astro_moon_rate_matches_hour_angle_change) {
 // ---- TargetTracker / Telemetry glue
 #include "../app/src/astro/target_telemetry.h"
 
+// Position and time as app::updateLocationTime() leaves them
+static void known(Telemetry& t, const UtcTime& u, double lat, double lon, float alt = 0.0f) {
+  t.loc_source = 1; t.time_source = 1;
+  t.jd_ut = julianDate(u);
+  t.obs_lat_deg = lat; t.obs_lon_deg = lon; t.obs_alt_m = alt;
+}
+
 TEST(astro_utc_from_gps) {
   UtcTime u;
   CHECK(!utcFromGps(0, 0, 0, 0, 0, 0, 0, u));          // GPS before the first RMC
@@ -190,9 +197,7 @@ TEST(astro_moon_telemetry_matches_moon_state) {
   TargetTracker tr(Target::Moon, 1000);
   Telemetry t;
   t.now_ms = 5000;
-  t.year = 26; t.month = 11; t.day = 22; t.hour = 12;
-  t.fixquality = 1;
-  t.latitude = 37.5665; t.longitude = 126.9780; t.altitude_m = 40.0f;
+  known(t, {2026, 11, 22, 12, 0, 0.0}, 37.5665, 126.9780, 40.0f);
   CHECK(updateMoonTelemetry(tr, t));
   const MoonState s = moonState(julianDate({2026, 11, 22, 12, 0, 0.0}), Observer{37.5665, 126.9780, 40.0});
   CHECK(t.moon_valid);
@@ -200,7 +205,7 @@ TEST(astro_moon_telemetry_matches_moon_state) {
   CHECK_NEAR(t.moon_dec_deg, s.topo.dec_deg, 1e-12);
   CHECK_NEAR(t.moon_alt_deg, s.hor.alt_deg, 1e-12);
   CHECK_NEAR(t.moon_rate_arcsec_s, s.ha_rate_arcsec_s, 1e-12);
-  t.fixquality = 0;
+  t.time_source = 0;                               // no time
   updateMoonTelemetry(tr, t);
   CHECK(!t.moon_valid);
 }
@@ -221,8 +226,8 @@ TEST(astro_tracking_command_is_rate_plus_offset) {
   TargetTracker tr(Target::Moon, 1000);
   Telemetry t;
   UiState st;
-  t.now_ms = 1000; t.year = 26; t.month = 11; t.day = 22; t.hour = 12; t.fixquality = 1;
-  t.latitude = 37.5665; t.longitude = 126.9780;
+  t.now_ms = 1000;
+  known(t, {2026, 11, 22, 12, 0, 0.0}, 37.5665, 126.9780);
   st.track_target = 3;   // Mars
   CHECK(updateTargetTelemetry(tr, st.track_target, t));
   CHECK(t.target_valid && t.target_index == 3);
@@ -234,12 +239,45 @@ TEST(astro_tracking_command_is_rate_plus_offset) {
   st.track_offset = 12.0f;
   CHECK(applyTracking(t, st, 0.0f));
   CHECK_NEAR(st.ra_speed_cmd, 12.0, 1e-9);
-  CHECK(applyTracking(t, st, 100.0f));
-  CHECK_NEAR(st.ra_speed_cmd, 100.0 * t.target_rate_arcsec_s / SIDEREAL_RATE_ARCSEC_S + 12.0, 1e-4);
+  CHECK(applyTracking(t, st, 100.0f));            // sidereal: follows the tube (DES-TRK-02)
+  CHECK_NEAR(st.ra_speed_cmd, 112.0, 1e-4);
   st.track_offset = 0.0f;
   CHECK_NEAR(trackingDuty(SIDEREAL_RATE_ARCSEC_S, 80.0f), 80.0, 1e-4);
-  st.track_target = 4;                            // target changed, data not there yet
+  st.track_target = 4;                            // target changed: sidereal goes on
+  CHECK(applyTracking(t, st, 100.0f));
+  st.track_mode = UiState::TRACK_LUNAR;           // lunar needs the Moon
   CHECK(!applyTracking(t, st, 100.0f));
+  TargetTracker moon(Target::Moon, 1000);
+  CHECK(updateMoonTelemetry(moon, t));
+  CHECK(applyTracking(t, st, 100.0f));
+  CHECK_NEAR(st.ra_speed_cmd, 100.0 * t.moon_rate_arcsec_s / SIDEREAL_RATE_ARCSEC_S, 1e-4);
+  CHECK(st.ra_speed_cmd < 100.0f);                // the Moon lags the stars
+}
+
+TEST(astro_guide_offsets_and_on_target) {
+  double dra, ddec;
+  guideOffsets(350.0, 10.0, 5.0, 12.5, dra, ddec);   // across 0h
+  CHECK_NEAR(dra, 15.0, 1e-12);
+  CHECK_NEAR(ddec, 2.5, 1e-12);
+  guideOffsets(5.0, 10.0, 350.0, 9.0, dra, ddec);
+  CHECK_NEAR(dra, -15.0, 1e-12);
+  CHECK(onTarget(0.5, -0.5, 0.0, 1.0));
+  CHECK(!onTarget(1.5, 0.0, 0.0, 1.0));
+  CHECK(onTarget(1.5, 0.0, 60.0, 1.0));              // 1.5 deg of RA at Dec 60 = 0.75 on the sky
+  CHECK(!onTarget(0.0, 1.2, 0.0, 1.0));
+}
+
+TEST(astro_polaris_of_date_and_clock) {
+  const double jd = julianDate({2026, 11, 24, 12, 0, 0.0});
+  const Equatorial p = polarisOfDate(jd);
+  CHECK_NEAR(p.ra_deg, 3.0 * 15.0 + 7.0 * 0.25, 0.5);    // about 03h07m in 2026 (02h32m in 2000)
+  CHECK_NEAR(p.dec_deg, 89.37, 0.02);
+  const double lst = lstDeg(jd, 126.978);
+  CHECK_NEAR(polarisHaDeg(jd, 126.978), wrap180(lst - p.ra_deg), 1e-9);
+  CHECK_NEAR(polarisClockHours(0.0), 12.0, 1e-12);       // above the pole
+  CHECK_NEAR(polarisClockHours(90.0), 9.0, 1e-12);       // 6 h west: left of the pole
+  CHECK_NEAR(polarisClockHours(-90.0), 3.0, 1e-12);
+  CHECK_NEAR(polarisClockHours(180.0), 6.0, 1e-12);
 }
 
 // ---- pointing from gravity (equatorial mount)
@@ -291,8 +329,7 @@ TEST(astro_scope_from_roll_pitch_level_tube_on_meridian) {
   // Default IMU axes (x optical, y Dec). Tube level, pointing south on the meridian:
   // the RA axis tilted by lat, so a level tube points at Dec = lat - 90.
   Telemetry t;
-  t.year = 26; t.month = 11; t.day = 22; t.hour = 12; t.fixquality = 1;
-  t.latitude = 37.5665; t.longitude = 126.9780;
+  known(t, {2026, 11, 22, 12, 0, 0.0}, 37.5665, 126.9780);
   double up[3];
   upInTubeFromRollPitch(0.0, 0.0, 1, 2, up);
   CHECK_NEAR(up[0], 0.0, 1e-12);
@@ -300,13 +337,17 @@ TEST(astro_scope_from_roll_pitch_level_tube_on_meridian) {
   CHECK_NEAR(up[2], 1.0, 1e-12);
   CHECK(updateScopeTelemetry(t, 1, 2));
   CHECK(t.scope_valid);
-  CHECK_NEAR(t.scope_dec_deg, t.latitude - 90.0, 1e-6);
+  CHECK_NEAR(t.scope_dec_deg, t.obs_lat_deg - 90.0, 1e-6);
+  CHECK_NEAR(t.tube_alt_deg, 0.0, 1e-9);
+  CHECK(t.polaris_valid);
   // nose raised by 90 - lat from the south horizon (pitch < 0: up gets a +x part) -> equator
-  upInTubeFromRollPitch(0.0, -(90.0 - t.latitude), 1, 2, up);
+  upInTubeFromRollPitch(0.0, -(90.0 - t.obs_lat_deg), 1, 2, up);
   Equatorial q;
-  CHECK(pointingFromUp(up, t.latitude, 0.0, 0.0, 0.0, q));
+  CHECK(pointingFromUp(up, t.obs_lat_deg, 0.0, 0.0, 0.0, q));
   CHECK_NEAR(fabs(q.dec_deg), 0.0, 1e-6);
-  t.fixquality = 0;
+  t.pitch_est_deg = (float)-t.obs_lat_deg;         // tube raised by the latitude (Dec 90 pose)
+  t.loc_source = 0;                                // no position: tube altitude only
   CHECK(!updateScopeTelemetry(t, 1, 2));
-  CHECK(!t.scope_valid);
+  CHECK(!t.scope_valid && !t.polaris_valid);
+  CHECK_NEAR(t.tube_alt_deg, 37.5665, 1e-4);
 }

@@ -18,17 +18,19 @@ struct Frame {
   static const int CONTENT_LINES = 6;
 
   char lines[LINES][COLS];
+  bool overflow = false;         // some text was cut at the line width (tests check it)
 
   Frame() { clear(); }
-  void clear() { memset(lines, 0, sizeof(lines)); }
+  void clear() { memset(lines, 0, sizeof(lines)); overflow = false; }
 
   // printf into one line, truncated to the line width
   void set(int row, const char* fmt, ...) __attribute__((format(printf, 3, 4))) {
     if (row < 0 || row >= LINES) return;
     va_list args;
     va_start(args, fmt);
-    vsnprintf(lines[row], COLS, fmt, args);
+    const int n = vsnprintf(lines[row], COLS, fmt, args);
     va_end(args);
+    if (n >= COLS) overflow = true;
   }
   void blank(int from_row, int to_row = LINES - 1) {
     for (int r = from_row; r <= to_row; r++) set(r, " ");

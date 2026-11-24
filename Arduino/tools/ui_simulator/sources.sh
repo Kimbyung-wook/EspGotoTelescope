@@ -8,6 +8,8 @@ FIRMWARE_SRCS=(
   "$APP_SRC/motor/ra_motor.cpp"
   "$APP_SRC/estimation/filter.cpp"
   "$APP_SRC/estimation/attitude_estimator.cpp"
+  "$APP_SRC/estimation/calibration.cpp"
+  "$APP_SRC/location/location.cpp"
   "$APP_SRC/astro/astro.cpp"
   "$APP_SRC/config/settings.cpp"
 )

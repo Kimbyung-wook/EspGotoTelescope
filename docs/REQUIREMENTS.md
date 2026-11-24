@@ -102,7 +102,7 @@
 |---|---|---|
 | **DES-TRK-01** | **추적 방식**은 두 가지입니다: `Sidereal`(항성시 15.041″/s), `Lunar`(달 추적 속도, `src/astro`가 1초마다 계산하는 관측지 기준 RA 속도). 대상이 달이면 `Lunar`, 행성과 그 밖은 `Sidereal`이 기본이고 화면에서 바꿀 수 있습니다. | REQ-TRK-01, REQ-MOT-01, REQ-MOT-02 |
 | **DES-TRK-02** | 대상을 고르는 일(지향 안내)과 추적 속도를 고르는 일을 나눕니다. 추적은 지금 경통이 가리키는 곳을 그 속도로 따라갑니다. 행성의 고유 운동은 관측 시간 동안 무시할 만큼 작아서 항성시로 충분합니다. | REQ-TRK-01 |
-| **DES-MOT-01** | **모터 지령** = `RA_DUTY_AT_SIDEREAL × 속도 / 15.041 + Offset`(개루프). `RA_DUTY_AT_SIDEREAL`은 빌드 상수에서 **설정값**으로 옮기고, RA Speed 화면에서 별을 따라가며 찾은 값을 `Save`로 저장합니다. | REQ-MOT-01, REQ-CFG-01 |
+| **DES-MOT-01** | **모터 지령** = `RA_DUTY_AT_SIDEREAL × 속도 / 15.041 + Offset`(개루프). `RA_DUTY_AT_SIDEREAL`은 빌드 상수에서 **설정값**으로 옮기고, RA Speed 화면에서 별을 따라가며 찾은 RRcmd를 Settings 화면의 `RAduty = RRcmd`로 저장합니다. | REQ-MOT-01, REQ-CFG-01 |
 | **DES-MOT-02** | **반구**: 위도가 음수(남반구)이면 모터 방향을 반대로 합니다. 설정 `motor_reverse`로 배선 방향도 바꿀 수 있게 합니다. | REQ-MOT-01 |
 | **DES-MOT-03** | (나중) 추적 중 지향(방법 B)의 RA가 천천히 벗어나는 만큼 PWM을 고치는 느린 보정 루프. 개루프 결과를 실물에서 본 뒤 정합니다. | REQ-TRK-01 |
 
@@ -120,7 +120,7 @@
 | ID | 설계 | 근거 |
 |---|---|---|
 | **DES-CFG-01** | **저장소**: ESP8266 `EEPROM` 라이브러리(플래시 한 섹터를 흉내 냄)를 씁니다. LittleFS보다 코드가 작고 구조체 하나를 쓰기에 충분합니다. | REQ-CFG-01 |
-| **DES-CFG-02** | **형식**: `struct Settings { magic, version, size, crc32, 값들 }`. 부팅 때 읽어서 magic, 크기, CRC가 맞지 않으면 기본값을 쓰고 부팅 화면에 `Settings: default`를 표시합니다. 형식이 바뀌면 `version`을 올리고, 아는 이전 버전은 옮겨 담습니다. | REQ-CFG-01 |
+| **DES-CFG-02** | **형식**: `struct Settings { magic, version, size, crc32, 값들 }`. 부팅 때 읽어서 magic, 크기, CRC가 맞지 않으면 기본값을 쓰고 부팅 화면에 `>> Settings bad->def`(처음이면 `6. Settings new`)를 표시합니다. 형식이 바뀌면 `version`을 올리고, 아는 이전 버전은 옮겨 담습니다. | REQ-CFG-01 |
 | **DES-CFG-03** | **저장하는 값**: 자이로 바이어스(3), 가속도 바이어스·배율(3+3), 지자기 오프셋·배율(3+3), 자편각, 위치 출처 모드, 수동 위치(위도·경도·고도), 직전 GPS 위치와 날짜, UTC 오프셋, `RA_DUTY_AT_SIDEREAL`, 모터 방향, 마지막 추적 방식과 Offset, 안내 허용 범위. 모두 합쳐 200 바이트 미만입니다. | REQ-CFG-01, REQ-LOC-02, REQ-LOC-03 |
 | **DES-CFG-04** | **언제 쓰는가**: 사용자가 보정 결과를 적용하거나 설정 화면에서 `Save`를 누를 때, 그리고 직전 GPS 값(DES-LOC-02)뿐입니다. 값이 같으면 쓰지 않습니다. 쓰는 동안(수십 ms) 루프가 한 번 밀리는 것은 허용합니다. | REQ-CFG-01 |
 | **DES-CFG-05** | **설정 화면**: 위치(모드, 수동 값), 시각/시간대, 자편각, 모터(보정값, 방향), 안내 허용 범위, `Save`, `Reset to defaults`(확인을 한 번 더 받음). | REQ-CFG-01, REQ-LOC-02 |

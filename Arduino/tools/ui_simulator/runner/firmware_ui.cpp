@@ -6,25 +6,31 @@
 
 // Firmware (read-only, include path Arduino/app/src)
 #include "astro/target_telemetry.h"
+#include "config/settings_binding.h"
 #include "estimation/attitude_estimator.h"
 #include "motor/ra_motor.h"
 #include "sensors/imu_data.h"
 #include "ui/telescope_ui.h"
+#include "version.h"
 
 namespace sim {
 
 namespace {
 
-// Same lines as setup() in Arduino/app/app.ino (ICM20948 set to 16G/250dps/10Hz).
-void bootLines(const BootConfig& boot, const char* out[8]) {
-  out[0] = "1. Display ON 160MHz";   // ESP.getCpuFreqMHz() at 160 MHz
-  out[1] = boot.imu_ok ? "2. IMU is ON" : ">> IMU failed";
-  out[2] = "Acc +-16G";
-  out[3] = "Gyro 250 dps";
-  out[4] = "Mag 10 Hz";
-  out[5] = boot.gps_ok ? "3. GPS is ON" : ">> GPS is timeout";
-  out[6] = "4. Buttons are ON";
-  out[7] = "5. GPIO/PWM is ON";
+// Same lines as setup() in Arduino/app/app.ino (ICM20948 set to 16G/250dps/10Hz,
+// remote UI off).
+void bootLines(const BootConfig& boot, const char* settings_text,
+               const char* out[FirmwareUi::kBootLines]) {
+  out[0] = SIMPLEGOTO_NAME " v" SIMPLEGOTO_VERSION;
+  out[1] = "1. Display ON 160MHz";   // ESP.getCpuFreqMHz() at 160 MHz
+  out[2] = boot.imu_ok ? "2. IMU is ON" : ">> IMU failed";
+  out[3] = "Acc +-16G";
+  out[4] = "Gyro 250 dps";
+  out[5] = "Mag 10 Hz";
+  out[6] = boot.gps_ok ? "3. GPS is ON" : ">> GPS is timeout";
+  out[7] = "4. Buttons are ON";
+  out[8] = "5. GPIO/PWM is ON";
+  out[9] = settings_text;
 }
 
 // updateTelemetry() of app.ino, with the fake sensors as the source.
@@ -75,7 +81,8 @@ void fillTelemetry(unsigned long now_ms, const SensorState& s, const UiState& st
 
 }  // namespace
 
-FirmwareUi::FirmwareUi() {}
+FirmwareUi::FirmwareUi()
+    : store_(new config::RamSettingsStore()), settings_(new config::Settings()) {}
 FirmwareUi::~FirmwareUi() {}
 
 void FirmwareUi::begin(const BootConfig& boot, const SensorState&) {
@@ -88,15 +95,25 @@ void FirmwareUi::begin(const BootConfig& boot, const SensorState&) {
   att_est_.reset(new AttitudeEstimator());
   moon_tracker_.reset(new astro::TargetTracker(astro::Target::Moon, 1000));
   target_tracker_.reset(new astro::TargetTracker(astro::Target::Mercury, 1000));
+  // setup(): settings after the motor, before the main loop
+  const config::LoadResult r = config::load(*store_, *settings_);
+  config::applyToUi(*settings_, ctx_->state);
+  ctx_->tel.settings_status = config::statusAfterLoad(r);
+  settings_load_ = (int)r;
   att_est_->begin(kAttEstTauS, kFrameMs / 1000.0f);   // end of setup()
 }
 
 void FirmwareUi::renderBoot(Frame& out) {
-  const char* lines[8];
-  bootLines(boot_, lines);
+  const char* lines[kBootLines];
+  bootLines(boot_, config::loadText((config::LoadResult)settings_load_), lines);
   int shown = boot_frame_ / kBootLineFrames + 1;
-  if (shown > 8) shown = 8;
-  for (int i = 0; i < shown; i++) std::snprintf(out.lines[i], kCols + 1, "%s", lines[i]);
+  if (shown > kBootLines) shown = kBootLines;
+  // bootLine() of app.ino: line 0 stays, the rest scrolls up when the screen is full
+  const int skip = shown > kLines ? shown - kLines : 0;
+  for (int row = 0; row < kLines && row < shown; row++) {
+    const int i = row == 0 ? 0 : row + skip;
+    std::snprintf(out.lines[row], kCols + 1, "%s", lines[i]);
+  }
 }
 
 void FirmwareUi::frame(unsigned long now_ms, const InputSnapshot& input,
@@ -120,7 +137,7 @@ void FirmwareUi::frame(unsigned long now_ms, const InputSnapshot& input,
   ctx_->tel.pitch_est_deg = att_est_->pitchDeg();
   astro::updateMoonTelemetry(*moon_tracker_, ctx_->tel);
   astro::updateTargetTelemetry(*target_tracker_, ctx_->state.track_target, ctx_->tel);
-  ctx_->tel.ra_calibrated = kRaDutyAtSidereal > 0.0f;
+  ctx_->tel.ra_calibrated = ctx_->state.ra_duty_at_sidereal != 0.0f;
   astro::updateScopeTelemetry(ctx_->tel, IMU_TUBE_OPTICAL_AXIS, IMU_TUBE_DEC_AXIS);
 
   ::Frame f;   // the firmware's frame type
@@ -131,7 +148,8 @@ void FirmwareUi::frame(unsigned long now_ms, const InputSnapshot& input,
     out.lines[i][kCols] = '\0';
   }
 
-  astro::applyTracking(ctx_->tel, ctx_->state, kRaDutyAtSidereal);
+  config::serviceRequests(*store_, *settings_, *ctx_);   // Save / Reset from the UI
+  astro::applyTracking(ctx_->tel, ctx_->state, ctx_->state.ra_duty_at_sidereal);
   ::MotorOutput m = RaMotor::toOutput(ctx_->state.ra_speed_cmd);
   motor.in1 = m.in1;
   motor.in2 = m.in2;

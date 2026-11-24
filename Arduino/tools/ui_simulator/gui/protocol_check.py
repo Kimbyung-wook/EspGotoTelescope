@@ -15,9 +15,9 @@ from runner_client import DEFAULT_RUNNER, RunnerClient
 
 TITLES = ["*1RA Speed", "*2Status - GPS", "*3Status - Acc/Gyro", "*4Status - Mag/Alt",
           "*5Status - IMUCalib", "*6Do IMU Calib.", "*7Att.Estimator", "*8Health",
-          "*9Axis for Moon", "*10Planet Tracking", " "]   # Sleep blanks the title line
+          "*9Axis for Moon", "*10Planet Tracking", "*11Settings", " "]   # Sleep blanks the title line
 # rotations from the first row to Quit; None = info screen (click leaves)
-EXIT_ROTATE = [2, None, None, None, None, 5, None, None, None, 5, None]
+EXIT_ROTATE = [2, None, None, None, None, 5, None, None, None, 5, 3, None]
 
 failures = 0
 verbose = False
@@ -57,7 +57,7 @@ def main():
         check(c.hello["backend"] == "firmware", "backend is the firmware UI")
 
         f = c.step()
-        check(f["lines"][0] == "1. Display ON 160MHz", "boot starts with display line", f)
+        check(f["lines"][0] == "SimpleGoTo v0.1.0", "boot starts with the name and version", f)
         for _ in range(100):
             f = c.step()
             if f["lines"][1] == "Main Menu":

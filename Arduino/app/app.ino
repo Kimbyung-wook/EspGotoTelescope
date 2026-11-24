@@ -20,6 +20,8 @@
 #include "src/astro/target_telemetry.h"
 #include "src/ui/telescope_ui.h"
 #include "src/remote/remote_ui.h"
+#include "src/config/settings_binding.h"
+#include "src/config/eeprom_store.h"
 
 /************************************/
 // Devices
@@ -45,6 +47,12 @@ TelescopeUi ui;
 UiContext   ui_ctx;
 Frame       frame;
 int         rotary_count_prev = 0;
+
+/************************************/
+// Settings in flash (docs/REQUIREMENTS.md DES-CFG)
+/************************************/
+config::EepromSettingsStore settings_store;
+config::Settings            settings;
 
 static_assert(sizeof(frame.lines) == sizeof(monitor->msg), "Frame and OLED buffers must match");
 
@@ -121,12 +129,21 @@ void setup() {
   ra_motor.begin();
   bootLine(line, "5. GPIO/PWM is ON");
 
+  /************************************/
+  // Settings : calibration, RA duty, tracking offset (defaults if none or bad)
+  /************************************/
+  settings_store.begin();
+  const config::LoadResult settings_result = config::load(settings_store, settings);
+  config::applyToUi(settings, ui_ctx.state);
+  ui_ctx.tel.settings_status = config::statusAfterLoad(settings_result);
+  bootLine(line, config::loadText(settings_result));
+
 #if REMOTE_UI_ENABLE
   /************************************/
   // Remote UI : Wi-Fi AP + web page + WebSocket
   /************************************/
   remote::begin();
-  bootLine(line, "6. WiFi AP " REMOTE_UI_AP_SSID);
+  bootLine(line, "7. WiFi AP " REMOTE_UI_AP_SSID);
 #endif
 
   att_est.begin(ATT_EST_TAU_S, 1.0f / hz);
@@ -201,7 +218,7 @@ void loop() {
   bool astro_ran = astro::updateMoonTelemetry(moon_tracker, ui_ctx.tel);
   astro_ran |= astro::updateTargetTelemetry(target_tracker, ui_ctx.state.track_target, ui_ctx.tel);
   if (astro_ran) perform_astro.toc();
-  ui_ctx.tel.ra_calibrated = RA_DUTY_AT_SIDEREAL > 0.0f;
+  ui_ctx.tel.ra_calibrated = ui_ctx.state.ra_duty_at_sidereal != 0.0f;
   // Where the tube points (IMU on the tube, polar-aligned mount)
   astro::updateScopeTelemetry(ui_ctx.tel, IMU_TUBE_OPTICAL_AXIS, IMU_TUBE_DEC_AXIS);
 
@@ -211,9 +228,10 @@ void loop() {
   memcpy(monitor->msg, frame.lines, sizeof(frame.lines));
   monitor->print();
   remote::publish(frame);   // phone mirror (only when the lines changed)
+  config::serviceRequests(settings_store, settings, ui_ctx);   // Save / Reset from the UI
 
   // Outputs (tracking overrides the manual RRcmd while it is on)
-  astro::applyTracking(ui_ctx.tel, ui_ctx.state, RA_DUTY_AT_SIDEREAL);
+  astro::applyTracking(ui_ctx.tel, ui_ctx.state, ui_ctx.state.ra_duty_at_sidereal);
   ra_motor.setSpeed(ui_ctx.state.ra_speed_cmd);
 
   perform_main.toc();

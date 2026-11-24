@@ -419,7 +419,8 @@ TOUR = [
     ("rotate", 2, None), ("click", None, "16_planet_mars"), ("click", None, "17_planet_mars_tracking"),
     ("rotate", 1, None), ("click", None, None), ("rotate", 5, "18_planet_offset_edit"), ("click", None, None),
     ("rotate", 1, None), ("click", None, None), ("rotate", 3, None), ("click", None, None),
-    ("rotate", 1, None), ("click", None, "19_sleep"), ("click", None, "20_back_to_main"),
+    ("rotate", 1, None), ("click", None, "19_settings"), ("rotate", 3, None), ("click", None, None),
+    ("rotate", 1, None), ("click", None, "20_sleep"), ("click", None, "21_back_to_main"),
 ]
 
 

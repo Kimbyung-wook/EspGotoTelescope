@@ -50,6 +50,10 @@ struct Telemetry {
   enum RemoteState { REMOTE_OFF = 0, REMOTE_WAITING = 1, REMOTE_CONNECTED = 2 };
   int remote = REMOTE_OFF;                  // OFF: no mark, WAITING: 'w', CONNECTED: 'W'
 
+  // Settings in flash (src/config): shown on the Settings screen
+  enum SettingsStatus { SETTINGS_DEFAULT = 0, SETTINGS_LOADED, SETTINGS_SAVED, SETTINGS_SAVE_FAILED };
+  int settings_status = SETTINGS_DEFAULT;
+
   // Health [us]
   float loop_hz = 10.0f;
   unsigned long loop_us = 0, main_us = 0, disp_us = 0, gps_us = 0, imu_us = 0, est_us = 0, astro_us = 0;
@@ -65,6 +69,11 @@ struct UiState {
   int   track_target = 1;                   // astro::Target index (1 = Mercury)
   bool  tracking = false;                   // RA motor follows the target rate
   float track_offset = 0.0f;                // added to the tracking command [PWM duty]
+  float ra_duty_at_sidereal = 0.0f;         // RRcmd at the sidereal rate (from the settings), 0 = not set
+
+  // Requests to the main loop (config::serviceRequests clears them)
+  bool settings_save_request = false;       // write the current values to flash
+  bool settings_reset_request = false;      // back to defaults, then save
 };
 
 struct UiContext {

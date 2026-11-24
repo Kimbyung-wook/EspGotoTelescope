@@ -187,6 +187,10 @@ void GyroBiasCalibScreen::tick(UiContext& ctx) {
   const float w[3] = {ctx.tel.imu.wx, ctx.tel.imu.wy, ctx.tel.imu.wz};
   calib_.update(ctx.tel.now_ms, w);
   for (int i = 0; i < 3; i++) ctx.state.gyro_bias[i] = calib_.bias()[i];
+  if (calib_.done() && !saved_) {          // keep the new bias across power cycles
+    ctx.state.settings_save_request = true;
+    saved_ = true;
+  }
 }
 
 void GyroBiasCalibScreen::render(Frame& f, const UiContext& ctx, char /*blink*/) {
@@ -199,6 +203,50 @@ void GyroBiasCalibScreen::render(Frame& f, const UiContext& ctx, char /*blink*/)
   f.set(5, "bWx   %10.5f dps", b[0]);
   f.set(6, "bWy   %10.5f dps", b[1]);
   f.set(7, "bWz   %10.5f dps", b[2]);
+}
+
+/************************************/
+// Settings
+/************************************/
+void SettingsScreen::onClick(ScreenManager& mgr, UiContext& ctx) {
+  UiState& st = ctx.state;
+  switch (cursor_.selected()) {
+    case SET_RA_DUTY:                       // RRcmd found on 1RA Speed by following a star
+      st.ra_duty_at_sidereal = st.ra_speed_cmd;
+      st.settings_save_request = true;
+      break;
+    case SAVE:
+      st.settings_save_request = true;
+      break;
+    case RESET:
+      if (!confirm_reset_) { confirm_reset_ = true; return; }
+      st.settings_reset_request = true;
+      break;
+    case BACK:
+      mgr.pop();
+      break;
+  }
+  confirm_reset_ = false;
+}
+
+static const char* settingsStatusText(int s) {
+  switch (s) {
+    case Telemetry::SETTINGS_LOADED:      return "loaded";
+    case Telemetry::SETTINGS_SAVED:       return "saved";
+    case Telemetry::SETTINGS_SAVE_FAILED: return "SAVE FAILED";
+    default:                              return "defaults";
+  }
+}
+
+void SettingsScreen::render(Frame& f, const UiContext& ctx, char blink) {
+  const UiState& st = ctx.state;
+  f.set(1, "*%s", title_);
+  f.set(2, "Flash: %s", settingsStatusText(ctx.tel.settings_status));
+  f.set(3, "RAduty %+9.1f PWM", st.ra_duty_at_sidereal);
+  f.set(4, "%cRAduty = RRcmd", cursor_.mark(SET_RA_DUTY, blink));
+  f.set(5, "%cSave", cursor_.mark(SAVE, blink));
+  f.set(6, "%c%s", cursor_.mark(RESET, blink), confirm_reset_ ? "Reset? click again" : "Reset defaults");
+  f.set(7, "%cBack", cursor_.mark(BACK, blink));
 }
 
 /************************************/

@@ -57,7 +57,9 @@ TEST(ui_main_menu_scrolls_one_item_per_step) {
   CHECK_STR(u.f.lines[2] + 1, "2Status - GPS");
   CHECK_STR(u.f.lines[7] + 1, "7Att.Estimator");
   CHECK(u.cursorAt(7) != ' ');
-  u.step(4);                                     // item 11 (Sleep) reachable
+  u.step(4);                                     // item 11 (Settings)
+  CHECK_STR(u.f.lines[7] + 1, "11Settings");
+  u.step(1);                                     // item 12 (Sleep) reachable
   CHECK_STR(u.f.lines[7] + 1, "Sleep");
   CHECK(u.cursorAt(7) != ' ');
 }
@@ -67,9 +69,9 @@ TEST(ui_main_menu_clamps_at_both_ends) {
   u.step(-3);
   CHECK(u.ui.mainMenu().selected() == 0);
   u.step(50);
-  CHECK(u.ui.mainMenu().selected() == 10);
+  CHECK(u.ui.mainMenu().selected() == 11);
   u.step(-1);
-  CHECK(u.ui.mainMenu().selected() == 9);       // one step back from the end
+  CHECK(u.ui.mainMenu().selected() == 10);      // one step back from the end
 }
 
 TEST(ui_every_menu_item_opens_and_returns_to_same_item) {
@@ -81,6 +83,7 @@ TEST(ui_every_menu_item_opens_and_returns_to_same_item) {
     if (item == 0) { u.step(2); }                // RA Speed : move to Quit
     if (item == 5) { u.step(5); }                // Do IMU Calib : move to Quit
     if (item == 9) { u.step(5); }                // Planet Tracking : Mercury -> Quit
+    if (item == 10) { u.step(3); }               // Settings : Back
     u.step(0, true);                             // back
     CHECK(u.ui.manager().depth() == 1);
     CHECK(u.ui.mainMenu().selected() == item);
@@ -142,8 +145,14 @@ TEST(ui_gyro_bias_calibration_phases) {
   CHECK_STR(u.f.lines[1], "*6Do IMU Calib.");
   u.step(2); u.step(0, true);                    // Gyro Bias Calib
   CHECK_STR(u.f.lines[1], "Calib Gyro Bias Ready");
-  for (unsigned long ms = 100; ms <= 16000; ms += 100) { u.ctx.tel.now_ms = ms; u.step(); }
+  for (unsigned long ms = 100; ms <= 15900; ms += 100) { u.ctx.tel.now_ms = ms; u.step(); }
+  CHECK(!u.ctx.state.settings_save_request);     // not saved while measuring
+  u.ctx.tel.now_ms = 16000; u.step();
   CHECK_STR(u.f.lines[1], "Calib Gyro Bias Done.");
+  CHECK(u.ctx.state.settings_save_request);      // the new bias goes to flash once
+  u.ctx.state.settings_save_request = false;
+  u.ctx.tel.now_ms = 16100; u.step();
+  CHECK(!u.ctx.state.settings_save_request);
   CHECK_NEAR(u.ctx.state.gyro_bias[0], 0.5, 1e-4);
   CHECK_NEAR(u.ctx.state.gyro_bias[1], -0.2, 1e-4);
   u.step(0, true);                               // back to the calib menu, cursor on Gyro Bias
@@ -164,6 +173,7 @@ TEST(ui_lines_never_overflow) {
     if (item == 0) u.step(2);
     if (item == 5) u.step(5);
     if (item == 9) u.step(5);
+    if (item == 10) u.step(3);
     u.step(0, true);
   }
 }
@@ -238,4 +248,39 @@ TEST(ui_manual_ra_speed_stops_tracking) {
   u.step(0, true);                               // 1RA Speed
   u.step(0, true);                               // edit RRcmd
   CHECK(!u.ctx.state.tracking);
+}
+
+TEST(ui_settings_screen_save_and_ra_duty) {
+  UiFixture u;
+  u.ctx.tel.settings_status = Telemetry::SETTINGS_LOADED;
+  u.ctx.state.ra_speed_cmd = 123.0f;             // found on 1RA Speed
+  u.step(10); u.step(0, true);                   // 11Settings
+  CHECK_STR(u.f.lines[1], "*11Settings");
+  CHECK_STR(u.f.lines[2], "Flash: loaded");
+  CHECK_STR(u.f.lines[3], "RAduty      +0.0 PWM");
+  CHECK(u.cursorAt(4) != ' ');
+  CHECK_STR(u.f.lines[4] + 1, "RAduty = RRcmd");
+  u.step(0, true);                               // RAduty = RRcmd
+  CHECK(u.ctx.state.ra_duty_at_sidereal == 123.0f);
+  CHECK(u.ctx.state.settings_save_request);
+  CHECK_STR(u.f.lines[3], "RAduty    +123.0 PWM");
+  u.ctx.state.settings_save_request = false;
+  u.step(1); u.step(0, true);                    // Save
+  CHECK(u.ctx.state.settings_save_request);
+  CHECK_STR(u.f.lines[5] + 1, "Save");
+}
+
+TEST(ui_settings_reset_needs_a_second_click) {
+  UiFixture u;
+  u.step(10); u.step(0, true);
+  u.step(2); u.step(0, true);                    // Reset defaults : first click
+  CHECK_STR(u.f.lines[6] + 1, "Reset? click again");
+  CHECK(!u.ctx.state.settings_reset_request);
+  u.step(1); u.step(-1);                         // turning cancels
+  CHECK_STR(u.f.lines[6] + 1, "Reset defaults");
+  u.step(0, true); u.step(0, true);              // click, click
+  CHECK(u.ctx.state.settings_reset_request);
+  CHECK_STR(u.f.lines[6] + 1, "Reset defaults");
+  u.step(1); u.step(0, true);                    // Back
+  CHECK(u.ui.manager().depth() == 1);
 }

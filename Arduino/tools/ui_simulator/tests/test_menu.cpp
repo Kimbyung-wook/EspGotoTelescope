@@ -11,6 +11,7 @@
 #include "firmware_ui.h"
 #include "protocol.h"
 #include "ui/telescope_ui.h"
+#include "config/settings.h"
 
 namespace {
 
@@ -69,10 +70,10 @@ void expectScreen(Sim& s, const char* const (&pat)[7], int src_line) {
 }
 #define EXPECT_SCREEN(s, ...) do { const char* const _p[7] = __VA_ARGS__; expectScreen(s, _p, __LINE__); } while (0)
 
-const char* const kItems[11] = {
+const char* const kItems[12] = {
   "1RA Speed", "2Status - GPS", "3Status - Acc/Gyro", "4Status - Mag/Alt",
   "5Status - IMUCalib", "6Do IMU Calib.", "7Att.Estimator", "8Health",
-  "9Axis for Moon", "10Planet Tracking", "Sleep",
+  "9Axis for Moon", "10Planet Tracking", "11Settings", "Sleep",
 };
 
 /******************************************************************/
@@ -80,14 +81,19 @@ const char* const kItems[11] = {
 void test_boot_then_main_menu() {
   Sim s;
   s.tick();
-  EXPECT_LINE(s, 0, "1. Display ON 160MHz");
+  EXPECT_LINE(s, 0, "SimpleGoTo v0.1.0");
   EXPECT_LINE(s, 1, "");
-  s.tick(sim::FirmwareUi::kBootLineFrames * 7);
-  EXPECT_LINE(s, 1, "2. IMU is ON");
-  EXPECT_LINE(s, 5, "3. GPS is ON");
-  EXPECT_LINE(s, 7, "5. GPIO/PWM is ON");
+  s.tick(sim::FirmwareUi::kBootLineFrames * 7);   // 8 lines: the screen is full
+  EXPECT_LINE(s, 1, "1. Display ON 160MHz");
+  EXPECT_LINE(s, 2, "2. IMU is ON");
+  EXPECT_LINE(s, 6, "3. GPS is ON");
+  EXPECT_LINE(s, 7, "4. Buttons are ON");
+  s.tick(sim::FirmwareUi::kBootLineFrames * 2);   // 10 lines: scrolled, line 0 stays
+  EXPECT_SCREEN(s, {"Acc +-16G", "Gyro 250 dps", "Mag 10 Hz", "3. GPS is ON",
+                    "4. Buttons are ON", "5. GPIO/PWM is ON", "6. Settings new"});
+  EXPECT_LINE(s, 0, "SimpleGoTo v0.1.0");
   s.tick(sim::FirmwareUi::kBootHoldFrames - 1);
-  EXPECT_LINE(s, 1, "2. IMU is ON");    // boot log is still held
+  EXPECT_LINE(s, 7, "6. Settings new");   // boot log is still held
   s.tick();
   CHECK(!s.ui.booting());
   EXPECT_LINE(s, 0, "T 12: 0: 0.0 V 12.60");
@@ -100,8 +106,8 @@ void test_boot_failures() {
   Sim s;
   s.send("{\"type\":\"reset\",\"imu_ok\":false,\"gps_ok\":false}");
   s.tick(sim::FirmwareUi::kBootLineFrames * 8);
-  EXPECT_LINE(s, 1, ">> IMU failed");
-  EXPECT_LINE(s, 5, ">> GPS is timeout");
+  EXPECT_LINE(s, 2, ">> IMU failed");
+  EXPECT_LINE(s, 6, ">> GPS is timeout");
 }
 
 void test_input_ignored_during_boot() {
@@ -143,11 +149,11 @@ void test_main_menu_scrolls() {
   EXPECT_SCREEN(s, {"Main Menu", " 2Status - GPS", " 3Status - Acc/Gyro", " 4Status - Mag/Alt",
                     " 5Status - IMUCalib", " 6Do IMU Calib.", "?7Att.Estimator"});
   s.rotate(10);  // clamps at the last item
-  EXPECT_SCREEN(s, {"Main Menu", " 6Do IMU Calib.", " 7Att.Estimator", " 8Health",
-                    " 9Axis for Moon", " 10Planet Tracking", "?Sleep"});
+  EXPECT_SCREEN(s, {"Main Menu", " 7Att.Estimator", " 8Health", " 9Axis for Moon",
+                    " 10Planet Tracking", " 11Settings", "?Sleep"});
   s.rotate(-1);  // the selected item stays on the bottom row while scrolling back
-  EXPECT_LINE(s, 2, " 5Status - IMUCalib");
-  EXPECT_LINE(s, 7, "?10Planet Tracking");
+  EXPECT_LINE(s, 2, " 6Do IMU Calib.");
+  EXPECT_LINE(s, 7, "?11Settings");
   s.rotate(-20);
   EXPECT_LINE(s, 2, "?1RA Speed");
 }
@@ -155,14 +161,15 @@ void test_main_menu_scrolls() {
 // Every main menu item can be entered and left; the cursor comes back to it.
 void test_enter_and_leave_every_screen() {
   struct Item { const char* title; int exit_rotate; };   // rotations to Quit; -1 = click leaves
-  const Item items[11] = {
+  const Item items[12] = {
     {"*1RA Speed", 2}, {"*2Status - GPS", -1}, {"*3Status - Acc/Gyro", -1},
     {"*4Status - Mag/Alt", -1}, {"*5Status - IMUCalib", -1}, {"*6Do IMU Calib.", 5},
     {"*7Att.Estimator", -1}, {"*8Health", -1}, {"*9Axis for Moon", -1},
     {"*10Planet Tracking", 5},   // cursor starts on Mercury (1); Quit is item 6
+    {"*11Settings", 3},          // RAduty = RRcmd, Save, Reset defaults, Back
     {" ", -1},
   };
-  for (int k = 0; k < 11; k++) {
+  for (int k = 0; k < 12; k++) {
     Sim s;
     s.boot();
     s.rotate(k);
@@ -424,16 +431,54 @@ void test_planet_tracking() {
   EXPECT_LINE(s, 5, "?Mars     TRACKING");
 }
 
+// Settings survive a reset (power cycle): the simulator keeps its "flash" across begin().
+void test_settings_survive_reset() {
+  Sim s;
+  s.boot();
+  s.click();                 // 1RA Speed
+  s.click();                 // edit RRcmd
+  s.rotate(40);
+  s.click();                 // done
+  s.rotate(2);
+  s.click();                 // Quit
+  s.rotate(10);
+  s.click();                 // 11Settings
+  EXPECT_SCREEN(s, {"*11Settings", "Flash: defaults", "RAduty      +0.0 PWM", "?RAduty = RRcmd",
+                    " Save", " Reset defaults", " Back"});
+  s.click();                 // RAduty = RRcmd -> saved by the main loop after this frame
+  s.tick();
+  EXPECT_LINE(s, 2, "Flash: saved");
+  EXPECT_LINE(s, 3, "RAduty     +40.0 PWM");
+  CHECK(s.ui.settingsStore().writes == 1);
+
+  s.send("{\"type\":\"reset\"}");
+  s.tick();
+  EXPECT_LINE(s, 0, "SimpleGoTo v0.1.0");
+  s.boot();
+  s.rotate(10);
+  s.click();
+  EXPECT_LINE(s, 2, "Flash: loaded");
+  EXPECT_LINE(s, 3, "RAduty     +40.0 PWM");
+
+  s.rotate(2);
+  s.click();                 // Reset defaults?
+  CHECK(std::strcmp(s.line(6) + 1, "Reset? click again") == 0);   // literal "?" : skip the cursor only
+  s.click();                 // confirmed
+  s.tick();
+  EXPECT_LINE(s, 2, "Flash: saved");
+  EXPECT_LINE(s, 3, "RAduty      +0.0 PWM");
+}
+
 void test_sleep_and_health() {
   Sim s;
   s.boot();
-  s.rotate(10);
+  s.rotate(11);
   s.click();
   EXPECT_SCREEN(s, {" ", " ", " ", " ", " ", " ", " "});
   EXPECT_LINE(s, 0, "T 12: 0: 0.0 V 12.60");   // status bar stays
   s.click();
   EXPECT_LINE(s, 7, "?Sleep");
-  s.rotate(-3);
+  s.rotate(-4);
   s.click();
   EXPECT_SCREEN(s, {"*8Health", "Loop 100000/ 10.0Hz", "MAIN  24300", "DISP  21800",
                     "GPS     650", "IMU    1250", "EST     180 AST  4000"});
@@ -452,7 +497,7 @@ void test_protocol_messages() {
   s.tick(3);
   CHECK(s.replies.size() == 3);
   CHECK(s.replies[2].find("\"seq\":2,\"t_ms\":200") != std::string::npos);
-  CHECK(s.replies[0].find("\"lines\":[\"1. Display ON 160MHz\",\"\"") != std::string::npos);
+  CHECK(s.replies[0].find("\"lines\":[\"SimpleGoTo v0.1.0\",\"\"") != std::string::npos);
   std::vector<std::string> r;
   CHECK(s.session.handleLine("{\"type\":\"quit\"}", r) == false);
 }
@@ -467,7 +512,7 @@ int main() {
     T(test_enter_and_leave_every_screen), T(test_ra_speed_edit_drives_motor),
     T(test_gps_screen_shows_sensor_values), T(test_imu_screens), T(test_do_imu_calib_menu),
     T(test_gyro_bias_calibration), T(test_att_estimator_converges),
-    T(test_att_estimator_uses_gyro_bias), T(test_sleep_and_health), T(test_planet_tracking), T(test_protocol_messages),
+    T(test_att_estimator_uses_gyro_bias), T(test_sleep_and_health), T(test_settings_survive_reset), T(test_planet_tracking), T(test_protocol_messages),
 #undef T
   };
   for (auto& t : tests) {

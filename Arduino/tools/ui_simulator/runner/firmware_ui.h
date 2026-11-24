@@ -12,6 +12,7 @@
 #include "board_config.h"   // Arduino/app/src (only #defines)
 
 class TelescopeUi;         // Arduino/app/src/ui/telescope_ui.h
+namespace config { struct Settings; class RamSettingsStore; }   // Arduino/app/src/config/settings.h
 class AttitudeEstimator;   // Arduino/app/src/estimation/attitude_estimator.h
 namespace astro { class TargetTracker; }   // Arduino/app/src/astro/target_tracker.h
 struct UiContext;    // Arduino/app/src/ui/ui_context.h
@@ -22,14 +23,14 @@ class FirmwareUi : public UiBackend {
  public:
   // Boot timing in frames (10 Hz): one boot line every kBootLineFrames
   // (frame 0 shows line 1), the full log is held for kBootHoldFrames frames,
-  // and frame 7*kBootLineFrames + kBootHoldFrames is the first UI frame.
+  // and frame (kBootLines-1)*kBootLineFrames + kBootHoldFrames is the first UI frame.
+  // The log scrolls like bootLine() in app.ino once it has more than 8 lines.
+  static const int kBootLines = 10;
   static const int kBootLineFrames = 3;
   static const int kBootHoldFrames = 10;
-  static const int kBootFrames = 7 * kBootLineFrames + kBootHoldFrames;
+  static const int kBootFrames = (kBootLines - 1) * kBootLineFrames + kBootHoldFrames;
   // ATT_EST_TAU_S in app.ino (not includable from the host build)
   static constexpr float kAttEstTauS = 1.0f;
-  // RA_DUTY_AT_SIDEREAL of board_config.h, taken from the firmware header itself
-  static constexpr float kRaDutyAtSidereal = RA_DUTY_AT_SIDEREAL;
 
   FirmwareUi();
   ~FirmwareUi() override;
@@ -44,6 +45,8 @@ class FirmwareUi : public UiBackend {
   bool booting() const { return boot_frame_ < kBootFrames; }
   TelescopeUi& ui() { return *ui_; }
   UiContext& context() { return *ctx_; }
+  // Flash of the board: kept across begin() (reset = power cycle keeps the settings)
+  config::RamSettingsStore& settingsStore() { return *store_; }
 
  private:
   void renderBoot(Frame& out);
@@ -53,6 +56,9 @@ class FirmwareUi : public UiBackend {
   std::unique_ptr<AttitudeEstimator> att_est_;
   std::unique_ptr<astro::TargetTracker> moon_tracker_;
   std::unique_ptr<astro::TargetTracker> target_tracker_;
+  std::unique_ptr<config::RamSettingsStore> store_;
+  std::unique_ptr<config::Settings> settings_;
+  int settings_load_ = 0;    // config::LoadResult of the last begin()
   BootConfig boot_;
   int boot_frame_ = 0;
   int last_count_ = 0;

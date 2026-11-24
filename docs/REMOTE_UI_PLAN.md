@@ -107,7 +107,7 @@ Arduino/scripts/build.sh --build-property "compiler.cpp.extra_flags=-DREMOTE_UI_
    - 9 Axis for Moon 화면의 Yaw가 함께 흔들리는지도 봅니다.
    - 차이가 크면 `REMOTE_UI_TX_DBM`을 낮춰 다시 잽니다.
 4. **폰 접속 절차**
-   1. 부팅 화면에 `6. WiFi AP SimpleGoTo`가 나오는지 확인.
+   1. 부팅 화면에 `7. WiFi AP SimpleGoTo`가 나오는지 확인.
    2. 안드로이드 Wi-Fi 설정에서 `SimpleGoTo` 선택, 비밀번호 `simplegoto`. "인터넷 없음" 경고가 나오면 "연결 유지".
    3. Chrome에서 `http://192.168.4.1/` 열기 → `connected`와 OLED와 같은 8줄이 보이는지(메뉴를 로터리로 움직이면 폰도 따라 바뀌는지, 지연 체감).
    4. `+1`, `OK` 버튼 → 페이지 아래 `ESP received: rotate 1, click 1`이 나오는지(이번 단계에서는 화면 커서는 움직이지 않는 것이 정상).

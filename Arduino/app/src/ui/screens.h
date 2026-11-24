@@ -84,12 +84,13 @@ private:
 // Gyro bias calibration : keep the mount still for 16 s
 class GyroBiasCalibScreen : public Screen {
 public:
-  void onEnter(UiContext& ctx) override { calib_.start(ctx.tel.now_ms); }
+  void onEnter(UiContext& ctx) override { calib_.start(ctx.tel.now_ms); saved_ = false; }
   void tick(UiContext& ctx) override;
   void onClick(ScreenManager& mgr, UiContext& /*ctx*/) override { mgr.pop(); }
   void render(Frame& f, const UiContext& ctx, char blink) override;
 private:
   GyroBiasCalibrator calib_;
+  bool saved_ = false;           // result handed to the settings once
 };
 
 // Do IMU Calib. menu
@@ -141,10 +142,26 @@ private:
   TargetScreen target_;
 };
 
-// Main menu with 11 items in a 6-line scroll window
+// Settings : what is in flash, RA duty from the current RRcmd, Save, Reset defaults
+//   (the main loop does the flash work : UiState::settings_*_request)
+class SettingsScreen : public Screen {
+public:
+  enum Item { SET_RA_DUTY = 0, SAVE, RESET, BACK, ITEMS };
+  explicit SettingsScreen(const char* title) : title_(title), cursor_(ITEMS) {}
+  void onEnter(UiContext& /*ctx*/) override { cursor_.reset(); confirm_reset_ = false; }
+  void onRotate(int delta, UiContext& /*ctx*/) override { cursor_.move(delta); confirm_reset_ = false; }
+  void onClick(ScreenManager& mgr, UiContext& ctx) override;
+  void render(Frame& f, const UiContext& ctx, char blink) override;
+private:
+  const char* title_;
+  MenuCursor cursor_;
+  bool confirm_reset_ = false;   // Reset needs a second click
+};
+
+// Main menu with 12 items in a 6-line scroll window
 class MainMenuScreen : public Screen {
 public:
-  static const int ITEMS = 11;
+  static const int ITEMS = 12;
   MainMenuScreen(const char* const labels[ITEMS], Screen* const targets[ITEMS]);
   void onRotate(int delta, UiContext& /*ctx*/) override { cursor_.move(delta); }
   void onClick(ScreenManager& mgr, UiContext& ctx) override;

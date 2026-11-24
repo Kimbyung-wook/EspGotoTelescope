@@ -55,7 +55,8 @@ Mag 10 Hz
 3. GPS is ON          (실패: >> GPS is timeout)
 4. Buttons are ON
 5. GPIO/PWM is ON
-6. WiFi AP SimpleGoTo ← REMOTE_UI_ENABLE 1일 때만
+6. Settings loaded    ← 저장된 설정 (처음: Settings new, 손상: >> Settings bad->def)
+7. WiFi AP SimpleGoTo ← REMOTE_UI_ENABLE 1일 때만
 ```
 
 ## 5. 메뉴 구조
@@ -73,6 +74,7 @@ Main Menu
 ├─ 9 Axis for Moon
 ├─ 10 Planet Tracking ─ Moon / Mercury / Venus / Mars / Jupiter / Saturn / Quit
 │                       └─ 대상 화면: 위치 + 망원경 위치(T.R.A./T.DEC.) + Track ON/OFF / Offset / Back
+├─ 11 Settings ────── RAduty = RRcmd / Save / Reset defaults / Back
 └─ Sleep
 ```
 
@@ -94,6 +96,7 @@ Main Menu
  8Health
  9Axis for Moon
  10Planet Tracking
+ 11Settings
  Sleep
 ```
 6줄 스크롤 창으로 보여줍니다.
@@ -274,7 +277,23 @@ T.DEC.XXXX.XXXXX DEG
 - `Track`을 클릭하면 추적을 켜고 끕니다. 오른쪽 값은 RA 축 추적 속도입니다(항성 15.041″/s).
 - `Offset`을 클릭하면 편집 모드가 되고, 다이얼 한 칸에 PWM 1씩 바뀝니다. 다시 클릭하면 끝납니다. 대상을 바꿔도 값은 유지되고, 전원을 끄면 0으로 돌아갑니다.
 - 추적은 화면에서 나가도 계속됩니다. 다른 대상을 고르거나 1 RA Speed에서 RRcmd를 편집하면 꺼집니다.
-- 추적이 켜져 있으면 RA 모터 지령(RRcmd)을 `RA_DUTY_AT_SIDEREAL × 추적속도 / 15.041 + Offset`으로 덮어씁니다. `board_config.h`의 `RA_DUTY_AT_SIDEREAL`이 0(보정 전)이면 Offset만으로 모터가 돌고 `(RA uncal)`을 표시합니다. 별을 따라가는 Offset 값을 찾으면 그 값이 `RA_DUTY_AT_SIDEREAL`의 후보입니다.
+- 추적이 켜져 있으면 RA 모터 지령(RRcmd)을 `RAduty × 추적속도 / 15.041 + Offset`으로 덮어씁니다. RAduty는 11 Settings에 저장된 값이고 처음 값은 `board_config.h`의 `RA_DUTY_AT_SIDEREAL`입니다. RAduty가 0(보정 전)이면 Offset만으로 모터가 돌고 `(RA uncal)`을 표시합니다. 별을 따라가는 RRcmd를 찾으면 11 Settings에서 `RAduty = RRcmd`로 저장합니다.
+
+### 11 Settings — 설정 저장 (DES-CFG)
+```
+T XX:XX:XX.X VXX.XX
+*11Settings
+Flash: loaded           ← loaded / saved / SAVE FAILED / defaults
+RAduty   +187.5 PWM     ← 항성시 속도에 해당하는 RA 듀티 (0 = 보정 전)
+>RAduty = RRcmd         ← 지금 RRcmd 값을 RAduty로 정하고 저장
+ Save                   ← 지금 값들을 저장
+ Reset defaults         ← 클릭하면 'Reset? click again', 한 번 더 누르면 기본값으로 되돌리고 저장 (돌리면 취소)
+ Back
+```
+- 저장하는 값과 형식은 `src/config/settings.h`(REQUIREMENTS.md DES-CFG-02, 03). 플래시에는 ESP8266 `EEPROM` 라이브러리로 256 B를 씁니다.
+- **언제 쓰는가**: `Save`, `RAduty = RRcmd`, `Reset defaults`, 그리고 6 Do IMU Calib.의 Gyro Bias 보정이 끝났을 때. 저장된 내용과 같으면 쓰지 않습니다.
+- UI는 요청 플래그만 세우고, 메인 루프가 UI 다음에 `config::serviceRequests`로 씁니다. 그래서 `Flash: saved`는 한 프레임 뒤에 나옵니다.
+- 지금 화면과 연결된 값은 자이로·가속도 바이어스, RAduty, Offset, 추적 대상입니다. 위치·시간대·자편각·모터 방향 칸은 저장 형식에만 있고 화면은 위치 기능(DES-LOC)과 함께 만듭니다.
 
 ### Sleep
 ```
@@ -292,7 +311,8 @@ T XX:XX:XX.X VXX.XX
 | 5 IMU Calib | 바이어스 값 | 자이로 바이어스는 Gyro Bias Calib 결과를 표시하고 자이로 측정값에 적용. 가속도 바이어스는 보정 기능이 없어 0 |
 | 7 Att.Estimator | Roll/Pitch/Yaw + R/Q/K + Exit, 스크롤 | 상보필터(τ=1 s) Roll/Pitch, 가속도 기반 Roll/Pitch(aR/aP), 바이어스 보정된 Wx/Wy/Wz를 표시. Yaw와 튜닝 값은 미구현 |
 | 9 Axis for Moon | 추정 자세 + 달 RA/Dec | 롤/피치는 상보필터 값. Yaw 대신 달 고도·방위와 추적 속도. RA/Dec는 `src/astro`로 계산(GPS fix 없으면 `---`) |
-| 10 Planet Tracking | (설계에 없음) | 새로 추가. 대상 선택, 겉보기 위치, 추적 켜기/끄기. RA 모터 속도 보정값(`RA_DUTY_AT_SIDEREAL`)은 아직 0 |
+| 10 Planet Tracking | (설계에 없음) | 새로 추가. 대상 선택, 겉보기 위치, 추적 켜기/끄기. RA 모터 속도 보정값(RAduty)은 11 Settings에서 저장 |
+| 11 Settings | DES-CFG-05: 위치, 시간대, 자편각, 모터, 안내 범위, Save, Reset | RAduty, Save, Reset만. 나머지는 해당 기능과 함께 |
 | Sleep | `(Sleep)` 표시 | 빈 화면. 디스플레이 전원은 끄지 않음. 나오면 커서가 Sleep 항목에 있음 |
 | 1 RA Speed | RRcmd/RRate 단위 DEG | RRate는 dps로 표시. RRcmd는 PWM 듀티 값 |
 
@@ -323,6 +343,9 @@ Sensor 하위: Show Acc/Gyro/Mag Raw, Show Acc/Gyro Bias, Show Mag Calib,
 | `src/ui/screen_manager.*` | 화면 스택(push = 들어가기, pop = 나가기)과 커서 깜박임 |
 | `src/ui/screens.*` | 각 화면 클래스 |
 | `src/ui/telescope_ui.*` | 화면들을 묶은 `TelescopeUi`. 메인 루프는 프레임마다 `ui.step(회전량, 클릭, ctx, frame)`만 호출 |
+| `src/config/settings.*` | 저장할 설정 구조체, 직렬화(little endian), CRC-32, 범위 검사, `SettingsStore` 인터페이스와 PC용 `RamSettingsStore` |
+| `src/config/settings_binding.h` | 설정 ↔ `UiState` 옮기기, UI의 저장·초기화 요청 처리(`serviceRequests`) |
+| `src/config/eeprom_store.h` | 보드 전용 `EepromSettingsStore`(ESP8266 `EEPROM`) |
 
 UI 코드는 하드웨어에 의존하지 않아서 PC에서도 빌드됩니다. 단위 테스트(`Arduino/test/test_ui.cpp`)와 UI 시뮬레이터가 같은 코드를 씁니다.
 

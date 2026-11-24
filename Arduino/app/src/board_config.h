@@ -35,9 +35,10 @@
 #define MOTOR_PWM   GPIO_D8 // speed (enable)
 #define MOTOR_IN1   GPIO_D0 // direction
 #define MOTOR_IN2   GPIO_D3 // direction
-// RRcmd (PWM duty) that turns the RA axis at the sidereal rate (15.041"/s).
-// Find it on the 1RA Speed screen by following a star. 0 = not calibrated:
-// Planet Tracking then computes the rate but does not drive the motor.
+// Default RRcmd (PWM duty) that turns the RA axis at the sidereal rate (15.041"/s).
+// The value in use is a setting (11Settings > "RAduty = RRcmd" after finding
+// the RRcmd on 1RA Speed by following a star); this is only the factory default.
+// 0 = not calibrated: Planet Tracking then drives the motor with the Offset only.
 #define RA_DUTY_AT_SIDEREAL 0.0f
 
 // ICM20948 on the telescope tube: which IMU body axis (1 = x, 2 = y, 3 = z,

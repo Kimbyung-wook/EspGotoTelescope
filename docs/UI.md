@@ -70,7 +70,7 @@ Main Menu
 ├─ 8 Health
 ├─ 9 Axis for Moon
 ├─ 10 Planet Tracking ─ Moon / Mercury / Venus / Mars / Jupiter / Saturn / Quit
-│                       └─ 대상 화면: 위치 + 망원경 위치(TEL) + Track ON/OFF / Offset / Back
+│                       └─ 대상 화면: 위치 + 망원경 위치(T.R.A./T.DEC.) + Track ON/OFF / Offset / Back
 └─ Sleep
 ```
 
@@ -246,18 +246,28 @@ T XX:XX:XX.X VXX.XX
 대상을 클릭하면 대상 화면으로 들어갑니다.
 ```
 T XX:XX:XX.X VXX.XX      T XX:XX:XX.X VXX.XX
-*Mars                    *Mars
+*Mars                    *Mars     no GPS fix   (고른 직후 한 프레임은 computing...)
 R.A.  XXXX.XXXXX DEG     R.A.         ---
 DEC.  XXXX.XXXXX DEG     DEC.         ---
-TEL  XXX.XXX +XX.XXX        no GPS fix     (고른 직후 한 프레임은 computing...)
+T.R.A.XXXX.XXXXX DEG     T.R.A.       ---
+T.DEC.XXXX.XXXXX DEG     T.DEC.       ---
 >Track OFF XX.XXXX"/s    >Track OFF
  Offset    +XX.X PWM      Offset     +0.0 PWM
- Back                     Back
+```
+- 내용(좌표 4줄 + `Track` / `Offset` / `Back`)이 7줄이라 6줄 창에 다 들어가지 않습니다. 다이얼을 돌리면 커서를 따라 화면 전체가 한 줄씩 스크롤됩니다. 제목 줄은 고정입니다. `Back`으로 가면 맨 위 `R.A.` 줄이 밀려 올라갑니다.
+```
+*Mars
+DEC.  XXXX.XXXXX DEG     ← R.A.는 위로 밀려남
+T.R.A.XXXX.XXXXX DEG
+T.DEC.XXXX.XXXXX DEG
+ Track ON  XX.XXXX"/s
+ Offset    +XX.X PWM
+>Back   (RA uncal)
 ```
 - R.A./DEC.는 날짜 기준 겉보기 좌표입니다(광행시간, 세차, 관측지 시차 보정). GPS 시각과 위치로 1초마다 다시 계산합니다.
-- `TEL`은 망원경이 지금 가리키는 RA/Dec입니다. 경통에 붙인 IMU의 롤/피치(자세 추정기 값)로 매 프레임 계산합니다. 극축 정렬된 적도의 가대를 가정합니다.
+- `T.R.A.`/`T.DEC.`는 망원경(Telescope)이 지금 가리키는 RA/Dec입니다. 대상 좌표와 같은 형식으로 바로 아래에 두어 비교하기 쉽게 했습니다. 경통에 붙인 IMU의 롤/피치(자세 추정기 값)로 매 프레임 계산합니다. 극축 정렬된 적도의 가대를 가정합니다.
   - 중력만으로는 자오선 기준 거울상 두 자세를 구별할 수 없어서, 고른 대상에 가까운 쪽을 보여줍니다. 피어 뒤집힘(meridian flip) 자세도 같은 하늘 방향으로 접어서 계산합니다.
-  - IMU 축 방향은 `board_config.h`의 `IMU_TUBE_OPTICAL_AXIS`(광축), `IMU_TUBE_DEC_AXIS`(적위축)으로 정합니다(현재 가정값 x, y). 경통을 천구 북극에 맞추고 TEL Dec가 +90 근처인지 확인합니다.
+  - IMU 축 방향은 `board_config.h`의 `IMU_TUBE_OPTICAL_AXIS`(광축), `IMU_TUBE_DEC_AXIS`(적위축)으로 정합니다(현재 가정값 x, y). 경통을 천구 북극에 맞추고 T.DEC.가 +90 근처인지 확인합니다.
   - 정확도는 가속도계 수준(0.2~0.5°)이고, 극축 정렬 오차가 그대로 더해집니다. 가대의 지자기 센서는 이 계산에 쓰지 않습니다.
 - `Track`을 클릭하면 추적을 켜고 끕니다. 오른쪽 값은 RA 축 추적 속도입니다(항성 15.041″/s).
 - `Offset`을 클릭하면 편집 모드가 되고, 다이얼 한 칸에 PWM 1씩 바뀝니다. 다시 클릭하면 끝납니다. 대상을 바꿔도 값은 유지되고, 전원을 끄면 0으로 돌아갑니다.

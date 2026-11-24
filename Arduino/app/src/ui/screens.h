@@ -111,7 +111,11 @@ private:
 class TargetScreen : public Screen {
 public:
   static constexpr float OFFSET_STEP = 1.0f;   // PWM duty per detent
-  TargetScreen() : cursor_(3) {}
+  // Rows 2-7 are a window over INFO_LINES info lines + the 3 items; the window
+  // follows the cursor, so turning the dial scrolls the whole page.
+  static const int INFO_LINES = 4;              // R.A., DEC., T.R.A., T.DEC.
+  static const int ITEMS = 3;                   // Track, Offset, Back
+  TargetScreen() : cursor_(ITEMS) {}
   void onEnter(UiContext& /*ctx*/) override { cursor_.reset(); editing_ = false; }
   void onRotate(int delta, UiContext& ctx) override;
   void onClick(ScreenManager& mgr, UiContext& ctx) override;

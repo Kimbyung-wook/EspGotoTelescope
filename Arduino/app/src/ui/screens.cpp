@@ -1,6 +1,6 @@
 #include "screens.h"
 #include <math.h>
-#include "../astro/target_telemetry.h"
+#include "../app/tracking.h"
 #include "../location/location.h"
 #include "../gps/gps_link.h"
 #include "../board_config.h"
@@ -684,7 +684,7 @@ void TargetScreen::render(Frame& f, const UiContext& ctx, char blink) {
         break;
       case INFO_LINES + TRACK: {
         double rate = 0.0;
-        if (astro::trackingRate(t, st, rate))
+        if (app::trackingRate(t, st, rate))
           f.set(line, "%cTrack %-3s %7.4f\"/s", cursor_.mark(TRACK, blink), st.tracking ? "ON" : "OFF", rate);
         else
           f.set(line, "%cTrack %-3s   ---", cursor_.mark(TRACK, blink), st.tracking ? "ON" : "OFF");

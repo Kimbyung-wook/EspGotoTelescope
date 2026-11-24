@@ -172,7 +172,9 @@ TEST(astro_moon_rate_matches_hour_angle_change) {
 }
 
 // ---- TargetTracker / Telemetry glue
-#include "../app/src/astro/target_telemetry.h"
+#include "../app/src/app/sky.h"
+#include "../app/src/app/tracking.h"
+using namespace app;
 
 // Position and time as app::updateLocationTime() leaves them
 static void known(Telemetry& t, const UtcTime& u, double lat, double lon, float alt = 0.0f) {

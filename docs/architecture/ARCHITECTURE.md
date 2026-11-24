@@ -77,7 +77,14 @@ flowchart TB
   subgraph AST["천체 위치 (double)"]
     ASTRO["astro/astro"]
     MTRK["astro/target_tracker"]
-    MTEL["astro/target_telemetry"]
+  end
+
+  subgraph APPL["앱 로직 (순수 C++)"]
+    LOOP["app/loop_logic"]
+    STATE["app/app_state"]
+    SKY["app/sky"]
+    TRK["app/tracking"]
+    BIND["app/settings_binding"]
   end
 
   subgraph UI["UI"]
@@ -86,7 +93,6 @@ flowchart TB
     MGR["ui/screen_manager"]
     SCR["ui/screen"]
     FRM["ui/frame"]
-    CTX["ui/ui_context"]
   end
 
   subgraph COMMON["공통"]
@@ -102,18 +108,19 @@ flowchart TB
     L_ICM["Adafruit ICM20X"]
   end
 
-  APP --> CFG & OLED & GPS & IMU & ROT & MOT & ATT & MTEL & TUI & TT & LT
-  MTEL --> MTRK --> ASTRO
-  MTEL --> CTX
+  APP --> CFG & OLED & GPS & IMU & ROT & MOT & ATT & LOOP & BIND & TUI & TT & LT
+  LOOP --> SKY & TRK & STATE
+  SKY --> MTRK --> ASTRO
+  SKY & TRK & BIND --> STATE
   OLED --> L_SSD & TT & CFG
   GPS --> L_GPS & GPSL & TT
   IMU --> L_ICM & IMUD
   ROT --> ROTD
   ATT --> FLT & IMUD
   TUI --> SCRS --> MGR --> SCR
-  SCRS --> BIAS
-  SCR --> FRM & CTX
-  CTX --> IMUD
+  SCRS --> BIAS & TRK
+  SCR --> FRM & STATE
+  STATE --> IMUD
 ```
 
 - UI, 추정, 천체 위치 모듈은 하드웨어 라이브러리를 쓰지 않습니다. 그래서 PC에서 단위시험(`Arduino/test`)과 GUI 시뮬레이터(`Arduino/tools/ui_simulator`)로 그대로 빌드할 수 있습니다.

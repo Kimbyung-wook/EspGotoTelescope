@@ -1,7 +1,11 @@
 #pragma once
-#ifndef _UI_CONTEXT_H_
-#define _UI_CONTEXT_H_
+#ifndef _APP_STATE_H_
+#define _APP_STATE_H_
 #include "../sensors/imu_data.h"
+
+// App-wide state shared by the main loop, the UI, the astro glue and the settings:
+//   Telemetry : measured and computed values (the main loop fills them every frame)
+//   UiState   : values the UI changes (settings, run state, requests to the main loop)
 
 /************************************/
 // Values the UI shows (filled by the main loop every frame)
@@ -128,4 +132,4 @@ struct UiContext {
   UiState   state;
 };
 
-#endif // _UI_CONTEXT_H_
+#endif // _APP_STATE_H_

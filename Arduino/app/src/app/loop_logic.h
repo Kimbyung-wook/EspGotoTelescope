@@ -5,11 +5,12 @@
 //   correctImu -> attitude estimator -> updateLocationTime -> updateAstro
 //   -> SimpleGoToUi::step -> config::serviceRequests -> motorCommand
 #pragma once
-#include "../astro/target_telemetry.h"
+#include "app_state.h"
+#include "sky.h"
+#include "tracking.h"
 #include "../estimation/calibration.h"
 #include "../location/location.h"
 #include "../gps/gps_link.h"
-#include "../ui/ui_context.h"
 
 namespace app {
 
@@ -96,10 +97,10 @@ inline void updateLocationTime(Telemetry& t, UiState& st, loc::LastGpsRecorder& 
 // Moon, target and tube. Returns true when a 1 s astro update ran this frame.
 inline bool updateAstro(astro::TargetTracker& moon, astro::TargetTracker& target, Telemetry& t,
                         const UiState& st, int optical_axis, int dec_axis) {
-  bool ran = astro::updateMoonTelemetry(moon, t);
-  ran |= astro::updateTargetTelemetry(target, st.track_target, t);
+  bool ran = updateMoonTelemetry(moon, t);
+  ran |= updateTargetTelemetry(target, st.track_target, t);
   t.ra_calibrated = st.ra_duty_at_sidereal != 0.0f;
-  astro::updateScopeTelemetry(t, optical_axis, dec_axis);
+  updateScopeTelemetry(t, optical_axis, dec_axis);
   return ran;
 }
 
@@ -107,7 +108,7 @@ inline bool updateAstro(astro::TargetTracker& moon, astro::TargetTracker& target
 // a calibration or Polar Align screen stops the motor (DES-SYS-02) without
 // changing RRcmd or the tracking state.
 inline float motorCommand(const Telemetry& t, UiState& st) {
-  astro::applyTracking(t, st, st.ra_duty_at_sidereal);
+  applyTracking(t, st, st.ra_duty_at_sidereal);
   return st.motor_inhibit ? 0.0f : st.ra_speed_cmd;
 }
 

@@ -405,6 +405,25 @@ bool poseCandidatesFromUp(const double up_in[3], double lat_deg, MountPose out[2
   return true;
 }
 
+void upInTubeFromRollPitch(double roll_deg, double pitch_deg, int optical_axis, int dec_axis,
+                                  double up[3]) {
+  const double r = roll_deg * D2R, p = pitch_deg * D2R;
+  const double ub[3] = {-sin(p), cos(p) * sin(r), cos(p) * cos(r)};   // ~ accelerometer / g
+  auto axis = [](int a, double v[3]) {
+    v[0] = v[1] = v[2] = 0.0;
+    const int i = (a < 0 ? -a : a) - 1;
+    if (i >= 0 && i < 3) v[i] = a < 0 ? -1.0 : 1.0;
+  };
+  double o[3], d[3];
+  axis(optical_axis, o);
+  axis(dec_axis, d);
+  const double z[3] = {o[1] * d[2] - o[2] * d[1], o[2] * d[0] - o[0] * d[2], o[0] * d[1] - o[1] * d[0]};
+  up[0] = ub[0] * o[0] + ub[1] * o[1] + ub[2] * o[2];
+  up[1] = ub[0] * d[0] + ub[1] * d[1] + ub[2] * d[2];
+  up[2] = ub[0] * z[0] + ub[1] * z[1] + ub[2] * z[2];
+}
+
+
 bool pointingFromUp(const double up[3], double lat_deg, double lst_deg,
                     double hint_ra_deg, double hint_dec_deg, Equatorial& out) {
   MountPose c[2];

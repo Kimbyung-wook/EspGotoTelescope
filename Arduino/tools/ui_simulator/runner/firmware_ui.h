@@ -16,7 +16,7 @@ namespace config { struct Settings; class RamSettingsStore; }   // Arduino/app/s
 class AttitudeEstimator;   // Arduino/app/src/estimation/attitude_estimator.h
 namespace astro { class TargetTracker; }   // Arduino/app/src/astro/target_tracker.h
 namespace loc { class LastGpsRecorder; }   // Arduino/app/src/location/location.h
-struct UiContext;    // Arduino/app/src/ui/ui_context.h
+struct UiContext;    // Arduino/app/src/app/app_state.h
 
 namespace sim {
 

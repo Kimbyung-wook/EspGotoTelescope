@@ -21,7 +21,7 @@
 #include "src/app/loop_logic.h"
 #include "src/ui/simplegoto_ui.h"
 #include "src/remote/remote_ui.h"
-#include "src/config/settings_binding.h"
+#include "src/app/settings_binding.h"
 #include "src/config/eeprom_store.h"
 
 /************************************/

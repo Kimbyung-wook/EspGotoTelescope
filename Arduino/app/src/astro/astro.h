@@ -125,6 +125,10 @@ bool poseCandidatesFromUp(const double up[3], double lat_deg, MountPose out[2]);
 // Picks the candidate closest to a hint direction (normally the chosen target).
 bool pointingFromUp(const double up[3], double lat_deg, double lst_deg,
                     double hint_ra_deg, double hint_dec_deg, Equatorial& out);
+// "Up" in the tube frame from roll/pitch (rollFromAccelDeg / pitchFromAccelDeg
+// conventions) and the IMU axes along the optical axis and the Dec axis.
+void upInTubeFromRollPitch(double roll_deg, double pitch_deg, int optical_axis, int dec_axis,
+                           double up[3]);
 
 // ---- pointing guidance (DES-PNT-04)
 // Target minus tube: dRA (deg, wrapped -180..180, positive = target further east,

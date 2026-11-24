@@ -1,6 +1,6 @@
 #include "test_main.h"
 #include "../app/src/config/settings.h"
-#include "../app/src/config/settings_binding.h"
+#include "../app/src/app/settings_binding.h"
 
 using namespace config;
 

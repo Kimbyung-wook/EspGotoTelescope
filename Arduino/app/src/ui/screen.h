@@ -2,7 +2,7 @@
 #ifndef _UI_SCREEN_H_
 #define _UI_SCREEN_H_
 #include "frame.h"
-#include "ui_context.h"
+#include "../app/app_state.h"
 
 class ScreenManager;
 

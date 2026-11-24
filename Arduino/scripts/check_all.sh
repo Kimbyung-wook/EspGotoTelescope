@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Run every check in order and stop at the first failure:
 #   unit tests, UI simulator (build + tests), protocol check, remote page check,
-#   firmware build (default and remote UI). Prints IRAM/IROM sizes at the end.
+#   firmware build (default and remote UI). Prints IRAM/IROM sizes and code
+#   metrics (scripts/metrics.py) at the end.
 # Usage: Arduino/scripts/check_all.sh [--no-firmware]
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")/.." && pwd)"

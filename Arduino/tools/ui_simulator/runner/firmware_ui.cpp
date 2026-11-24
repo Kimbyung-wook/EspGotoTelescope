@@ -6,7 +6,7 @@
 
 // Firmware (read-only, include path Arduino/app/src)
 #include "app/loop_logic.h"
-#include "config/settings_binding.h"
+#include "app/settings_binding.h"
 #include "estimation/attitude_estimator.h"
 #include "motor/ra_motor.h"
 #include "sensors/imu_data.h"

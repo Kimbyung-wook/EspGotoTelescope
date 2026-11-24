@@ -1,8 +1,8 @@
 #pragma once
-#ifndef _CONFIG_SETTINGS_BINDING_H_
-#define _CONFIG_SETTINGS_BINDING_H_
-#include "settings.h"
-#include "../ui/ui_context.h"
+#ifndef _APP_SETTINGS_BINDING_H_
+#define _APP_SETTINGS_BINDING_H_
+#include "app_state.h"
+#include "../config/settings.h"
 
 /************************************/
 // Settings <-> the values the UI and the main loop use (UiState)
@@ -91,4 +91,4 @@ inline bool serviceRequests(SettingsStore& store, Settings& s, UiContext& ctx) {
 
 } // namespace config
 
-#endif // _CONFIG_SETTINGS_BINDING_H_
+#endif // _APP_SETTINGS_BINDING_H_

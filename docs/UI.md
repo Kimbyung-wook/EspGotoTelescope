@@ -340,17 +340,18 @@ OLED를 끕니다(SSD1306 display off). 폰 원격 UI에는 상태바만 남은 
 | 파일 | 역할 |
 |---|---|
 | `src/ui/frame.h` | 한 화면 분량(8줄×22바이트) 버퍼. `set(row, fmt, ...)`은 줄 너비를 넘으면 잘라내고 `overflow`를 켬(테스트가 확인) |
-| `src/ui/ui_context.h` | `Telemetry`(UI가 보여줄 값, 메인 루프가 매 프레임 채움), `UiState`(UI가 바꾸는 값: RA 속도 명령, 보정값, 추적, 위치·시각 입력, 모터 정지 요청) |
 | `src/ui/screen.h` | `Screen` 인터페이스(`onEnter`/`onRotate`/`onClick`/`tick`/`render`), `MenuCursor`(메뉴 선택·스크롤), `PageCursor`(정보 줄 + 항목 화면의 스크롤) |
 | `src/ui/screen_manager.*` | 화면 스택(push = 들어가기, pop = 나가기), 커서 깜박임, 매 프레임 `motor_inhibit` 초기화 |
 | `src/ui/screens.*` | 각 화면 클래스 |
 | `src/ui/simplegoto_ui.*` | 화면들을 묶은 `SimpleGoToUi`와 상태바. 메인 루프는 프레임마다 `ui.step(회전량, 클릭, ctx, frame)`만 호출 |
+| `src/app/app_state.h` | 앱 전체 상태. `Telemetry`(측정·계산값, 메인 루프가 매 프레임 채움), `UiState`(UI가 바꾸는 값: RA 속도 명령, 보정값, 추적, 위치·시각 입력, 모터 정지 요청) |
 | `src/app/loop_logic.h` | 메인 루프의 순수 로직(`correctImu`, `updateLocationTime`, `updateAstro`, `motorCommand`). `app.ino`와 시뮬레이터가 같이 씀 |
 | `src/estimation/calibration.*` | 충격 감지, 자이로 30초 보정, 가속도 6방향 보정 |
 | `src/location/location.*` | 위치 출처 고르기, 거리, 직전 GPS 기록 |
-| `src/astro/target_telemetry.h` | 천체 계산 결과를 `Telemetry`로, 추적 속도·방향, 경통 지향, 북극성 |
+| `src/app/sky.h` | 천체 계산 결과를 `Telemetry`로(달, 추적 대상), 경통 지향, 북극성 |
+| `src/app/tracking.h` | 추적 정책: 속도(항성/달), 방향(남반구, 배선 반전), 모터 duty |
 | `src/config/settings.*` | 저장할 설정 구조체, 직렬화(little endian), CRC-32, 범위 검사, `SettingsStore` 인터페이스와 PC용 `RamSettingsStore` |
-| `src/config/settings_binding.h` | 설정 ↔ `UiState` 옮기기, UI의 저장·초기화 요청 처리(`serviceRequests`) |
+| `src/app/settings_binding.h` | 설정 ↔ `UiState` 옮기기, UI의 저장·초기화 요청 처리(`serviceRequests`) |
 | `src/config/eeprom_store.h` | 보드 전용 `EepromSettingsStore`(ESP8266 `EEPROM`) |
 
 메인 루프 한 바퀴: 센서 읽기 → `correctImu`(보정값 적용) → 자세 추정 → `updateLocationTime`(위치·시각 출처) → `updateAstro`(1초마다 천체, 매 프레임 경통 지향) → `ui.step` → 설정 저장 요청 처리 → `motorCommand`(추적, 모터 정지).

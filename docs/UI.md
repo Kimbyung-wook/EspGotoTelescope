@@ -344,7 +344,7 @@ OLED를 끕니다(SSD1306 display off). 폰 원격 UI에는 상태바만 남은 
 | `src/ui/screen.h` | `Screen` 인터페이스(`onEnter`/`onRotate`/`onClick`/`tick`/`render`), `MenuCursor`(메뉴 선택·스크롤), `PageCursor`(정보 줄 + 항목 화면의 스크롤) |
 | `src/ui/screen_manager.*` | 화면 스택(push = 들어가기, pop = 나가기), 커서 깜박임, 매 프레임 `motor_inhibit` 초기화 |
 | `src/ui/screens.*` | 각 화면 클래스 |
-| `src/ui/telescope_ui.*` | 화면들을 묶은 `TelescopeUi`와 상태바. 메인 루프는 프레임마다 `ui.step(회전량, 클릭, ctx, frame)`만 호출 |
+| `src/ui/simplegoto_ui.*` | 화면들을 묶은 `SimpleGoToUi`와 상태바. 메인 루프는 프레임마다 `ui.step(회전량, 클릭, ctx, frame)`만 호출 |
 | `src/app/loop_logic.h` | 메인 루프의 순수 로직(`correctImu`, `updateLocationTime`, `updateAstro`, `motorCommand`). `app.ino`와 시뮬레이터가 같이 씀 |
 | `src/estimation/calibration.*` | 충격 감지, 자이로 30초 보정, 가속도 6방향 보정 |
 | `src/location/location.*` | 위치 출처 고르기, 거리, 직전 GPS 기록 |
@@ -357,4 +357,4 @@ OLED를 끕니다(SSD1306 display off). 폰 원격 UI에는 상태바만 남은 
 
 UI 코드는 하드웨어에 의존하지 않아서 PC에서도 빌드됩니다. 단위 테스트(`Arduino/test/test_ui.cpp`)와 UI 시뮬레이터가 같은 코드를 씁니다.
 
-화면을 추가하려면 `Screen`을 상속한 클래스를 만들고, `TelescopeUi`에 멤버로 넣은 뒤 메뉴 항목에 연결하면 됩니다.
+화면을 추가하려면 `Screen`을 상속한 클래스를 만들고, `SimpleGoToUi`에 멤버로 넣은 뒤 메뉴 항목에 연결하면 됩니다.

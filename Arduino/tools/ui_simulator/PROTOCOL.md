@@ -93,4 +93,4 @@ class UiBackend {
 ```
 
 - `InputSnapshot.count`는 부팅 뒤 누적 회전 수(`Rotary::count()`), `clicks`는 직전 프레임 뒤 클릭 수(`Rotary::takeClick()`는 `clicks > 0`).
-- 구현은 `FirmwareUi`(`runner/firmware_ui.*`, 백엔드 이름 `firmware`, 기본값) 하나로, 실제 펌웨어 `TelescopeUi::step()`을 10 Hz 프레임마다 호출합니다. 다른 UI를 붙이려면 `UiBackend`를 구현해 `runner/backends.cpp`의 `createBackend()`에 등록하고 `ui_runner --backend 이름`(GUI는 `simulator.py --backend 이름`)으로 고릅니다. 프로토콜과 GUI는 바꿀 필요가 없습니다.
+- 구현은 `FirmwareUi`(`runner/firmware_ui.*`, 백엔드 이름 `firmware`, 기본값) 하나로, 실제 펌웨어 `SimpleGoToUi::step()`을 10 Hz 프레임마다 호출합니다. 다른 UI를 붙이려면 `UiBackend`를 구현해 `runner/backends.cpp`의 `createBackend()`에 등록하고 `ui_runner --backend 이름`(GUI는 `simulator.py --backend 이름`)으로 고릅니다. 프로토콜과 GUI는 바꿀 필요가 없습니다.

@@ -1,7 +1,7 @@
-#include "telescope_ui.h"
+#include "simplegoto_ui.h"
 #include "../location/location.h"
 
-static const char* const MAIN_LABELS[TelescopeUi::MAIN_ITEMS] = {
+static const char* const MAIN_LABELS[SimpleGoToUi::MAIN_ITEMS] = {
   "1Target",
   "2Polar Align",
   "3Status",
@@ -11,15 +11,15 @@ static const char* const MAIN_LABELS[TelescopeUi::MAIN_ITEMS] = {
   "Sleep",
 };
 
-static const char* const STATUS_LABELS[TelescopeUi::STATUS_ITEMS] = {
+static const char* const STATUS_LABELS[SimpleGoToUi::STATUS_ITEMS] = {
   "GPS", "Acc/Gyro", "Mag/Temp", "IMU Calib", "Att.Estimator", "Health", "Back",
 };
 
-static const char* const CALIB_LABELS[TelescopeUi::CALIB_ITEMS] = {
+static const char* const CALIB_LABELS[SimpleGoToUi::CALIB_ITEMS] = {
   "Gyro Bias", "Accel 6-pos", "Back",
 };
 
-TelescopeUi::TelescopeUi()
+SimpleGoToUi::SimpleGoToUi()
   : target_menu_(MAIN_LABELS[0]),
     polar_align_(MAIN_LABELS[1]),
     gps_(STATUS_LABELS[0]),
@@ -38,7 +38,7 @@ TelescopeUi::TelescopeUi()
     main_("Main Menu", MAIN_LABELS, main_targets_, MAIN_ITEMS, true),
     mgr_(&main_) {}
 
-void TelescopeUi::step(int rotate_delta, bool click, UiContext& ctx, Frame& f) {
+void SimpleGoToUi::step(int rotate_delta, bool click, UiContext& ctx, Frame& f) {
   const Telemetry& t = ctx.tel;
   // 'T' GPS time, 'M' manual clock (DES-LOC-04), 'P' phone clock (DES-LOC-05)
   const char src = t.time_source == loc::TIME_MANUAL ? 'M' : t.time_source == loc::TIME_PHONE ? 'P' : 'T';

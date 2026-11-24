@@ -3,7 +3,7 @@
 // the same logic:
 //   updateTelemetry (sensors -> Telemetry raw fields)
 //   correctImu -> attitude estimator -> updateLocationTime -> updateAstro
-//   -> TelescopeUi::step -> config::serviceRequests -> motorCommand
+//   -> SimpleGoToUi::step -> config::serviceRequests -> motorCommand
 #pragma once
 #include "../astro/target_telemetry.h"
 #include "../estimation/calibration.h"

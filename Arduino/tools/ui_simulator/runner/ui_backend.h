@@ -3,7 +3,7 @@
 // The runner (protocol.cpp) owns time, input accumulation and sensor values.
 // A backend only turns them into a frame of text and a motor output.
 // The backend is FirmwareUi (firmware_ui.cpp), which runs the real
-// TelescopeUi from Arduino/app/src/ui. Another UI can be plugged in by
+// SimpleGoToUi from Arduino/app/src/ui. Another UI can be plugged in by
 // implementing this interface and registering it in backends.cpp.
 #pragma once
 #include "sim_types.h"

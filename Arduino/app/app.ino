@@ -19,7 +19,7 @@
 #include "src/motor/ra_motor.h"
 #include "src/estimation/attitude_estimator.h"
 #include "src/app/loop_logic.h"
-#include "src/ui/telescope_ui.h"
+#include "src/ui/simplegoto_ui.h"
 #include "src/remote/remote_ui.h"
 #include "src/config/settings_binding.h"
 #include "src/config/eeprom_store.h"
@@ -47,7 +47,7 @@ loc::LastGpsRecorder last_gps;                                     // DES-LOC-02
 /************************************/
 // UI
 /************************************/
-TelescopeUi ui;
+SimpleGoToUi ui;
 UiContext   ui_ctx;
 Frame       frame;
 int         rotary_count_prev = 0;

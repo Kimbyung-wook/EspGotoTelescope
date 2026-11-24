@@ -1,6 +1,6 @@
 #pragma once
-#ifndef _TELESCOPE_UI_H_
-#define _TELESCOPE_UI_H_
+#ifndef _SIMPLEGOTO_UI_H_
+#define _SIMPLEGOTO_UI_H_
 #include "screens.h"
 
 /************************************/
@@ -11,13 +11,13 @@
 // Menu (docs/REQUIREMENTS.md DES-UI-01):
 //   1Target  2Polar Align  3Status >  4Calibration >  5Settings  6RA Speed  Sleep
 /************************************/
-class TelescopeUi {
+class SimpleGoToUi {
 public:
   static const int MAIN_ITEMS = 7;
   static const int STATUS_ITEMS = 7;     // 6 screens + Back
   static const int CALIB_ITEMS = 3;      // Gyro, Accel, Back
 
-  TelescopeUi();
+  SimpleGoToUi();
   void step(int rotate_delta, bool click, UiContext& ctx, Frame& f);
   ScreenManager& manager() { return mgr_; }
   MenuScreen& mainMenu() { return main_; }
@@ -50,4 +50,4 @@ private:
   ScreenManager  mgr_;
 };
 
-#endif // _TELESCOPE_UI_H_
+#endif // _SIMPLEGOTO_UI_H_

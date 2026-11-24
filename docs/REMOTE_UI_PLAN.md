@@ -24,11 +24,11 @@ ESP8266(NodeMCU v3)에는 Bluetooth가 없고 Wi-Fi만 있습니다. Wi-Fi로 �
   - 가상 다이얼(드래그) + 클릭 버튼 + ±1/±10 버튼
 ```
 
-- **AP 모드**: 관측지에는 공유기가 없으므로 ESP8266이 직접 AP를 엽니다. 폰이 접속해 `http://192.168.4.1`을 엽니다. 개발 중에는 집 공유기에 붙는 STA 모드와 `telescope.local`(mDNS)도 씁니다.
+- **AP 모드**: 관측지에는 공유기가 없으므로 ESP8266이 직접 AP를 엽니다. 폰이 접속해 `http://192.168.4.1`을 엽니다. 개발 중에는 집 공유기에 붙는 STA 모드와 `simplegoto.local`(mDNS)도 씁니다.
 - **프로토콜**: UI 시뮬레이터의 JSON 프로토콜(`tools/ui_simulator/PROTOCOL.md`)을 그대로 씁니다.
   - ESP → 폰: `{"lines":[8줄]}`. 화면이 바뀔 때만, 최대 5~10 Hz로 보냅니다.
   - 폰 → ESP: `{"rotate":n}`, `{"click":1}`
-- **입력 합치기**: `loop()`에서 `delta = 로터리 delta + 원격 delta`, `click = 로터리 click || 원격 click`으로 합칩니다. UI 코드(`TelescopeUi::step`)는 바뀌지 않습니다. 실물 OLED와 로터리도 그대로 동작합니다(폰이 없어도, 끊겨도 됨).
+- **입력 합치기**: `loop()`에서 `delta = 로터리 delta + 원격 delta`, `click = 로터리 click || 원격 click`으로 합칩니다. UI 코드(`SimpleGoToUi::step`)는 바뀌지 않습니다. 실물 OLED와 로터리도 그대로 동작합니다(폰이 없어도, 끊겨도 됨).
 - **화면**: 지금의 `Frame`이 이미 8줄 텍스트라 그대로 보냅니다. 비트맵 전송은 필요 없습니다.
 
 ## 3. 위험 요소와 확인 방법
@@ -60,7 +60,7 @@ ESP8266(NodeMCU v3)에는 Bluetooth가 없고 Wi-Fi만 있습니다. Wi-Fi로 �
   - ESP → 폰: 화면 줄이 바뀐 프레임에만 `{"lines":[8줄]}`. 글자 이스케이프는 UI 시뮬레이터와 같음(0x20 미만, 0x7F 이상 → `\u00XX`).
   - 폰 → ESP: `{"rotate":n}`(−100~100), `{"click":1}`를 세기만 하고, 받은 누계를 `{"rx":{"rotate":합,"click":합}}`로 되돌려 보냅니다(페이지 아래에 표시 → 왕복 확인용). **UI 입력에는 아직 합치지 않습니다(2단계).**
   - 끔(0): `setup()` 맨 앞에서 `WiFi.persistent(false); WiFi.mode(WIFI_OFF)`. 네트워크 코드는 링크되지 않습니다.
-- `app.ino`: `monitor->print()` 다음에 `remote::publish(frame)`, 대기 루프에서 `yield()` 전에 `remote::poll()`. `TelescopeUi::step`은 그대로입니다.
+- `app.ino`: `monitor->print()` 다음에 `remote::publish(frame)`, 대기 루프에서 `yield()` 전에 `remote::poll()`. `SimpleGoToUi::step`은 그대로입니다.
 - 참고: core 3.x는 이미 부팅 때 Wi-Fi를 끈 채(모뎀 슬립) 시작합니다(`__disableWiFiAtBootTime`). 그래서 위험표의 "기본 Wi-Fi 상태"는 core 3.1.2에서는 이미 해결되어 있고, 명시 호출은 보험입니다.
 
 라이브러리: **WebSockets 2.7.2** (Markus Sattler, `links2004/arduinoWebSockets`). ESP8266 core에는 WebSocket 서버가 없어서 설치했습니다. Arduino 라이브러리 관리자에 있고 ESP8266에서 가장 널리 쓰이며, core의 `WiFiServer` 위에서 돌아 추가 의존성이 없습니다. `REMOTE_UI_ENABLE 1`로 빌드할 때만 필요합니다.

@@ -4,7 +4,7 @@ APP_SRC="$HERE/../../app/src"
 FIRMWARE_SRCS=(
   "$APP_SRC/ui/screen_manager.cpp"
   "$APP_SRC/ui/screens.cpp"
-  "$APP_SRC/ui/telescope_ui.cpp"
+  "$APP_SRC/ui/simplegoto_ui.cpp"
   "$APP_SRC/motor/ra_motor.cpp"
   "$APP_SRC/estimation/filter.cpp"
   "$APP_SRC/estimation/attitude_estimator.cpp"

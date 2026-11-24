@@ -1,9 +1,9 @@
-// UiBackend that runs the real firmware UI (Arduino/app/src/ui, TelescopeUi).
+// UiBackend that runs the real firmware UI (Arduino/app/src/ui, SimpleGoToUi).
 //
 // It does on the PC what app.ino does on the board:
 //   setup(): the boot log lines (setup() itself is not host-buildable)
 //   loop():  rotary delta/click + updateTelemetry() -> AttitudeEstimator
-//            -> TelescopeUi::step() -> RaMotor output from UiState::ra_speed_cmd
+//            -> SimpleGoToUi::step() -> RaMotor output from UiState::ra_speed_cmd
 // Firmware sources are only read, never changed; see build.sh for the list.
 #pragma once
 #include <memory>
@@ -11,7 +11,7 @@
 #include "ui_backend.h"
 #include "board_config.h"   // Arduino/app/src (only #defines)
 
-class TelescopeUi;         // Arduino/app/src/ui/telescope_ui.h
+class SimpleGoToUi;         // Arduino/app/src/ui/simplegoto_ui.h
 namespace config { struct Settings; class RamSettingsStore; }   // Arduino/app/src/config/settings.h
 class AttitudeEstimator;   // Arduino/app/src/estimation/attitude_estimator.h
 namespace astro { class TargetTracker; }   // Arduino/app/src/astro/target_tracker.h
@@ -44,7 +44,7 @@ class FirmwareUi : public UiBackend {
 
   // For tests
   bool booting() const { return boot_frame_ < kBootFrames; }
-  TelescopeUi& ui() { return *ui_; }
+  SimpleGoToUi& ui() { return *ui_; }
   UiContext& context() { return *ctx_; }
   // Flash of the board: kept across begin() (reset = power cycle keeps the settings)
   config::RamSettingsStore& settingsStore() { return *store_; }
@@ -52,7 +52,7 @@ class FirmwareUi : public UiBackend {
  private:
   void renderBoot(Frame& out);
 
-  std::unique_ptr<TelescopeUi> ui_;
+  std::unique_ptr<SimpleGoToUi> ui_;
   std::unique_ptr<UiContext> ctx_;
   std::unique_ptr<AttitudeEstimator> att_est_;
   std::unique_ptr<astro::TargetTracker> moon_tracker_;

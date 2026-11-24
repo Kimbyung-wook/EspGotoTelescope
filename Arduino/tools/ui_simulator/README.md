@@ -5,11 +5,11 @@ PC에서 망원경 펌웨어의 OLED 메뉴를 돌려 보는 도구입니다. �
 ```
 gui/simulator.py  (tkinter)  ──stdin: input/sensors/tick──▶  build/ui_runner.exe  (C++)
   128×64 화면, 센서 패널,    ◀──stdout: frame(8줄+모터)───    Session ─ UiBackend ─ FirmwareUi
-  모터 표시                                                       └ TelescopeUi (Arduino/app/src/ui)
+  모터 표시                                                       └ SimpleGoToUi (Arduino/app/src/ui)
 ```
 
 - **UI 러너** (`runner/`): C++14 콘솔 프로그램. 한 줄 JSON으로 입력·센서 값을 받고 10 Hz 프레임마다 화면 8줄과 모터 출력을 돌려줍니다. 프로토콜은 [PROTOCOL.md](PROTOCOL.md).
-- **UI 백엔드 경계**: UI는 `runner/ui_backend.h`의 `sim::UiBackend` 뒤에만 있습니다. 구현은 `FirmwareUi`(`runner/firmware_ui.*`) 하나로, **실제 펌웨어 UI 코드**(`Arduino/app/src/ui`의 `TelescopeUi`, `Screen`/`ScreenManager`)를 그대로 컴파일해 돌립니다. 펌웨어 소스는 읽기만 하고 고치지 않습니다.
+- **UI 백엔드 경계**: UI는 `runner/ui_backend.h`의 `sim::UiBackend` 뒤에만 있습니다. 구현은 `FirmwareUi`(`runner/firmware_ui.*`) 하나로, **실제 펌웨어 UI 코드**(`Arduino/app/src/ui`의 `SimpleGoToUi`, `Screen`/`ScreenManager`)를 그대로 컴파일해 돌립니다. 펌웨어 소스는 읽기만 하고 고치지 않습니다.
 - **GUI** (`gui/`): Python 3.12 표준 라이브러리(tkinter)만 씁니다. 추가 패키지가 필요 없습니다.
 
 ## 빌드와 실행 (Git Bash)
@@ -75,4 +75,4 @@ python gui/make_font.py   # 기본 경로: ~/Documents/Arduino/libraries/Adafrui
 
 빌드에 쓰는 펌웨어 소스와 include 경로는 `sources.sh`에 있습니다. `Arduino.h`는 이 폴더의 `stubs/`(핀 함수는 빈 함수)를 씁니다. `Arduino/test/stubs`는 단위 테스트용이라 따로 둡니다. 펌웨어 UI에 화면이나 소스 파일이 늘면 `sources.sh`의 `FIRMWARE_SRCS`에 추가하고 `tests/test_menu.cpp`의 기대 화면을 맞춥니다.
 
-재부팅(`reset`)하면 `TelescopeUi`, `UiContext`, `AttitudeEstimator`를 새로 만들어 전원을 다시 켠 것처럼 처음부터 시작합니다.
+재부팅(`reset`)하면 `SimpleGoToUi`, `UiContext`, `AttitudeEstimator`를 새로 만들어 전원을 다시 켠 것처럼 처음부터 시작합니다.

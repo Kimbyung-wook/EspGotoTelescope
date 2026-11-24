@@ -10,7 +10,7 @@
 #include "estimation/attitude_estimator.h"
 #include "motor/ra_motor.h"
 #include "sensors/imu_data.h"
-#include "ui/telescope_ui.h"
+#include "ui/simplegoto_ui.h"
 #include "version.h"
 
 namespace sim {
@@ -90,8 +90,8 @@ void FirmwareUi::begin(const BootConfig& boot, const SensorState&) {
   boot_ = boot;
   boot_frame_ = 0;
   last_count_ = 0;
-  // Fresh UI and context, like a power cycle (TelescopeUi has no reset()).
-  ui_.reset(new TelescopeUi());
+  // Fresh UI and context, like a power cycle (SimpleGoToUi has no reset()).
+  ui_.reset(new SimpleGoToUi());
   ctx_.reset(new UiContext());
   att_est_.reset(new AttitudeEstimator());
   moon_tracker_.reset(new astro::TargetTracker(astro::Target::Moon, 1000));

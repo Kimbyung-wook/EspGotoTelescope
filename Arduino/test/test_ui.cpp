@@ -1,11 +1,11 @@
 #include "test_main.h"
-#include "../app/src/ui/telescope_ui.h"
+#include "../app/src/ui/simplegoto_ui.h"
 #include "../app/src/location/location.h"
 #include "../app/src/astro/astro.h"
 
 namespace {
 struct UiFixture {
-  TelescopeUi ui;
+  SimpleGoToUi ui;
   UiContext ctx;
   Frame f;
   UiFixture() { ctx.tel.voltage_valid = true; ctx.tel.voltage = 12.6f; }   // as measured
@@ -113,13 +113,13 @@ TEST(ui_main_menu_clamps_at_both_ends) {
   u.step(-3);
   CHECK(u.ui.mainMenu().selected() == 0);
   u.step(50);
-  CHECK(u.ui.mainMenu().selected() == TelescopeUi::MAIN_ITEMS - 1);
+  CHECK(u.ui.mainMenu().selected() == SimpleGoToUi::MAIN_ITEMS - 1);
   u.step(-1);
-  CHECK(u.ui.mainMenu().selected() == TelescopeUi::MAIN_ITEMS - 2);
+  CHECK(u.ui.mainMenu().selected() == SimpleGoToUi::MAIN_ITEMS - 2);
 }
 
 // Rotations from the first item of each main screen to its Back/Quit
-static const int TO_BACK[TelescopeUi::MAIN_ITEMS] = {
+static const int TO_BACK[SimpleGoToUi::MAIN_ITEMS] = {
   5,   // Target menu : starts on Mercury, Quit is item 6
   1,   // Polar Align : Confirm, Back
   6,   // Status : 6 screens, Back
@@ -130,7 +130,7 @@ static const int TO_BACK[TelescopeUi::MAIN_ITEMS] = {
 };
 
 TEST(ui_every_menu_item_opens_and_returns_to_same_item) {
-  for (int item = 0; item < TelescopeUi::MAIN_ITEMS; item++) {
+  for (int item = 0; item < SimpleGoToUi::MAIN_ITEMS; item++) {
     UiFixture u;
     u.open(item);
     CHECK(u.ui.manager().depth() == 2);
@@ -570,14 +570,14 @@ TEST(ui_lines_never_overflow) {
   s.manual_lat_deg = -90.0; s.manual_lon_deg = -180.0; s.manual_alt_m = -1000.0f;
   s.utc_offset_min = -720; s.guide_tolerance_deg = 20.0f;
   // sub pages opened from each main item (-1 = none)
-  static const int SUBS[TelescopeUi::MAIN_ITEMS][7] = {
+  static const int SUBS[SimpleGoToUi::MAIN_ITEMS][7] = {
     {1, -1},                          // Target menu : Mercury
     {-1}, {0, 1, 2, 3, 4, 5, -1},     // Polar Align ; Status screens
     {0, 1, -1},                       // Calibration : Gyro, Accel
     {1, 2, -1},                       // Settings : Location, Time
     {-1}, {-1},
   };
-  for (int item = 0; item < TelescopeUi::MAIN_ITEMS; item++) {
+  for (int item = 0; item < SimpleGoToUi::MAIN_ITEMS; item++) {
     u.step(-20); u.step(item); u.click();
     for (int k = 0; k < 12; k++) u.step(1);      // every line of the page
     for (int j = 0; SUBS[item][j] >= 0; j++) {

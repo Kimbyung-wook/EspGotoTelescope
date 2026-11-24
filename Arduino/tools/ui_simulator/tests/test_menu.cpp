@@ -1,4 +1,4 @@
-// Menu tests for the runner with the real firmware UI (TelescopeUi):
+// Menu tests for the runner with the real firmware UI (SimpleGoToUi):
 // input sequence -> expected screen lines. Drives sim::Session, the same code
 // path the GUI uses, so the protocol layer is covered too.
 // Build and run with ../run_tests.sh.
@@ -10,7 +10,7 @@
 
 #include "firmware_ui.h"
 #include "protocol.h"
-#include "ui/telescope_ui.h"
+#include "ui/simplegoto_ui.h"
 #include "config/settings.h"
 
 namespace {

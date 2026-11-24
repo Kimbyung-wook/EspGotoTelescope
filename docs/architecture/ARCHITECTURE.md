@@ -81,7 +81,7 @@ flowchart TB
   end
 
   subgraph UI["UI"]
-    TUI["ui/telescope_ui"]
+    TUI["ui/simplegoto_ui"]
     SCRS["ui/screens"]
     MGR["ui/screen_manager"]
     SCR["ui/screen"]
@@ -149,7 +149,7 @@ flowchart LR
 
 ```mermaid
 classDiagram
-  class TelescopeUi {
+  class SimpleGoToUi {
     +step(delta, click, UiContext, Frame)
   }
   class ScreenManager {
@@ -175,12 +175,12 @@ classDiagram
   class TargetMenuScreen
   class TargetScreen
 
-  TelescopeUi *-- ScreenManager
-  TelescopeUi *-- MainMenuScreen
-  TelescopeUi *-- RaSpeedScreen
-  TelescopeUi *-- ImuCalibMenuScreen
-  TelescopeUi *-- InfoScreen
-  TelescopeUi *-- TargetMenuScreen
+  SimpleGoToUi *-- ScreenManager
+  SimpleGoToUi *-- MainMenuScreen
+  SimpleGoToUi *-- RaSpeedScreen
+  SimpleGoToUi *-- ImuCalibMenuScreen
+  SimpleGoToUi *-- InfoScreen
+  SimpleGoToUi *-- TargetMenuScreen
   Screen <|-- TargetMenuScreen
   Screen <|-- TargetScreen
   TargetMenuScreen *-- TargetScreen

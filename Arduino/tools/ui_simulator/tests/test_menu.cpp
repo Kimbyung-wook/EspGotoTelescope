@@ -309,7 +309,7 @@ void test_imu_screens() {
   EXPECT_LINE(s, 7, "Wz       15.00000 DPS");
 }
 
-// Moon from src/astro: default GPS 2026-11-21 12:00:00 UT, Seoul (host values of moonState)
+// Moon from src/astro: default GPS 2026-11-21 12:00:00 UT, Seoul (host values of targetState)
 void test_moon_target() {
   Sim s;
   s.boot();

@@ -57,3 +57,11 @@ TEST(gps_fix_text_fits_5_chars) {
   gpsFixText(2, buf, sizeof(buf)); CHECK_STR(buf, "DGPS");
   gpsFixText(6, buf, sizeof(buf)); CHECK_STR(buf, "Q6");
 }
+
+TEST(gps_utc_from_gps) {
+  astro::UtcTime u;
+  CHECK(!utcFromGps(0, 0, 0, 0, 0, 0, 0, u));          // GPS before the first RMC
+  CHECK(utcFromGps(26, 11, 22, 13, 5, 7, 250, u));
+  CHECK(u.year == 2026 && u.month == 11 && u.day == 22 && u.hour == 13 && u.minute == 5);
+  CHECK_NEAR(u.second, 7.25, 1e-12);
+}

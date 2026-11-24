@@ -29,12 +29,6 @@ int OLED::setup_display()
   return true;
 }
 
-// void OLED::writeln(int line_in, char* text_in, unsigned int size_in){
-//   int line = max(0, min(line_in, DISP_LINE_COLUMN-1));
-//   size_t size = (size_t)min(size_in, (unsigned int)DISP_LINE_ROW);
-//   strncpy(&msg[line][0], text_in, size);
-// }
-
 void OLED::setPower(bool on)
 {
   if (on == power_on) return;

@@ -8,6 +8,7 @@
 #include "../astro/target_telemetry.h"
 #include "../estimation/calibration.h"
 #include "../location/location.h"
+#include "../gps/gps_link.h"
 #include "../ui/ui_context.h"
 
 namespace app {
@@ -47,8 +48,8 @@ inline void setPhoneClock(UiState& st, unsigned long now_ms, unsigned long unix_
 inline void updateLocationTime(Telemetry& t, UiState& st, loc::LastGpsRecorder& last_rec) {
   astro::UtcTime u;
   const bool fix = t.fixquality > 0;
-  const bool gps_date = astro::utcFromGps(t.year, t.month, t.day, t.hour, t.minute, t.seconds,
-                                          t.milliseconds, u);
+  const bool gps_date = utcFromGps(t.year, t.month, t.day, t.hour, t.minute, t.seconds,
+                                   t.milliseconds, u);
   loc::Position gps, last, manual, used;
   gps.lat_deg = t.latitude;          gps.lon_deg = t.longitude;          gps.alt_m = t.altitude_m;
   last.lat_deg = st.last_lat_deg;    last.lon_deg = st.last_lon_deg;    last.alt_m = st.last_alt_m;

@@ -2,6 +2,7 @@
 #include <math.h>
 #include "../astro/target_telemetry.h"
 #include "../location/location.h"
+#include "../gps/gps_link.h"
 #include "../board_config.h"
 
 /************************************/
@@ -66,19 +67,10 @@ void RaSpeedScreen::render(Frame& f, const UiContext& ctx, char blink) {
 /************************************/
 // Info screens
 /************************************/
-static void fixText(int q, char* out, int size) {
-  switch (q) {
-    case 0:  snprintf(out, size, "NoFix"); break;
-    case 1:  snprintf(out, size, "GPS");   break;
-    case 2:  snprintf(out, size, "DGPS");  break;
-    default: snprintf(out, size, "Q%d", q); break;
-  }
-}
-
 void GpsStatusScreen::render(Frame& f, const UiContext& ctx, char /*blink*/) {
   const Telemetry& t = ctx.tel;
   char fix[6];
-  fixText(t.fixquality, fix, sizeof(fix));
+  gpsFixText(t.fixquality, fix, sizeof(fix));
   renderTitle(f);
   f.set(2, "Date: 20%02d/%02d/%02d", t.year % 100, t.month % 100, t.day % 100);
   f.set(3, "Time:   %02d:%02d:%02d.%03d", t.hour % 100, t.minute % 100, t.seconds % 100, t.milliseconds % 1000);
@@ -276,7 +268,7 @@ void PolarAlignScreen::tick(UiContext& ctx) {
   ctx.state.motor_inhibit = true;            // DES-PA-01
   const Telemetry& t = ctx.tel;
   // DES-PA-04 : altitude only for now (azimuth needs the magnetometer, DES-MAG)
-  const bool inside = t.loc_source != 0 && fabs(t.tube_alt_deg - t.obs_lat_deg) <= PA_ALT_TOL_DEG;
+  const bool inside = t.loc_source != loc::SRC_NONE && fabs(t.tube_alt_deg - t.obs_lat_deg) <= PA_ALT_TOL_DEG;
   if (!inside) { holding_ = false; ok_ = false; return; }
   if (!holding_) { holding_ = true; since_ms_ = t.now_ms; }
   ok_ = (unsigned long)(t.now_ms - since_ms_) >= (unsigned long)PA_OK_HOLD_MS;
@@ -291,7 +283,7 @@ void PolarAlignScreen::onClick(ScreenManager& mgr, UiContext& ctx) {
 
 void PolarAlignScreen::render(Frame& f, const UiContext& ctx, char blink) {
   const Telemetry& t = ctx.tel;
-  const bool have_lat = t.loc_source != 0;
+  const bool have_lat = t.loc_source != loc::SRC_NONE;
   const double dalt = t.tube_alt_deg - t.obs_lat_deg;
   f.set(1, "*%s", title_);
   const int first = cursor_.first();
@@ -505,12 +497,6 @@ void LocationScreen::render(Frame& f, const UiContext& ctx, char blink) {
 /************************************/
 // Time (manual clock, local time = UTC + offset)
 /************************************/
-static int daysInMonth(int y, int m) {
-  static const int d[12] = {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
-  if (m == 2 && ((y % 4 == 0 && y % 100 != 0) || y % 400 == 0)) return 29;
-  return (m >= 1 && m <= 12) ? d[m - 1] : 31;
-}
-
 void TimeScreen::onEnter(UiContext& ctx) {
   cursor_.reset();
   editing_ = false;
@@ -545,7 +531,7 @@ void TimeScreen::onClick(ScreenManager& mgr, UiContext& ctx) {
   if (editing_) { editing_ = false; return; }
   switch (cursor_.selected()) {
     case SET: {
-      if (v_[DAY] > daysInMonth(v_[YEAR], v_[MONTH])) v_[DAY] = daysInMonth(v_[YEAR], v_[MONTH]);
+      if (v_[DAY] > astro::daysInMonth(v_[YEAR], v_[MONTH])) v_[DAY] = astro::daysInMonth(v_[YEAR], v_[MONTH]);
       const astro::UtcTime local{v_[0], v_[1], v_[2], v_[3], v_[4], (double)v_[5]};
       UiState& st = ctx.state;
       st.manual_clock_jd = astro::julianDate(local) - st.utc_offset_min / 1440.0;

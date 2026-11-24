@@ -77,7 +77,7 @@ void fillTelemetry(unsigned long now_ms, const SensorState& s, const UiState& st
   t.gps_us = 650;
   t.imu_us = 1250;
   t.est_us = 180;
-  t.astro_us = 4000;   // MoonState, about 4 ms at 160 MHz (tools/astro_bench measures it)
+  t.astro_us = 4000;   // targetState(Moon), about 4 ms at 160 MHz (tools/astro_bench measures it)
 }
 
 }  // namespace

@@ -4,12 +4,14 @@
 #pragma once
 #include "target_tracker.h"
 #include "../ui/ui_context.h"
+#include "../location/location.h"
+#include "../util/angles.h"
 #include <math.h>
 
 namespace astro {
 
 namespace detail {
-inline bool known(const Telemetry& t) { return t.loc_source != 0 && t.time_source != 0; }
+inline bool known(const Telemetry& t) { return t.loc_source != loc::SRC_NONE && t.time_source != loc::TIME_NONE; }
 inline Observer observer(const Telemetry& t) { return Observer{t.obs_lat_deg, t.obs_lon_deg, t.obs_alt_m}; }
 inline bool trackerUpdate(TargetTracker& tr, const Telemetry& t) {
   return tr.updateJd(t.now_ms, known(t), t.jd_ut, observer(t));
@@ -74,7 +76,7 @@ inline bool trackingRate(const Telemetry& t, const UiState& st, double& rate_arc
 // Direction of the tracking command (DES-MOT-02): -1 in the southern hemisphere,
 // flipped again by the motor_reverse setting.
 inline float trackingSign(const Telemetry& t, const UiState& st) {
-  float s = (t.loc_source != 0 && t.obs_lat_deg < 0.0) ? -1.0f : 1.0f;
+  float s = (t.loc_source != loc::SRC_NONE && t.obs_lat_deg < 0.0) ? -1.0f : 1.0f;
   return st.motor_reverse ? -s : s;
 }
 
@@ -95,7 +97,7 @@ inline bool applyTracking(const Telemetry& t, UiState& st, float duty_at_siderea
 // conventions) and the IMU axes along the optical axis and the Dec axis.
 inline void upInTubeFromRollPitch(double roll_deg, double pitch_deg, int optical_axis, int dec_axis,
                                   double up[3]) {
-  const double D2R = 3.14159265358979323846 / 180.0;
+  const double D2R = util::kDegToRad;
   const double r = roll_deg * D2R, p = pitch_deg * D2R;
   const double ub[3] = {-sin(p), cos(p) * sin(r), cos(p) * cos(r)};   // ~ accelerometer / g
   auto axis = [](int a, double v[3]) {
@@ -119,7 +121,7 @@ inline bool updateScopeTelemetry(Telemetry& t, int optical_axis, int dec_axis) {
   double up[3];
   upInTubeFromRollPitch(t.roll_est_deg, t.pitch_est_deg, optical_axis, dec_axis, up);
   const double u0 = up[0] > 1.0 ? 1.0 : (up[0] < -1.0 ? -1.0 : up[0]);
-  t.tube_alt_deg = asin(u0) * 57.29577951308232;
+  t.tube_alt_deg = asin(u0) * util::kRadToDeg;
   t.scope_valid = false;
   t.polaris_valid = false;
   if (!detail::known(t)) return false;

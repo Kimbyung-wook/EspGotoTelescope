@@ -1,12 +1,12 @@
 #include "astro.h"
 #include <math.h>
+#include "../util/angles.h"
 
 namespace astro {
 namespace {
 
-constexpr double PI = 3.14159265358979323846;
-constexpr double D2R = PI / 180.0;
-constexpr double R2D = 180.0 / PI;
+constexpr double D2R = util::kDegToRad;
+constexpr double R2D = util::kRadToDeg;
 constexpr double JD_J2000 = 2451545.0;
 // Schlyter's day number d = JD - 2451543.5 (0.0 at 1999-12-31 0h).
 constexpr double JD_SCHLYTER0 = 2451543.5;
@@ -93,6 +93,12 @@ double gmstDeg(double jd_ut) {
 }
 
 double lstDeg(double jd_ut, double lon_deg) { return wrap360(gmstDeg(jd_ut) + lon_deg); }
+
+int daysInMonth(int year, int month) {
+  static const int d[12] = {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
+  if (month == 2 && ((year % 4 == 0 && year % 100 != 0) || year % 400 == 0)) return 29;
+  return (month >= 1 && month <= 12) ? d[month - 1] : 31;
+}
 
 bool utcFromJd(double jd_ut, UtcTime& out) {
   if (!(jd_ut >= 0.0)) return false;

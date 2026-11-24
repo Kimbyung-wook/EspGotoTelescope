@@ -76,7 +76,7 @@ void setup() {
   const float t_gmst = timeUs(500, [&](int i) { sink += gmstDeg(jd0 + i * 1e-5); });
   const float t_sun = timeUs(200, [&](int i) { sink += sunEquatorial(jd0 + i * 1e-3).ra_deg; });
   const float t_moon = timeUs(200, [&](int i) { sink += moonGeocentric(jd0 + i * 1e-3).ra_deg; });
-  const float t_state = timeUs(50, [&](int i) { sink += moonState(jd0 + i * 1e-3, obs).ha_rate_arcsec_s; });
+  const float t_state = timeUs(50, [&](int i) { sink += targetState(Target::Moon, jd0 + i * 1e-3, obs).ha_rate_arcsec_s; });
   const float t_mars = timeUs(200, [&](int i) { sink += planetGeocentric(Planet::Mars, jd0 + i).ra_deg; });
 
   out("us/call @%uMHz", ESP.getCpuFreqMHz());
@@ -89,7 +89,7 @@ void setup() {
   out("1Hz load %6.2f %%", t_state / 1e4);   // MoonState once per second
   showOled();
 
-  const MoonState s = moonState(jd0, obs);
+  const TargetState s = targetState(Target::Moon, jd0, obs);
   Serial.println("(host reference: RA 27.5549 DE 15.7577 HA -19.0878 alt 62.435 az 137.147 rate 14.6677)");
   Serial.printf("Seoul 2026-11-22 12:00 UT: RA %.4f DE %.4f HA %.4f alt %.3f az %.3f rate %.4f\"/s\n",
                 s.topo.ra_deg, s.topo.dec_deg, s.ha_deg, s.hor.alt_deg, s.hor.az_deg, s.ha_rate_arcsec_s);

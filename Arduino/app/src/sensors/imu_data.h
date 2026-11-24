@@ -2,6 +2,7 @@
 #ifndef _IMU_DATA_H_
 #define _IMU_DATA_H_
 #include <math.h>
+#include "../util/angles.h"
 
 /************************************/
 // IMU measurement in the telescope body frame
@@ -17,7 +18,7 @@ struct ImuData {
 // Inputs are in the sensor library units : accel [m/s^2], gyro [rad/s], mag [uT].
 inline ImuData imuSensorToBody(const float acc[3], const float gyro_radps[3],
                                const float mag[3], float temperature) {
-  const float RAD2DEG = 57.29577951308232f;
+  const float RAD2DEG = util::kRadToDegF;
   ImuData d;
   d.ax = -acc[0];
   d.ay =  acc[1];
@@ -48,12 +49,12 @@ inline float accelNorm(const ImuData& d) {
   return sqrtf(d.ax * d.ax + d.ay * d.ay + d.az * d.az);
 }
 inline float rollFromAccelDeg(const ImuData& d) {
-  return atan2f(d.ay, d.az) * 57.29577951308232f;
+  return atan2f(d.ay, d.az) * util::kRadToDegF;
 }
 inline float pitchFromAccelDeg(const ImuData& d) {
   float g = accelNorm(d);
   if (g <= 0.0f) return 0.0f;
-  return asinf(-d.ax / g) * 57.29577951308232f;
+  return asinf(-d.ax / g) * util::kRadToDegF;
 }
 
 #endif // _IMU_DATA_H_

@@ -70,6 +70,7 @@ double gmstDeg(double jd_ut);                  // Greenwich mean sidereal time, 
 double lstDeg(double jd_ut, double lon_deg);   // local mean sidereal time, 0..360
 // JD (UT) -> calendar date and time (Meeus 7.3); false for jd < 0
 bool utcFromJd(double jd_ut, UtcTime& out);
+int daysInMonth(int year, int month);       // Gregorian, 28..31 (31 for a bad month)
 
 // ---- angles
 double wrap360(double deg);
@@ -142,10 +143,5 @@ double polarisHaDeg(double jd_ut, double lon_deg);
 // with the naked eye facing north; an inverting polar scope shows it 6 h away).
 // Returns 0 < hours <= 12.
 double polarisClockHours(double ha_deg);
-
-using MoonState = TargetState;
-inline MoonState moonState(double jd_ut, const Observer& obs) {
-  return targetState(Target::Moon, jd_ut, obs);
-}
 
 }  // namespace astro

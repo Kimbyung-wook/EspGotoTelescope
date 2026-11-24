@@ -31,7 +31,6 @@ class OLED{
     
   public : // Variables
     int setup_display();
-    void writeln(int line_in, char* text_in, unsigned int size_in);
     void print();
     void setPower(bool on);   // SSD1306 display on/off (Sleep), sent only on a change
 

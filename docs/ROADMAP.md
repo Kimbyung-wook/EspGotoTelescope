@@ -11,7 +11,7 @@
 | 2 | **[실물] RA 모터 보정**: 별 하나를 따라가는 RRcmd를 6RA Speed에서 찾아 5Settings의 `RAduty = RRcmd`로 저장. 처음 값은 `RA_DUTY_AT_SIDEREAL`(0)이라 Offset만으로 모터가 돎 (MOON_POSITION.md 남은 일) | 자동 추적의 기본값. DC 모터는 PWM과 속도가 선형이 아니므로 여러 점을 재서 표로 바꿀 수도 있음 |
 | 3 | **[실물] 배선 가정 확인**: `(assumed)` 부품(배터리, 강압 컨버터, L298N형 드라이버, KY-040), `⚠` 핀 순서(ICM20948, GPS), 부팅 핀 D3/D4/D8 (ARCHITECTURE.md) | 배선도를 실물과 맞춰 두어야 이후 회로 추가(전압 측정 등)가 안전 |
 | 4 | **[실물] 원격 UI 측정**: `REMOTE_UI_ENABLE=1`로 Health 루프 주기, 전류, Wi-Fi 켜고/끄고 Mag 값 변화. 폰으로 Offset 편집, Track 켜기/끄기, 상태바 `w`/`W`, 잠금 후 재접속, 304 캐시 (REMOTE_UI_PLAN.md) | ESP32로 옮길지 판단하는 근거 |
-| 5 | **[실물] 달 계산 시간 측정**: `moonGeocentric`, `moonState`, 1 Hz 부하 µs 표 채우기 (MOON_POSITION.md) | 루프 여유 확인 |
+| 5 | **[실물] 달 계산 시간 측정**: `moonGeocentric`, `targetState(Moon)`, 1 Hz 부하 µs 표 채우기 (MOON_POSITION.md) | 루프 여유 확인 |
 | 6 | **[실물] 보정 문턱값**: 충격 감지(`CAL_SHOCK_GYRO_DPS` 2 °/s, `CAL_SHOCK_ACCEL_MPS2` 0.5 m/s²)가 손 떨림·모터 진동에 너무 민감하거나 둔하지 않은지. 가속도 6방향 자세 판정(0.8 g / 0.35 g) (DES-CAL-02, 04) | 보정이 실물에서 끝까지 되는지 |
 | 7 | **[실물] 극축 정렬과 북극성 시계**: 고도 허용 0.5°(`PA_ALT_TOL_DEG`)가 맞출 만한지, `Polaris at h:mm`이 극축 망원경 눈금과 같은 방향인지(맨눈 기준, 상이 뒤집히면 6시간 차) (DES-PA-03, 04) | 정렬 확인 뒤 지향(`?` 없음)을 믿을 수 있는지 |
 | 8 | **[실물] 전압 측정**: A0에 직렬 저항(가정 1.2 MΩ)을 달고 `VBAT_SENSE_ENABLE 1`, 멀티미터와 비교해 `VBAT_FULL_SCALE_V` 맞추기. Wi-Fi 켠 채 0.5초 읽기가 연결을 흔들지 않는지 (board_config.h) | 상태바 전압이 맞는지 |

@@ -133,13 +133,23 @@ TEST(astro_horizontal) {
   CHECK_NEAR(h.az_deg, 90.0, 1e-9);
 }
 
+TEST(astro_days_in_month) {
+  CHECK(daysInMonth(2026, 1) == 31);
+  CHECK(daysInMonth(2026, 4) == 30);
+  CHECK(daysInMonth(2026, 2) == 28);
+  CHECK(daysInMonth(2028, 2) == 29);
+  CHECK(daysInMonth(2100, 2) == 28);
+  CHECK(daysInMonth(2000, 2) == 29);
+  CHECK(daysInMonth(2026, 13) == 31);
+}
+
 TEST(astro_moon_tracking_rate) {
   const Observer seoul{37.5665, 126.9780};
   double sum = 0, lo = 1e9, hi = -1e9;
   int n = 0;
   const double jd0 = julianDate({2026, 11, 1, 0, 0, 0.0});
   for (double k = 0; k < 29.5; k += 0.25) {       // one month, every 6 h
-    const MoonState s = moonState(jd0 + k, seoul);
+    const TargetState s = targetState(Target::Moon, jd0 + k, seoul);
     sum += s.ha_rate_arcsec_s; n++;
     if (s.ha_rate_arcsec_s < lo) lo = s.ha_rate_arcsec_s;
     if (s.ha_rate_arcsec_s > hi) hi = s.ha_rate_arcsec_s;
@@ -153,8 +163,8 @@ TEST(astro_moon_tracking_rate) {
 TEST(astro_moon_rate_matches_hour_angle_change) {
   const Observer seoul{37.5665, 126.9780};
   const double jd = julianDate({2026, 11, 22, 13, 0, 0.0});
-  const MoonState a = moonState(jd, seoul);
-  const MoonState b = moonState(jd + 60.0 / 86400.0, seoul);
+  const TargetState a = targetState(Target::Moon, jd, seoul);
+  const TargetState b = targetState(Target::Moon, jd + 60.0 / 86400.0, seoul);
   const double measured = wrap180(b.ha_deg - a.ha_deg) * 3600.0 / 60.0;
   CHECK_NEAR(a.ha_rate_arcsec_s, measured, 0.01);
   CHECK_NEAR(a.dec_rate_arcsec_s, (b.topo.dec_deg - a.topo.dec_deg) * 3600.0 / 60.0, 0.01);
@@ -166,30 +176,23 @@ TEST(astro_moon_rate_matches_hour_angle_change) {
 
 // Position and time as app::updateLocationTime() leaves them
 static void known(Telemetry& t, const UtcTime& u, double lat, double lon, float alt = 0.0f) {
-  t.loc_source = 1; t.time_source = 1;
+  t.loc_source = loc::SRC_GPS; t.time_source = loc::TIME_GPS;
   t.jd_ut = julianDate(u);
   t.obs_lat_deg = lat; t.obs_lon_deg = lon; t.obs_alt_m = alt;
-}
-
-TEST(astro_utc_from_gps) {
-  UtcTime u;
-  CHECK(!utcFromGps(0, 0, 0, 0, 0, 0, 0, u));          // GPS before the first RMC
-  CHECK(utcFromGps(26, 11, 22, 13, 5, 7, 250, u));
-  CHECK(u.year == 2026 && u.month == 11 && u.day == 22 && u.hour == 13 && u.minute == 5);
-  CHECK_NEAR(u.second, 7.25, 1e-12);
 }
 
 TEST(astro_moon_tracker_period_and_fix) {
   TargetTracker tr(Target::Moon, 1000);
   UtcTime u{2026, 11, 22, 12, 0, 0.0};
   const Observer seoul{37.5665, 126.9780};
-  CHECK(!tr.update(0, false, &u, seoul));               // no fix
+  const double jd = julianDate(u);
+  CHECK(!tr.updateJd(0, false, jd, seoul));             // position/time unknown
   CHECK(!tr.valid());
-  CHECK(tr.update(100, true, &u, seoul));               // first fix: compute now
+  CHECK(tr.updateJd(100, true, jd, seoul));             // first time known: compute now
   CHECK(tr.valid());
-  CHECK(!tr.update(1000, true, &u, seoul));             // 0.9 s later: keep
-  CHECK(tr.update(1100, true, &u, seoul));              // 1 s later: compute
-  CHECK(!tr.update(1200, true, nullptr, seoul));        // bad date
+  CHECK(!tr.updateJd(1000, true, jd, seoul));           // 0.9 s later: keep
+  CHECK(tr.updateJd(1100, true, jd, seoul));            // 1 s later: compute
+  CHECK(!tr.updateJd(1200, false, jd, seoul));          // lost
   CHECK(!tr.valid());
 }
 
@@ -199,13 +202,13 @@ TEST(astro_moon_telemetry_matches_moon_state) {
   t.now_ms = 5000;
   known(t, {2026, 11, 22, 12, 0, 0.0}, 37.5665, 126.9780, 40.0f);
   CHECK(updateMoonTelemetry(tr, t));
-  const MoonState s = moonState(julianDate({2026, 11, 22, 12, 0, 0.0}), Observer{37.5665, 126.9780, 40.0});
+  const TargetState s = targetState(Target::Moon, julianDate({2026, 11, 22, 12, 0, 0.0}), Observer{37.5665, 126.9780, 40.0});
   CHECK(t.moon_valid);
   CHECK_NEAR(t.moon_ra_deg, s.topo.ra_deg, 1e-12);
   CHECK_NEAR(t.moon_dec_deg, s.topo.dec_deg, 1e-12);
   CHECK_NEAR(t.moon_alt_deg, s.hor.alt_deg, 1e-12);
   CHECK_NEAR(t.moon_rate_arcsec_s, s.ha_rate_arcsec_s, 1e-12);
-  t.time_source = 0;                               // no time
+  t.time_source = loc::TIME_NONE;                  // no time
   updateMoonTelemetry(tr, t);
   CHECK(!t.moon_valid);
 }
@@ -214,11 +217,12 @@ TEST(astro_tracker_switches_target_immediately) {
   TargetTracker tr(Target::Moon, 1000);
   UtcTime u{2026, 11, 22, 12, 0, 0.0};
   const Observer seoul{37.5665, 126.9780};
-  CHECK(tr.update(0, true, &u, seoul));
-  CHECK(!tr.update(500, true, &u, seoul));
+  const double jd = julianDate(u);
+  CHECK(tr.updateJd(0, true, jd, seoul));
+  CHECK(!tr.updateJd(500, true, jd, seoul));
   tr.setTarget(Target::Mars);
   CHECK(!tr.valid());
-  CHECK(tr.update(600, true, &u, seoul));        // no wait for the 1 s period
+  CHECK(tr.updateJd(600, true, jd, seoul));        // no wait for the 1 s period
   CHECK_NEAR(tr.state().topo.dist, 1.2515, 0.01);  // AU
 }
 
@@ -346,7 +350,7 @@ TEST(astro_scope_from_roll_pitch_level_tube_on_meridian) {
   CHECK(pointingFromUp(up, t.obs_lat_deg, 0.0, 0.0, 0.0, q));
   CHECK_NEAR(fabs(q.dec_deg), 0.0, 1e-6);
   t.pitch_est_deg = (float)-t.obs_lat_deg;         // tube raised by the latitude (Dec 90 pose)
-  t.loc_source = 0;                                // no position: tube altitude only
+  t.loc_source = loc::SRC_NONE;                    // no position: tube altitude only
   CHECK(!updateScopeTelemetry(t, 1, 2));
   CHECK(!t.scope_valid && !t.polaris_valid);
   CHECK_NEAR(t.tube_alt_deg, 37.5665, 1e-4);

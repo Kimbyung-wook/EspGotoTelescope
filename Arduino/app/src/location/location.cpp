@@ -1,5 +1,6 @@
 #include "location.h"
 #include <math.h>
+#include "../util/angles.h"
 
 namespace loc {
 
@@ -36,7 +37,7 @@ int resolvePosition(int mode, bool gps_fix, const Position& gps,
 }
 
 double distanceKm(const Position& a, const Position& b) {
-  const double D2R = 3.14159265358979323846 / 180.0;
+  const double D2R = util::kDegToRad;
   const double R = 6371.0;
   const double p1 = a.lat_deg * D2R, p2 = b.lat_deg * D2R;
   const double dp = p2 - p1, dl = (b.lon_deg - a.lon_deg) * D2R;

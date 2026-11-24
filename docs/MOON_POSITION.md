@@ -187,7 +187,7 @@ Meeus, *Astronomical Algorithms* 예제 47.a(1992-04-12 0h)와 비교했습니�
 
 | 파일 | 내용 |
 |---|---|
-| `Arduino/app/src/astro/astro.{h,cpp}` | JD, GMST/LST(IAU 1982), 태양·달(Schlyter + 섭동항), 행성(Standish J2000 요소, trackingPlanet.m과 같은 값), 관측지 보정(WGS84 벡터 차), 고도·방위, `moonState()`(±30 s 중앙차분으로 추적 속도 계산) |
+| `Arduino/app/src/astro/astro.{h,cpp}` | JD, GMST/LST(IAU 1982), 태양·달(Schlyter + 섭동항), 행성(Standish J2000 요소, trackingPlanet.m과 같은 값), 관측지 보정(WGS84 벡터 차), 고도·방위, `targetState()`(±30 s 중앙차분으로 추적 속도 계산) |
 | `astro/target_tracker.h` | GPS 날짜 검사(2자리 연도 → 2000+), 대상(달·행성)별로 1 s 주기로만 다시 계산, 대상을 바꾸면 바로 계산, fix가 없으면 무효 |
 | `astro/target_telemetry.h` | `Telemetry`의 GPS 값 → 달 값 / 추적 대상 값, 추적 중 RA 모터 지령(`applyTracking`, 속도 + Offset), 경통 IMU 롤/피치 → 망원경 RA/Dec(`updateScopeTelemetry`). `app.ino`와 UI 시뮬레이터가 함께 씀 |
 | `Arduino/test/test_astro.cpp` | PC 정확도 시험 (아래 표) |
@@ -228,7 +228,7 @@ $env:SKETCH = 'tools/astro_bench'; bash Arduino/scripts/build.sh --library app/s
 | 항목 (160 MHz) | 실측 µs |
 |---|---|
 | `moonGeocentric` | (측정 전) |
-| `moonState` (달 3회 + 보정) | (측정 전) |
+| `targetState(Moon)` (달 3회 + 보정) | (측정 전) |
 | 1 Hz 부하 | (측정 전) |
 
 **남은 일**

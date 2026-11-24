@@ -128,6 +128,17 @@ Arduino/scripts/build.sh --build-property "compiler.cpp.extra_flags=-DREMOTE_UI_
 - 폰 페이지: 검은 바탕에 빨간 고정폭 글씨, 화면 꺼짐 방지(Wake Lock).
 - 시험: 폰에 화면이 OLED와 같게 나오는지 확인합니다.
 
+#### 1단계 구현 (2026-11-24)
+- 폰 페이지 원본: `Arduino/app/src/remote/web/index.html`. 펌웨어와 PC 브리지가 같은 파일을 씁니다.
+  - 펌웨어에는 `scripts/gen_remote_page.py`가 만든 `remote_page.h`(PROGMEM)로 들어갑니다. Arduino IDE는 빌드 스크립트를 못 돌리므로 생성 파일도 커밋합니다. 페이지를 고치면 스크립트를 다시 돌립니다(`tools/ui_simulator/run_tests.sh`가 `--check`로 확인).
+  - WebSocket 포트는 HTTP 포트 + 1로 계산합니다(ESP 80 → 81, PC 8080 → 8081).
+  - 화면: 검은 바탕 빨간 고정폭 글씨 8줄, 상태바 줄은 어둡게. 폭에 맞춰 글자 크기 조절.
+  - 상태 줄: `connected` / `connected, no data N s`(3초 넘게 프레임 없음) / `disconnected, retrying...`(1초마다 재접속).
+  - 화면 꺼짐 방지: Wake Lock API를 씁니다. 다만 Wake Lock은 HTTPS 또는 localhost에서만 동작해서 `http://192.168.4.1`에서는 안 됩니다. 이때 상태 줄에 `keep-awake needs your phone setting`을 표시하니, 폰의 화면 꺼짐 시간을 길게 설정합니다.
+- 메시지: 접속하면 ESP가 `{"hello":{"input":false}}`를 보냅니다. 페이지는 `input`이 true일 때만 입력 버튼을 보여줍니다(2단계에서 true). 화면은 바뀔 때, 그리고 바뀌지 않아도 1초마다 보냅니다.
+- PC 데모: `python Arduino/tools/ui_simulator/gui/web_bridge.py` → `http://localhost:8080/`. 펌웨어 UI 러너를 10 Hz로 돌리고 같은 페이지를 제공합니다. 데모에서는 입력 버튼(−10 −1 OK +1 +10)도 동작합니다. `--mirror-only`는 1단계 펌웨어처럼 입력을 무시합니다. 같은 Wi-Fi의 폰에서 `http://<PC IP>:8080/`으로 열어 볼 수도 있습니다(방화벽 허용 필요).
+- 실물 확인 (남음): `REMOTE_UI_ENABLE=1`로 올리고 폰을 `Telescope` AP(비밀번호 `telescope`)에 붙여 `http://192.168.4.1`을 엽니다. 폰 화면이 OLED와 같은지, Health 루프 주기가 흔들리지 않는지 확인합니다.
+
 ### 2단계. 입력 (다이얼, 클릭)
 - 폰 → ESP 입력을 `loop()`에서 합칩니다.
 - 가상 다이얼: 원을 드래그하면 15°마다 `rotate ±1`, 짧게 누르면 클릭. 세밀 조정용 `−10 −1 +1 +10` 버튼.

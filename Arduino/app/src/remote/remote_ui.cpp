@@ -19,41 +19,25 @@ void begin() {
 #include <stdlib.h>
 #include <string.h>
 
-#define REMOTE_STR2(x) #x
-#define REMOTE_STR(x)  REMOTE_STR2(x)
+#include "remote_page.h"   // web/index.html (scripts/gen_remote_page.py)
 
 namespace remote {
 namespace {
 
-// Stage 0 page : the 8 screen lines and a few input buttons (no dial yet).
-const char PAGE[] PROGMEM = R"HTML(<!doctype html><html><head><meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1"><title>Telescope</title>
-<style>body{background:#000;color:#d00;font-family:monospace;margin:12px}
-pre{font-size:5vw;line-height:1.15;border:1px solid #400;padding:6px;margin:0 0 12px}
-button{background:#200;color:#f22;border:1px solid #600;font-size:20px;padding:12px 0;width:18%}
-#st,#rx{font-size:14px;margin-top:8px}</style></head><body>
-<pre id="scr">connecting...</pre>
-<div><button onclick="s({rotate:-10})">-10</button> <button onclick="s({rotate:-1})">-1</button>
-<button onclick="s({click:1})">OK</button> <button onclick="s({rotate:1})">+1</button>
-<button onclick="s({rotate:10})">+10</button></div>
-<div id="st">-</div><div id="rx"></div>
-<script>var ws;function c(){ws=new WebSocket('ws://'+location.hostname+':)HTML" REMOTE_STR(REMOTE_UI_WS_PORT) R"HTML(/');
-ws.onopen=function(){st.textContent='connected'};
-ws.onclose=function(){st.textContent='disconnected';setTimeout(c,1000)};
-ws.onmessage=function(e){var m=JSON.parse(e.data);if(m.lines)scr.textContent=m.lines.join('\n');
-if(m.rx)rx.textContent='ESP received: rotate '+m.rx.rotate+', click '+m.rx.click}}
-function s(o){if(ws&&ws.readyState==1)ws.send(JSON.stringify(o))}c();</script></body></html>)HTML";
+// Stage 1: mirror only. The page shows its input buttons when this is true (stage 2).
+constexpr bool INPUT_ENABLED = false;
+constexpr unsigned long RESEND_MS = 1000;   // resend an unchanged frame (page "no data" check)
 
 ESP8266WebServer http(REMOTE_UI_HTTP_PORT);
 WebSocketsServer ws(REMOTE_UI_WS_PORT);
 
 Frame last;               // last frame sent
 bool  force_send = true;  // a new client needs the current frame
+unsigned long sent_ms = 0;
 // worst case: 8 lines x 21 chars x 6 bytes ("\u00XX") + quotes and commas
 char  json[16 + Frame::LINES * ((Frame::COLS - 1) * 6 + 3)];
 
-int  pending_rotate = 0, pending_clicks = 0;  // since takeInput()
-long total_rotate   = 0, total_clicks   = 0;  // since boot (echoed back to the phone)
+int pending_rotate = 0, pending_clicks = 0;  // since takeInput()
 
 // JSON string body of one screen line (same escaping as the UI simulator runner)
 size_t appendLine(char* out, size_t pos, const char* line) {
@@ -90,32 +74,19 @@ bool findInt(const char* msg, const char* key, long& value) {
 
 void onWsEvent(uint8_t num, WStype_t type, uint8_t* payload, size_t length) {
   if (type == WStype_CONNECTED) {
+    ws.sendTXT(num, INPUT_ENABLED ? "{\"hello\":{\"input\":true}}" : "{\"hello\":{\"input\":false}}");
     force_send = true;
     return;
   }
+  if (!INPUT_ENABLED) return;
   if (type != WStype_TEXT || length == 0 || length > 64) return;
   char msg[65];
   memcpy(msg, payload, length);
   msg[length] = '\0';
 
   long v = 0;
-  bool got = false;
-  if (findInt(msg, "\"rotate\"", v) && v >= -100 && v <= 100) {
-    pending_rotate += (int)v;
-    total_rotate   += v;
-    got = true;
-  }
-  if (findInt(msg, "\"click\"", v) && v > 0) {
-    pending_clicks += 1;
-    total_clicks   += 1;
-    got = true;
-  }
-  if (got) {
-    char ack[64];
-    int n = snprintf(ack, sizeof(ack), "{\"rx\":{\"rotate\":%ld,\"click\":%ld}}",
-                     total_rotate, total_clicks);
-    ws.sendTXT(num, ack, n);
-  }
+  if (findInt(msg, "\"rotate\"", v) && v >= -100 && v <= 100) pending_rotate += (int)v;
+  if (findInt(msg, "\"click\"", v) && v > 0) pending_clicks += 1;
 }
 
 } // namespace
@@ -127,7 +98,7 @@ void begin() {
   // one station at a time : only one phone can drive the mount
   WiFi.softAP(REMOTE_UI_AP_SSID, REMOTE_UI_AP_PASS, REMOTE_UI_AP_CHANNEL, 0, 1);
 
-  http.on("/", []() { http.send_P(200, "text/html", PAGE); });
+  http.on("/", []() { http.send_P(200, "text/html; charset=utf-8", REMOTE_PAGE); });
   http.onNotFound([]() { http.send(404, "text/plain", "not found"); });
   http.begin();
 
@@ -145,9 +116,12 @@ void publish(const Frame& frame) {
     force_send = true;
     return;
   }
-  if (!force_send && memcmp(last.lines, frame.lines, sizeof(last.lines)) == 0) return;
+  const unsigned long now = millis();
+  if (!force_send && now - sent_ms < RESEND_MS &&
+      memcmp(last.lines, frame.lines, sizeof(last.lines)) == 0) return;
   memcpy(last.lines, frame.lines, sizeof(last.lines));
   force_send = false;
+  sent_ms = now;
 
   size_t pos = 0;
   memcpy(json, "{\"lines\":[", 10);

@@ -193,7 +193,7 @@ void loop() {
   memcpy(monitor->msg, frame.lines, sizeof(frame.lines));
   monitor->print();
   remote::publish(frame);   // phone mirror (only when the lines changed)
-  // Stage 0: remote input is received and counted but not merged yet (stage 2).
+  // Stage 1: mirror only. Remote input is merged with the rotary in stage 2.
 
   // Outputs (tracking overrides the manual RRcmd while it is on)
   astro::applyTracking(ui_ctx.tel, ui_ctx.state, RA_DUTY_AT_SIDEREAL);

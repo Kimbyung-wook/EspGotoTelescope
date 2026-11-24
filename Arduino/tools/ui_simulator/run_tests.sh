@@ -14,3 +14,5 @@ done
 "$CXX" "${CXXFLAGS[@]}" "${INCLUDES[@]}" \
   "$HERE"/tests/test_*.cpp "${SRCS[@]}" "${FIRMWARE_SRCS[@]}" -o "$OUT/ui_tests.exe"
 "$OUT/ui_tests.exe"
+# The phone page embedded in the firmware must match web/index.html
+python "$HERE/../../scripts/gen_remote_page.py" --check

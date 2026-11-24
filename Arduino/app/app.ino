@@ -1,779 +1,211 @@
 /************************************/
-// Include Headers
+// SimpleGoTo - NodeMCU v3 (ESP8266)
+//   OLED SSD1306, rotary encoder, ICM20948 IMU, Adafruit Ultimate GPS,
+//   RA axis DC motor on an H-bridge
 /************************************/
-#include "oled.h"
-#include "gps.h"
-#include "tictok_us.h"
-#include "esp_12f.h"
+#include "src/board_config.h"
+#include "src/version.h"
 
-#include <Adafruit_ICM20X.h>
-#include <Adafruit_ICM20948.h>
-#include <Adafruit_Sensor.h>
-
-#define min(x, y) (x) < (y) ? (x) : (y)// -> x, y중에 작은값 반환
-#define max(x, y) (x) > (y) ? (x) : (y)// -> x, y중에 큰값 반환
-
-void setRotaryRight();
-void setRotaryLeft();
-void setRotaryNeutral();
-void updateRotary();
-void updateMenuCursor();
-
-
-/************************************/
-// Define Devices
-/************************************/
-#define GPS_PORT Serial
-// #define DEBUG_PORT Serial1
+#if defined(F_CPU) && F_CPU != 160000000L
+#warning "Build at 160 MHz (Arduino IDE: Tools > CPU Frequency > 160 MHz, or scripts/build.sh)"
+#endif
+#include "src/display/oled.h"
+#include "src/gps/gps.h"
+#include "src/util/stopwatch_us.h"
+#include "src/util/loop_timer.h"
+#include "src/input/rotary.h"
+#include "src/sensors/imu.h"
+#include "src/sensors/battery.h"
+#include "src/motor/ra_motor.h"
+#include "src/app/core.h"
+#include "src/app/boot_text.h"
+#include "src/remote/remote_ui.h"
+#include "src/config/eeprom_store.h"
 
 /************************************/
-// Display Settings
+// Devices
 /************************************/
-OLED* monitor           = new OLED();
-GPS* gps                = new GPS(&GPS_PORT);
-Adafruit_ICM20948 imu;
-sensors_event_t accel;
-sensors_event_t gyro;
-sensors_event_t mag;
-sensors_event_t temp;
-
-Tictok_us* perform_main = new Tictok_us();
-Tictok_us* perform_rest = new Tictok_us();
-Tictok_us* perform_imu  = new Tictok_us();
-// Simple Scheduler
-float hz = 10.0f;
-unsigned long last_loop_time  = micros();
-unsigned long now_loop_time   = micros();
-unsigned long size_loop_time  = 1000 * (1000 / hz);
-unsigned long delta_loop_time = 0;
+Oled    oled;
+Gps     gps(&GPS_PORT);
+Imu     imu;
+RaMotor ra_motor(MOTOR_PWM, MOTOR_IN1, MOTOR_IN2);
+Rotary  rotary(BUTTON_S1, BUTTON_S2, BUTTON_KEY);
+BatteryMonitor battery(VBAT_FULL_SCALE_V, VBAT_FILTER_ALPHA);
+unsigned long  battery_read_ms = 0;
 
 /************************************/
-// Rotary Button 
+// Everything that is not hardware: estimation, location/time, astro, UI, settings
+// (src/app/core.h, the same code the UI simulator runs)
 /************************************/
-// Rotary Encoder Inputs
-#define BUTTON_KEY  GPIO_D4
-#define BUTTON_S1   GPIO_D6
-#define BUTTON_S2   GPIO_D7
-#define PWM1        GPIO_D5
-#define PWM2        GPIO_D8
-#define PWM3        GPIO_D3
-#define MOTOR_IN1   GPIO_D0
-#define MOTOR_IN2   GPIO_D3
+const float hz = MAIN_LOOP_HZ;
+app::Core   core(hz, micros);
+Frame       frame;
+int         rotary_count_prev = 0;
 
-volatile int rotary_pulse_s1 = 0;
-volatile int rotary_pulse_s2 = 0;
-volatile unsigned long rotary_last_pulse_s1 = 0;
-volatile unsigned long rotary_last_pulse_s2 = 0;
-volatile int rotary_state = 0;
-volatile int rotary_state_prev = 0;
-volatile int rotary_state_s1 = 0;
-volatile int rotary_state_s2 = 0;
-volatile int rotary_counter = 0;
-volatile int rotary_counter_prev = 0;
-volatile int rotary_counter_interval = 0;
-volatile int rotary_right = false;
-volatile int rotary_direction = 0;
-volatile int rotary_left = false;
-volatile int rotary_event = true;
+/************************************/
+// Settings in flash (docs/REQUIREMENTS.md DES-CFG)
+/************************************/
+config::EepromSettingsStore settings_store;
 
-volatile int button_counter = 0;
-volatile int button_clicked = false;
-volatile int did_button_clicked = false;
-volatile unsigned long button_last_press = 0;
+static_assert(Frame::LINES == Oled::ROWS && Frame::COLS == Oled::COLS, "Frame and OLED lines must match");
 
-int rotation_speed_cnt_prev = 0;
-float rotation_speed = 0.0f;
-float rotation_speed_prev = 0.0f;
+/************************************/
+// Performance and simple scheduler
+/************************************/
+StopwatchUs perform_main;
+StopwatchUs perform_rest;
+StopwatchUs perform_imu;
+LoopTimer   loop_timer((unsigned long)(1000000.0f / hz));
 
-char main_menu_string[10][21]={
-  "%c1RA Speed",
-  "%c2Status - GPS",
-  "%c3Status - Acc/Gyro",
-  "%c4Status - Mag/Alt",
-  "%c5Status - IMUCalib",
-  "%c6Do IMU Calib.",
-  "%c7Att.Estimator",
-  "%c8Health",
-  "%c9Axis for Moon",
-  "%cSleep"
-};
+// One boot message per line (in 'frame'); when the screen is full the lines scroll
+// up (line 0, the name and version, stays).
+void bootLine(int& line, const char* text) {
+  if (line >= Frame::LINES) {
+    memmove(frame.lines[1], frame.lines[2], (Frame::LINES - 2) * Frame::COLS);
+    line = Frame::LINES - 1;
+  }
+  snprintf(frame.lines[line++], Frame::COLS, "%s", text);
+  oled.print(frame.lines);
+}
 
-char cursor[6];
-char cursor_icon = '>';
-int cursor_pos = 0;
-int menu_index = 0;
-int menu_index_max = 0;
-int menu_index_first = 0;
-
-
-float ax, ay, az;
-float wx, wy, wz;
-float mx, my, mz;
-float bax, bay, baz;
-float bwx, bwy, bwz;
-float temperature;
-float grav;
-float phi_acc;
-float theta_acc;
-unsigned long last_calib_time_since = micros();
-
-
-typedef enum Menu{
-  main_menu = 0,
-  
-  ra_speed = 1,
-  status_gps = 2,
-  status_acc_gyro = 3,
-  status_mag_temp = 4,
-  status_imu_calib = 5,
-  do_imu_calib = 6,
-  att_est = 7,
-  health = 8,
-  moon_axis = 9,
-  sleep = 10,
-
-  ra_speed_select = 100,
-  calib_acc_bias = 101,
-  calib_acc_scale = 102,
-  calib_gyro_bias = 103,
-  calib_gyro_scale = 104,
-}Menu;
+// Shows a "starting ..." text on the next line without moving to it
+void bootPending(int& line, const char* text) {
+  bootLine(line, text);
+  line--;                 // the next bootLine() overwrites it
+}
 
 void setup() {
   int line = 0;
-  int system_on = true;
-  /************************************/
-  // Display Initialization
-  /************************************/
-  int monitor_on  = monitor->setup_display();
-  system_on = system_on & monitor_on;
-  sprintf(monitor->msg[line++], "1. Display is ON");
-  monitor->print();
-
-  /************************************/
-  // IMU Setup - ICM 20948
-  /************************************/
-  sprintf(monitor->msg[line], "2. Intialize IMU");
-  int imu_on = imu.begin_I2C();
-  system_on = system_on & imu_on;
-  if(imu_on == true)    sprintf(monitor->msg[line++], "2. IMU is ON");
-  else                  sprintf(monitor->msg[line++], ">> IMU failed");
-
-  imu.setAccelRange(ICM20948_ACCEL_RANGE_16_G);
-  switch (imu.getAccelRange()) {
-  case ICM20948_ACCEL_RANGE_2_G:
-    sprintf(monitor->msg[line++], "Acc +-2G");
-    break;
-  case ICM20948_ACCEL_RANGE_4_G:
-    sprintf(monitor->msg[line++], "Acc +-4G");
-    break;
-  case ICM20948_ACCEL_RANGE_8_G:
-    sprintf(monitor->msg[line++], "Acc +-8G");
-    break;
-  case ICM20948_ACCEL_RANGE_16_G:
-    sprintf(monitor->msg[line++], "Acc +-16G");
-    break;
-  }
-  uint16_t accel_divisor = imu.getAccelRateDivisor();
-  float accel_rate = 1125 / (1.0 + accel_divisor);
-  monitor->print();
-
-  imu.setGyroRange(ICM20948_GYRO_RANGE_250_DPS);
-  switch (imu.getGyroRange()) {
-  case ICM20948_GYRO_RANGE_250_DPS:
-    sprintf(monitor->msg[line++], "Gyro 250 dps");
-    break;
-  case ICM20948_GYRO_RANGE_500_DPS:
-    sprintf(monitor->msg[line++], "Gyro 500 dps");
-    break;
-  case ICM20948_GYRO_RANGE_1000_DPS:
-    sprintf(monitor->msg[line++], "Gyro 1000 dps");
-    break;
-  case ICM20948_GYRO_RANGE_2000_DPS:
-    sprintf(monitor->msg[line++], "Gyro 2000 dps");
-    break;
-  }
-  uint8_t gyro_divisor = imu.getGyroRateDivisor();
-  float gyro_rate = 1100 / (1.0 + gyro_divisor);
-  monitor->print();
-
-  imu.setMagDataRate(AK09916_MAG_DATARATE_10_HZ);
-  switch (imu.getMagDataRate()) {
-  case AK09916_MAG_DATARATE_SHUTDOWN:
-    sprintf(monitor->msg[line++], "Mag Shutdown");
-    break;
-  case AK09916_MAG_DATARATE_SINGLE:
-    sprintf(monitor->msg[line++], "Mag Single/One shot");
-    break;
-  case AK09916_MAG_DATARATE_10_HZ:
-    sprintf(monitor->msg[line++], "Mag 10 Hz");
-    break;
-  case AK09916_MAG_DATARATE_20_HZ:
-    sprintf(monitor->msg[line++], "Mag 20 Hz");
-    break;
-  case AK09916_MAG_DATARATE_50_HZ:
-    sprintf(monitor->msg[line++], "Mag 50 Hz");
-    break;
-  case AK09916_MAG_DATARATE_100_HZ:
-    sprintf(monitor->msg[line++], "Mag 100 Hz");
-    break;
-  }
-  monitor->print();
-
-  /************************************/
-  // GPS Setup
-  /************************************/
-  sprintf(monitor->msg[line], "3. Intialize GPS");
-  monitor->print();
-  int gps_on      = gps->setup_gps();
-  system_on = system_on & gps_on;
-  if(gps_on == true)    sprintf(monitor->msg[line++], "3. GPS is ON");
-  else                  sprintf(monitor->msg[line++], ">> GPS is timeout");
-  monitor->print();
-  /************************************/
-  // Rotary Button Setup
-  /************************************/
-	// Set encoder pins as inputs
-  sprintf(monitor->msg[line], "4. Intialize Buttons");
-  monitor->print();
-	pinMode(BUTTON_S1,  INPUT);
-	pinMode(BUTTON_S2,  INPUT);
-	pinMode(BUTTON_KEY, INPUT_PULLUP);
-  attachInterrupt(digitalPinToInterrupt(BUTTON_S1),  isr_rotary_s1,     FALLING);
-  attachInterrupt(digitalPinToInterrupt(BUTTON_S2),  isr_rotary_s2,     FALLING);
-  attachInterrupt(digitalPinToInterrupt(BUTTON_KEY), isr_button_click,  RISING);
-  sprintf(monitor->msg[line++], "4. Buttons are ON");
-  monitor->print();
-  /************************************/
-  // PWM
-  /************************************/
-  pinMode(PWM2, OUTPUT);
-  analogWrite(PWM2, 120);
-  sprintf(monitor->msg[line++], "5. GPIO/PWM is ON");
-  pinMode(MOTOR_IN1, OUTPUT);
-  pinMode(MOTOR_IN2, OUTPUT);
-  analogWrite(MOTOR_IN1, LOW);
-  analogWrite(MOTOR_IN2, LOW);
-  monitor->print();
-}
-
-void loop() {	
-  perform_main->tic();
-  gps->read_all();
-  double latitude  = ((double)gps->gps_device->latitude_fixed)*1E-7;
-  double longitude = ((double)gps->gps_device->longitude_fixed)*1E-7;
-
-  perform_imu->tic();
-  imu.getEvent(&accel, &gyro, &temp, &mag);
-  ax =-accel.acceleration.x;
-  ay = accel.acceleration.y;
-  az = accel.acceleration.z;
-  wx = gyro.gyro.x;
-  wy =-gyro.gyro.y;
-  wz =-gyro.gyro.z;
-  mx = mag.magnetic.x;
-  my = mag.magnetic.y;
-  mz = mag.magnetic.z;
-  temperature = temp.temperature;
-  grav      = sqrt(ax*ax + ay*ay + az*az);
-  phi_acc   = atan2(ay, az) * 57.296f;
-  theta_acc = asin(-ax/grav)  * 57.296f;
-  perform_imu->toc();
-
-
-
+#if !REMOTE_UI_ENABLE
+  remote::begin();   // Wi-Fi off (REMOTE_UI_ENABLE 0)
+#endif
   /************************************/
   // Display
   /************************************/
-  // Top Window
-  sprintf(monitor->msg[0], "T %2d:%2d:%2d.%1d V %5.2f",
-          gps->gps_device->hour, gps->gps_device->minute,
-          gps->gps_device->seconds, gps->gps_device->milliseconds/100, 12.60f);
-  // sprintf(monitor->msg[1], "Button %2d Rotary %2d",
-  //         button_counter, rotary_counter);
+  oled.begin();      // nothing to show if it fails
+  bootLine(line, boot::TITLE);
+  char cpu_line[Frame::COLS];
+  boot::displayLine(cpu_line, sizeof(cpu_line), ESP.getCpuFreqMHz());
+  bootLine(line, cpu_line);
 
-  // Sub Window
-  switch(menu_index)
-  {
-    case Menu::main_menu:
-    {
-      menu_index_max = 10;
-      updateMenuCursor();
-      menu_index_first = max(0, rotary_counter_interval - cursor_pos - 1);
-      
-      sprintf(monitor->msg[1], "Main Menu");
-      sprintf(monitor->msg[2], main_menu_string[0 + menu_index_first], cursor[0]);
-      sprintf(monitor->msg[3], main_menu_string[1 + menu_index_first], cursor[1]);
-      sprintf(monitor->msg[4], main_menu_string[2 + menu_index_first], cursor[2]);
-      sprintf(monitor->msg[5], main_menu_string[3 + menu_index_first], cursor[3]);
-      sprintf(monitor->msg[6], main_menu_string[4 + menu_index_first], cursor[4]);
-      sprintf(monitor->msg[7], main_menu_string[5 + menu_index_first], cursor[5]);
-      
-      if(did_button_clicked == true)
-      {
-        menu_index = menu_index_first + cursor_pos + 1;
-        cursor_pos = 0;
-      }
-    }
-    break;
-    case Menu::ra_speed:
-    {
-      menu_index_max = 3-1;
-      updateMenuCursor();
-      sprintf(monitor->msg[1], main_menu_string[menu_index-1], '*');
-      sprintf(monitor->msg[2], "%cRRcmd %10.5fDEG", cursor[0], rotation_speed);
-      sprintf(monitor->msg[3], "%cRRate %10.5fDEG", cursor[1], wx);
-      sprintf(monitor->msg[4], "%cQuit"           , cursor[2]);
-      sprintf(monitor->msg[5], " ROL %10.5f  DEG",  phi_acc);
-      sprintf(monitor->msg[6], " LAT %c%10.6fDEG", gps->gps_device->lat, latitude);
-      sprintf(monitor->msg[7], " PIT %10.5f  DEG",  theta_acc);
-      if(did_button_clicked == true)
-      {
-        if(cursor_pos == 0)
-        {
-          menu_index = Menu::ra_speed_select;
-          rotary_counter_prev = rotary_counter;
-        }
-        else if(cursor_pos == menu_index_max)
-        {
-          rotary_counter_prev = rotary_counter - menu_index + 1;
-          menu_index = Menu::main_menu;
-        }
-      }
-    }
-    break;
-    case Menu::status_gps:
-    {
-      menu_index_max = 0;
-      char fixqual[5];
-      if(gps->gps_device->fixquality == 0)
-        sprintf(fixqual, "NoFix");
-      else if (gps->gps_device->fixquality == 1)
-        sprintf(fixqual, "GPS");
-      else if (gps->gps_device->fixquality == 2)
-        sprintf(fixqual, "DGPS");
-
-      sprintf(monitor->msg[1], main_menu_string[menu_index-1], '*');
-      sprintf(monitor->msg[2], "Date: 20%02d/%02d/%02d",      gps->gps_device->year, gps->gps_device->month, gps->gps_device->day);
-      sprintf(monitor->msg[3], "Time:   %02d:%02d:%02d.%03d", gps->gps_device->hour, gps->gps_device->minute, gps->gps_device->seconds, gps->gps_device->milliseconds);
-      sprintf(monitor->msg[4], "%5s Sat %2d",                 fixqual, (int)gps->gps_device->satellites);
-      sprintf(monitor->msg[5], " ");
-      sprintf(monitor->msg[6], " %c %12.8f DEG",              gps->gps_device->lat, latitude);
-      sprintf(monitor->msg[7], " %c %12.8f DEG",              gps->gps_device->lon, longitude);
-      if(did_button_clicked == true)
-      {
-        rotary_counter_prev = rotary_counter - menu_index + 1;
-        menu_index = Menu::main_menu;
-      }
-    }
-    break;
-    case Menu::status_acc_gyro:
-    {
-      menu_index_max = 0;
-      sprintf(monitor->msg[1], main_menu_string[menu_index-1], '*');
-      sprintf(monitor->msg[2],"Ax    %10.5f mpss", ax);
-      sprintf(monitor->msg[3],"Ay    %10.5f mpss", ay);
-      sprintf(monitor->msg[4],"Az    %10.5f mpss", az);
-      sprintf(monitor->msg[5],"Wx    %10.5f dps",  wx);
-      sprintf(monitor->msg[6],"Wy    %10.5f dps",  wy);
-      sprintf(monitor->msg[7],"Wz    %10.5f dps",  wz);
-      if(did_button_clicked == true)
-      {
-        rotary_counter_prev = rotary_counter - menu_index + 1;
-        menu_index = Menu::main_menu;
-      }
-    }
-    break;
-    case Menu::status_mag_temp:
-    {
-      sprintf(monitor->msg[1], main_menu_string[menu_index-1], '*');
-      sprintf(monitor->msg[2], "Mx   %10.5f uT", mx);
-      sprintf(monitor->msg[3], "My   %10.5f uT", my);
-      sprintf(monitor->msg[4], "Mz   %10.5f uT", mz);
-      sprintf(monitor->msg[5], "Temp %10.5f 'c ", temperature);
-      sprintf(monitor->msg[6], " ");
-      sprintf(monitor->msg[7], " ");
-      if(did_button_clicked == true)
-      {
-        rotary_counter_prev = rotary_counter - menu_index + 1;
-        menu_index = Menu::main_menu;
-      }
-    }
-    break;
-    case Menu::status_imu_calib:
-    {
-      sprintf(monitor->msg[1], main_menu_string[menu_index-1], '*');
-      sprintf(monitor->msg[2], "bAx  %10.5f mpss", 0.0f);
-      sprintf(monitor->msg[3], "bAy  %10.5f mpss", 0.0f);
-      sprintf(monitor->msg[4], "bAz  %10.5f mpss", 0.0f);
-      sprintf(monitor->msg[5], "bWx  %10.5f dps",  0.0f);
-      sprintf(monitor->msg[6], "bWy  %10.5f dps",  0.0f);
-      sprintf(monitor->msg[7], "bWz  %10.5f dps",  0.0f);
-      if(did_button_clicked == true)
-      {
-        rotary_counter_prev = rotary_counter - menu_index + 1;
-        menu_index = Menu::main_menu;
-      }
-    }
-    break;
-    case Menu::do_imu_calib:
-    {
-      menu_index_max = 6-1;
-      updateMenuCursor();
-      sprintf(monitor->msg[1], main_menu_string[menu_index-1], '*');
-      sprintf(monitor->msg[2], "%cAcc. Bias Calib", cursor[0]);
-      sprintf(monitor->msg[3], "%cAcc. Scale Calib", cursor[1]);
-      sprintf(monitor->msg[4], "%cGyro Bias Calib", cursor[2]);
-      sprintf(monitor->msg[5], "%cGyro Scale Calib", cursor[3]);
-      sprintf(monitor->msg[6], "%c", cursor[4]);
-      sprintf(monitor->msg[7], "%cQuit", cursor[5]);
-      if(did_button_clicked == true)
-      {
-        switch (cursor_pos)
-        {
-          case 0: // Acc Bias Calib
-          break;
-          case 1: // Acc Scale Calib
-          break;
-          case 2: // Gyro Bias Calib
-            menu_index = Menu::calib_gyro_bias;
-            last_calib_time_since = millis();
-          break;
-          case 3: // Gyro Scale Calib
-          break;
-          case 5:
-            menu_index = Menu::main_menu;
-          break;
-        }
-      }
-    }
-    break;
-    case Menu::att_est:
-    {
-      sprintf(monitor->msg[1], main_menu_string[menu_index-1], '*');
-      sprintf(monitor->msg[2], "ROLL   %10.5f DEG", phi_acc);
-      sprintf(monitor->msg[3], "PITCH  %10.5f DEG", theta_acc);
-      sprintf(monitor->msg[4], " ");
-      sprintf(monitor->msg[5], "Wx     %10.5f DPS", wx);
-      sprintf(monitor->msg[6], "Wy     %10.5f DPS", wy);
-      sprintf(monitor->msg[7], " ");
-      if(did_button_clicked == true)
-      {
-        rotary_counter_prev = rotary_counter - menu_index;
-        menu_index = Menu::main_menu;
-      }
-    }
-    break;
-    case Menu::health:
-    {
-      sprintf(monitor->msg[1], main_menu_string[menu_index-1], '*');
-      sprintf(monitor->msg[2], "Loop %6d/%5.1fHz", perform_rest->getdt() + perform_main->getdt(), hz);
-      sprintf(monitor->msg[3], "MAIN %6d", perform_main->getdt());
-      sprintf(monitor->msg[4], "DISP %6d", monitor->perform_print.getdt());
-      sprintf(monitor->msg[5], "GPS  %6d", gps->perform_read.getdt());
-      sprintf(monitor->msg[6], "IMU  %6d", perform_imu->getdt());
-      sprintf(monitor->msg[7], "EST  %6d", 0);
-      if(did_button_clicked == true)
-      {
-        rotary_counter_prev = rotary_counter - menu_index;
-        menu_index = Menu::main_menu;
-      }
-    }
-    break;
-    case Menu::moon_axis:
-    {
-      updateMenuCursor();
-      sprintf(monitor->msg[1], main_menu_string[menu_index-1], '*');
-      sprintf(monitor->msg[2], "ROLL  %10.5f DEG", phi_acc);
-      sprintf(monitor->msg[3], "PITCH %10.5f DEG", theta_acc);
-      sprintf(monitor->msg[4], "YAW   %10.5f DEG", 120.0012f);
-      sprintf(monitor->msg[5], "-- Moon --------");
-      sprintf(monitor->msg[6], "R.A.  %10.5f DEG",  37.0013f);
-      sprintf(monitor->msg[7], "DEC.  %10.5f DEG",-120.0014f);
-      if(did_button_clicked == true)
-      {
-        rotary_counter_prev = rotary_counter - menu_index;
-        menu_index = Menu::main_menu;
-      }
-    }
-    break;
-    case Menu::sleep:
-    {
-      sprintf(monitor->msg[1], " ");
-      sprintf(monitor->msg[2], " ");
-      sprintf(monitor->msg[3], " ");
-      sprintf(monitor->msg[4], " ");
-      sprintf(monitor->msg[5], " ");
-      sprintf(monitor->msg[6], " ");
-      sprintf(monitor->msg[7], " ");
-      if(did_button_clicked == true)
-      {
-        rotary_counter_prev = rotary_counter + 1;
-        menu_index = Menu::main_menu;
-      }
-    }
-    break;
-    case Menu::ra_speed_select:
-    {
-      rotation_speed = rotation_speed_prev + 1.0f * (rotary_counter - rotation_speed_cnt_prev);
-      // float spd = rotation_speed * 10.0f;
-      analogWrite(PWM2, fabs(rotation_speed));
-      if(rotation_speed == 0.0f)
-      {
-        analogWrite(MOTOR_IN1, LOW);
-        analogWrite(MOTOR_IN2, LOW);
-      }
-      else if (rotation_speed > 0.0f)
-      {
-        analogWrite(MOTOR_IN1, LOW);
-        analogWrite(MOTOR_IN2, HIGH);
-      }
-      else if (rotation_speed < 0.0f)
-      {
-        analogWrite(MOTOR_IN1, HIGH);
-        analogWrite(MOTOR_IN2, LOW);
-      }
-      sprintf(monitor->msg[1], "*Set RA Speed");
-      sprintf(monitor->msg[2], "%cRRcmd %10.5fDEG", cursor_icon, rotation_speed);
-      sprintf(monitor->msg[3], " RRate %10.5fDEG",  wx);
-      sprintf(monitor->msg[4], " Exit");
-      sprintf(monitor->msg[5], " ROL %10.5f  DEG",  phi_acc);
-      sprintf(monitor->msg[6], " LAT %c%10.6fDEG", gps->gps_device->lat, latitude);
-      sprintf(monitor->msg[7], " PIT %10.5f  DEG",  theta_acc);
-      if(did_button_clicked == true)
-      {
-        menu_index = Menu::ra_speed;
-      }
-      rotary_counter_prev = rotary_counter + 1;
-      rotation_speed_cnt_prev = rotary_counter;
-      rotation_speed_prev = rotation_speed;
-    }
-    break;
-    
-    case calib_acc_bias:
-    {
-      if(did_button_clicked == true)
-      {
-        rotary_counter_prev = rotary_counter - Menu::do_imu_calib + 0;
-        menu_index = Menu::do_imu_calib;
-      }
-    }
-    break;
-    case calib_acc_scale:
-    {
-      if(did_button_clicked == true)
-      {
-        rotary_counter_prev = rotary_counter - Menu::do_imu_calib + 1;
-        menu_index = Menu::do_imu_calib;
-      }
-    }
-    break;
-    case calib_gyro_bias:
-    {
-      float alpha = 0.01;
-      if((millis() - last_calib_time_since) < 1000)
-      {
-        bwx = wx;
-        bwy = wy;
-        bwz = wz;
-        sprintf(monitor->msg[1], "Calib Gyro Bias Ready");
-      }
-      else if((millis() - last_calib_time_since) < 6000)
-      {
-        alpha = 0.3;
-        bwx = (1.0 - alpha) * bwx + alpha * wx;
-        bwy = (1.0 - alpha) * bwy + alpha * wy;
-        bwz = (1.0 - alpha) * bwz + alpha * wz;
-        sprintf(monitor->msg[1], "Calib Gyro Bias ing.1");
-      }
-      else if((millis() - last_calib_time_since) < 16000)
-      {
-        alpha = 0.01;
-        bwx = (1.0 - alpha) * bwx + alpha * wx;
-        bwy = (1.0 - alpha) * bwy + alpha * wy;
-        bwz = (1.0 - alpha) * bwz + alpha * wz;
-        sprintf(monitor->msg[1], "Calib Gyro Bias ing.2");
-      }
-      else
-      {
-        sprintf(monitor->msg[1], "Calib Gyro Bias Done.");
-      }
-      sprintf(monitor->msg[2], "Wx %8.5f->%8.5f", wx, wx - bwx);
-      sprintf(monitor->msg[3], "Wy %8.5f->%8.5f", wy, wy - bwy);
-      sprintf(monitor->msg[4], "Wz %8.5f->%8.5f", wz, wz - bwz);
-      sprintf(monitor->msg[5], "bWx   %10.5f dps",  bwx);
-      sprintf(monitor->msg[6], "bWy   %10.5f dps",  bwy);
-      sprintf(monitor->msg[7], "bWz   %10.5f dps",  bwz);
-      if(did_button_clicked == true)
-      {
-        rotary_counter_prev = rotary_counter - Menu::do_imu_calib + 2;
-        menu_index = Menu::do_imu_calib;
-      }
-    }
-    break;
-    case calib_gyro_scale:
-    {
-      if(did_button_clicked == true)
-      {
-        rotary_counter_prev = rotary_counter - Menu::do_imu_calib + 3;
-        menu_index = Menu::do_imu_calib;
-      }
-    }
-    break;
-    default:
-    {
-      sprintf(monitor->msg[1], "ERROR");
-      sprintf(monitor->msg[2], " ");
-      sprintf(monitor->msg[3], " ");
-      sprintf(monitor->msg[4], " ");
-      sprintf(monitor->msg[5], " ");
-      sprintf(monitor->msg[6], " ");
-      sprintf(monitor->msg[7], " ");
-      if(did_button_clicked == true)
-      {
-        rotary_counter_prev = rotary_counter + 1;
-        menu_index = Menu::main_menu;
-      }
-    }
-  }
-  did_button_clicked = false;
-  if(cursor_icon == '>')
-    cursor_icon = '-';
-  else
-    cursor_icon = '>';
-  monitor->print();
-  
-  perform_main->toc();
   /************************************/
-  // Simple Scheduler
+  // IMU - ICM20948
   /************************************/
-  perform_rest->tic();
-  while(1){
-    now_loop_time = micros();
-    // Clock Overflow Case, each time after about 70 mins
-    if(now_loop_time < last_loop_time){
-      last_loop_time = 0;
-      break;
-    }
-    // Normal Case
-    else{
-      delta_loop_time = now_loop_time - last_loop_time;
-      if(delta_loop_time > size_loop_time){
-        last_loop_time = last_loop_time + size_loop_time;
-        break;
-      }
-    }
-  }
-  perform_rest->toc();
-}
-//3201 3201
+  bootPending(line, boot::IMU_PENDING);
+  bool imu_on = imu.begin();
+  bootLine(line, imu_on ? boot::IMU_ON : boot::IMU_FAILED);
+  bootLine(line, imu.accelRangeText());
+  bootLine(line, imu.gyroRangeText());
+  bootLine(line, imu.magRateText());
 
-// 0 -> 4 (2(0+1)+2) -> 10 (2*(4+1)+0) -> 23 (2*(10+1)+1)
-void setRotaryRight(){
-  rotary_counter++;
-  rotary_direction = 1; // left
-  rotary_event = true;
-}
-// 3102 3102
-// 0 -> 3 (2*(0+1)+1) -> 8 (2*(3+1)+0) -> 20 (2*(8+1)+2)
-void setRotaryLeft(){
-  rotary_counter--;
-  rotary_direction = -1; // right
-  rotary_event = true;
-}
-void setRotaryNeutral(){
-  rotary_event = false;
-  rotary_direction = 0; // neutral
-}
-void updateRotary(){
-  rotary_state_s1 = digitalRead(BUTTON_S1);
-  rotary_state_s2 = digitalRead(BUTTON_S2);
-  rotary_state = 2 * rotary_state_s1 + rotary_state_s2;
-  if(rotary_state_prev == 3 && rotary_state == 2){
-    setRotaryRight();
-  }
-  if(rotary_state_prev == 0 && rotary_state == 1){
-    setRotaryRight();
-  }
+  /************************************/
+  // GPS
+  /************************************/
+  bootPending(line, boot::GPS_PENDING);
+  bool gps_on = gps.begin();
+  bootLine(line, gps_on ? boot::GPS_ON : boot::GPS_TIMEOUT);
 
-  if(rotary_state_prev == 1 && rotary_state == 0){
-    setRotaryLeft();
-  }
-  if(rotary_state_prev == 2 && rotary_state == 3){
-    setRotaryLeft();
-  }
-  rotary_state_prev = rotary_state;
+  /************************************/
+  // Rotary encoder
+  /************************************/
+  bootPending(line, boot::BUTTONS_PENDING);
+  rotary.begin();
+  rotary_count_prev = rotary.count();
+  bootLine(line, boot::BUTTONS_ON);
+
+  /************************************/
+  // Motor
+  /************************************/
+  ra_motor.begin();
+  bootLine(line, boot::MOTOR_ON);
+
+  /************************************/
+  // Settings : calibration, RA duty, tracking offset (defaults if none or bad)
+  /************************************/
+  settings_store.begin();
+  const config::LoadResult settings_result = core.begin(settings_store);   // also starts the estimator
+  bootLine(line, config::loadText(settings_result));
+
+#if REMOTE_UI_ENABLE
+  /************************************/
+  // Remote UI : Wi-Fi AP + web page + WebSocket
+  /************************************/
+  remote::begin();
+  bootLine(line, boot::WIFI_AP);
+#endif
+
+  loop_timer.start(micros());
 }
 
-/************************************/
-// Interrupt Service Routines
-/************************************/
-// CW  (+, R) : S1 true,   S2 Rising
-// CCW (-, L) : S1 Rising, S2 true
-IRAM_ATTR void isr_rotary_s1(){
-  // prevent being clicked over twice at once
-  if(rotary_last_pulse_s1 - millis() < 30)
-    rotary_pulse_s1 = false;
-  else{
-    rotary_pulse_s1 = true;
-  }
-  rotary_last_pulse_s1 = millis();
+// Sensor values of this frame
+void readInputs(app::FrameInput& in) {
+  in.now_ms = millis();
+  in.gps = gps.data();
 
-  // processing rotary action
-  if(rotary_pulse_s1 == true){
-    rotary_pulse_s1 = false;
-    updateRotary();
+  in.imu = imu.data();
+  in.health.loop_hz = hz;
+  in.health.loop_us = perform_rest.last() + perform_main.last();
+  in.health.main_us = perform_main.last();
+  in.health.disp_us = oled.printUs();
+  in.health.gps_us  = gps.readUs();
+  in.health.imu_us  = perform_imu.last();   // est_us / astro_us: timed by core
+  in.remote = remote::state();                 // status bar Wi-Fi mark
+#if VBAT_SENSE_ENABLE
+  if (!battery.valid() || in.now_ms - battery_read_ms >= VBAT_PERIOD_MS) {
+    battery.update(analogRead(A0));
+    battery_read_ms = in.now_ms;
   }
+#endif
+  in.power.valid = battery.valid();
+  in.power.volts = battery.volts();
+  // Phone time from the remote UI page (DES-LOC-05)
+  in.phone_time = remote::takePhoneTime(in.phone_unix_s, in.phone_ms);
 }
 
-IRAM_ATTR void isr_rotary_s2(){
-  // prevent being clicked over twice at once
-  if(rotary_last_pulse_s2 - millis() < 30)
-    rotary_pulse_s2 = false;
-  else{
-    rotary_pulse_s2 = true;
-  }
-  rotary_last_pulse_s2 = millis();
+void loop() {
+  perform_main.start();
+  app::FrameInput in;
 
-  // processing rotary action
-  if(rotary_pulse_s2 == true){
-    rotary_pulse_s2 = false;
-    updateRotary();
-  }
-}
+  // Inputs
+  int  count = rotary.count();
+  in.delta = count - rotary_count_prev;
+  rotary_count_prev = count;
+  in.click = rotary.takeClick();
+  // Phone (remote UI): dial steps add to the rotary, a click counts like the button
+  int  remote_delta = 0;
+  bool remote_click = false;
+  remote::takeInput(remote_delta, remote_click);
+  in.delta += remote_delta;
+  in.click = in.click || remote_click;
 
-// Button Interrupt Routine
-IRAM_ATTR void isr_button_click(){
-  // prevent being clicked over twice at once
-  if(button_last_press - millis() < 500)
-    button_clicked = false;
-  else
-    button_clicked = true;
-  button_last_press = millis();
+  // Sensors
+  gps.read();
+  perform_imu.start();
+  imu.read();
+  perform_imu.stop();
+  readInputs(in);
 
-  // processing button action
-  // throw main loop the fact being clicked
-  if(button_clicked == true){
-    button_clicked = false;
-    did_button_clicked = true;
-    button_counter++;
-  }
-}
-void updateMenuCursor()
-{
-  rotary_counter_interval = rotary_counter - rotary_counter_prev;
-  if(rotary_counter_interval < 0)
-    rotary_counter_prev = rotary_counter;
-  else if(rotary_counter_interval > menu_index_max - 1)
-    rotary_counter_prev = rotary_counter - menu_index_max;
-  rotary_counter_interval = rotary_counter - rotary_counter_prev;
-  cursor_pos = min(max(0, rotary_counter_interval), 5);
+  // Estimation, position/time, astro, UI (src/app/core.h)
+  core.step(in, frame);
 
-  for (int i = 0; i < 6; i++)
-  {
-    if (i == cursor_pos)
-      cursor[i] = cursor_icon;
-    else
-      cursor[i] = ' ';
+  // Display
+  oled.setPower(core.displayOn());   // Sleep: OLED off, phone still mirrors
+  if (core.displayOn()) oled.print(frame.lines);
+  remote::publish(frame);   // phone mirror (only when the lines changed)
+
+  // Save / Reset from the UI, then the outputs (tracking overrides the manual RRcmd;
+  // calibration / Polar Align stop the motor)
+  ra_motor.setSpeed(core.finish(settings_store));
+
+  perform_main.stop();
+
+  /************************************/
+  // Simple scheduler : wait for the next period
+  /************************************/
+  perform_rest.start();
+  while (!loop_timer.due(micros())) {
+    remote::poll();   // HTTP / WebSocket (empty when REMOTE_UI_ENABLE is 0)
+    yield();
   }
+  perform_rest.stop();
 }

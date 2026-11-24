@@ -12,6 +12,7 @@ import sys
 
 import oled_render
 from runner_client import DEFAULT_RUNNER, RunnerClient
+from web_bridge import firmware_version
 
 TITLES = ["*1Target", "*2Polar Align", "*3Status", "*4Calibration", "*5Settings",
           "*6RA Speed", " "]   # Sleep blanks the title line
@@ -56,7 +57,8 @@ def main():
         check(c.hello["backend"] == "firmware", "backend is the firmware UI")
 
         f = c.step()
-        check(f["lines"][0] == "SimpleGoTo v0.3.1", "boot starts with the name and version", f)
+        name, version = firmware_version()
+        check(f["lines"][0] == "%s v%s" % (name, version), "boot starts with the name and version", f)
         for _ in range(100):
             f = c.step()
             if f["lines"][1] == "Main Menu":

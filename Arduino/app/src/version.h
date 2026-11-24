@@ -9,6 +9,6 @@
 //   Shown on the boot screen and on the phone page (remote UI hello).
 /************************************/
 #define SIMPLEGOTO_NAME    "SimpleGoTo"
-#define SIMPLEGOTO_VERSION "0.3.1"
+#define SIMPLEGOTO_VERSION "0.4.0"
 
 #endif // _VERSION_H_

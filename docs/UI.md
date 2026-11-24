@@ -301,7 +301,7 @@ In use GPS 21:00:08     ← 지금 쓰는 시각을 지역 시각으로
 ### 6RA Speed — 적경 축 모터 수동 구동
 ```
 *6RA Speed
->RRcmd    0.00000DEG    ← 클릭하면 편집 모드 (*Set RA Speed, 다이얼 한 칸 = 1)
+>RRcmd    0.00000PWM    ← 클릭하면 편집 모드 (*Set RA Speed, 다이얼 한 칸 = 1)
  RRate    0.00000DPS    ← 보정된 자이로로 잰 실제 회전 속도
  Quit
  ROL    0.00000  DEG

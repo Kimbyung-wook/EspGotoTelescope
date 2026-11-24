@@ -193,7 +193,7 @@ TEST(ui_ra_speed_edit_changes_command) {
   CHECK_STR(u.f.lines[1], "*Set RA Speed");
   u.step(-8);
   CHECK_NEAR(u.ctx.state.ra_speed_cmd, -3.0, 1e-6);
-  CHECK(u.has(2, "-3.00000DEG"));
+  CHECK(u.has(2, "-3.00000PWM"));
   u.click();                                     // finish editing
   CHECK(!u.ui.raSpeed().editing());
   u.step(+1);                                    // now moves the cursor, not the speed

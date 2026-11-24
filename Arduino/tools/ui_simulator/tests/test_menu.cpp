@@ -12,6 +12,10 @@
 #include "protocol.h"
 #include "ui/simplegoto_ui.h"
 #include "config/settings.h"
+#include "version.h"
+
+// Boot screen line 0 (from version.h, so a version bump needs no test change)
+#define BOOT_TITLE SIMPLEGOTO_NAME " v" SIMPLEGOTO_VERSION
 
 namespace {
 
@@ -89,7 +93,7 @@ void setRrcmd(Sim& s, int v) {
 void test_boot_then_main_menu() {
   Sim s;
   s.tick();
-  EXPECT_LINE(s, 0, "SimpleGoTo v0.3.1");
+  EXPECT_LINE(s, 0, BOOT_TITLE);
   EXPECT_LINE(s, 1, "");
   s.tick(sim::FirmwareUi::kBootLineFrames * 7);   // 8 lines: the screen is full
   EXPECT_LINE(s, 1, "1. Display ON 160MHz");
@@ -99,7 +103,7 @@ void test_boot_then_main_menu() {
   s.tick(sim::FirmwareUi::kBootLineFrames * 2);   // 10 lines: scrolled, line 0 stays
   EXPECT_SCREEN(s, {"Acc +-16G", "Gyro 250 dps", "Mag 10 Hz", "3. GPS is ON",
                     "4. Buttons are ON", "5. GPIO/PWM is ON", "6. Settings new"});
-  EXPECT_LINE(s, 0, "SimpleGoTo v0.3.1");
+  EXPECT_LINE(s, 0, BOOT_TITLE);
   s.tick(sim::FirmwareUi::kBootHoldFrames - 1);
   EXPECT_LINE(s, 7, "6. Settings new");   // boot log is still held
   s.tick();
@@ -211,16 +215,16 @@ void test_ra_speed_edit_drives_motor() {
   s.boot();
   s.rotate(5);
   s.click();
-  EXPECT_SCREEN(s, {"*6RA Speed", "?RRcmd    0.00000DEG", " RRate    0.00000DPS", " Quit",
+  EXPECT_SCREEN(s, {"*6RA Speed", "?RRcmd    0.00000PWM", " RRate    0.00000DPS", " Quit",
                     " ROL    0.00000  DEG", " LAT N 37.566500DEG", " PIT   -2.91874  DEG"});
   s.click();   // RRcmd -> edit mode
   EXPECT_LINE(s, 1, "*Set RA Speed");
   EXPECT_LINE(s, 4, " Exit");
   s.rotate(5);
-  EXPECT_LINE(s, 2, "?RRcmd    5.00000DEG");
+  EXPECT_LINE(s, 2, "?RRcmd    5.00000PWM");
   CHECK(s.motor().in1 == 0 && s.motor().in2 == 1 && s.motor().pwm == 5);
   s.rotate(-12);
-  EXPECT_LINE(s, 2, "?RRcmd   -7.00000DEG");
+  EXPECT_LINE(s, 2, "?RRcmd   -7.00000PWM");
   CHECK(s.motor().in1 == 1 && s.motor().in2 == 0 && s.motor().pwm == 7);
   s.rotate(7);
   CHECK(s.motor().in1 == 0 && s.motor().in2 == 0 && s.motor().pwm == 0);
@@ -228,7 +232,7 @@ void test_ra_speed_edit_drives_motor() {
   CHECK(s.motor().pwm == 255);   // duty limited by RaMotor
   s.click();   // finish editing, cursor back on RRcmd
   EXPECT_LINE(s, 1, "*6RA Speed");
-  EXPECT_LINE(s, 2, "?RRcmd  300.00000DEG");
+  EXPECT_LINE(s, 2, "?RRcmd  300.00000PWM");
   s.rotate(1);   // RRate is read-only
   s.click();
   EXPECT_LINE(s, 1, "*6RA Speed");
@@ -537,7 +541,7 @@ void test_settings_survive_reset() {
 
   s.send("{\"type\":\"reset\"}");
   s.tick();
-  EXPECT_LINE(s, 0, "SimpleGoTo v0.3.1");
+  EXPECT_LINE(s, 0, BOOT_TITLE);
   s.boot();
   openMain(s, 4);
   EXPECT_LINE(s, 2, "Flash: loaded");
@@ -606,7 +610,7 @@ void test_protocol_messages() {
   s.tick(3);
   CHECK(s.replies.size() == 3);
   CHECK(s.replies[2].find("\"seq\":2,\"t_ms\":200") != std::string::npos);
-  CHECK(s.replies[0].find("\"lines\":[\"SimpleGoTo v0.3.1\",\"\"") != std::string::npos);
+  CHECK(s.replies[0].find("\"lines\":[\"" BOOT_TITLE "\",\"\"") != std::string::npos);
   std::vector<std::string> r;
   CHECK(s.session.handleLine("{\"type\":\"quit\"}", r) == false);
 }

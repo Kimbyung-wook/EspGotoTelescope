@@ -4,10 +4,10 @@
 
 ```cpp
 #define SIMPLEGOTO_NAME    "SimpleGoTo"
-#define SIMPLEGOTO_VERSION "0.3.1"
+#define SIMPLEGOTO_VERSION "0.4.0"
 ```
 
-- 부팅 화면 첫 줄(`SimpleGoTo v0.3.1`)과 폰 원격 UI 페이지 맨 위에 나옵니다(접속 인사 `hello`의 `name`, `version`).
+- 부팅 화면 첫 줄(`SimpleGoTo v0.4.0`)과 폰 원격 UI 페이지 맨 위에 나옵니다(접속 인사 `hello`의 `name`, `version`).
 - PC 데모(`tools/ui_simulator/gui/web_bridge.py`)도 같은 파일을 읽어 보냅니다.
 
 ## 번호 규칙
@@ -20,6 +20,13 @@
 - 버전을 올리는 커밋은 메시지에 새 버전을 적습니다.
 
 ## 기록
+
+### 0.4.0 (2026-11-24)
+- 구조 정리([REFACTORING.md](REFACTORING.md) 0~6단계): 메인 루프 한 벌(`app::Core`, 보드와 시뮬레이터가 같이 씀), 앱 상태를 `app/`으로, 저장 설정 한 벌(`UiState::cfg`), 화면 파일 나누기(`ui/screens/`), 장치 코드(`Oled`, `Gps`, `StopwatchUs`) 정리. 저장 형식은 그대로.
+- GPS 링크 끊김: 3초 넘게 NMEA가 안 오면 Status > GPS에 `NoLink`, 남은 fix는 위치·시각 출처와 직전 GPS 저장에 쓰지 않음.
+- 직전 GPS 저장 조건에 HDOP 2.0 이하 추가(2D·3D fix 모두).
+- 6RA Speed의 `RRcmd` 단위를 `DEG`에서 `PWM`으로 고침.
+- 지자기 값도 설정으로 저장·복원(저장 형식은 그대로).
 
 ### 0.3.1 (2026-11-24)
 - 시각 순서를 GPS → 폰 시각 → 수동 시각으로 바꿈(0.3.0은 수동 시각이 폰 시각보다 앞).

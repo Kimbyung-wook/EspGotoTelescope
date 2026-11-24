@@ -29,6 +29,7 @@ GUI(`gui/simulator.py`)와 UI 러너(`build/ui_runner.exe`)가 주고받는 메�
 | `lat`, `lon` | 위도·경도 [deg], 북·동이 + | 37.5665, 126.9780 |
 | `fix` | Fix 품질: 0 NoFix, 1 GPS, 2 DGPS | 1 |
 | `sats` | 위성 수 | 8 |
+| `link` | GPS 링크(bool 또는 1/0). false면 3초 넘게 NMEA가 안 온 상태로, Status > GPS 4번째 줄 끝에 `NoLink` | true |
 
 `imu` 필드 (펌웨어 `loop()`에서 부호를 바꾼 **뒤**의 기체 좌표 값)
 

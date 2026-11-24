@@ -256,6 +256,12 @@ void test_gps_screen_shows_sensor_values() {
   s.tick();
   EXPECT_LINE(s, 4, "NoFix Sat  0");
   EXPECT_LINE(s, 5, "Pos ---  Time ---");   // no last fix yet (30 s needed)
+  s.send("{\"type\":\"sensors\",\"gps\":{\"link\":false}}");   // GPS unplugged
+  s.tick();
+  EXPECT_LINE(s, 4, "NoFix Sat  0 NoLink");
+  s.send("{\"type\":\"sensors\",\"gps\":{\"link\":1}}");
+  s.tick();
+  EXPECT_LINE(s, 4, "NoFix Sat  0");
 }
 
 // DES-LOC-02: a fix held for 30 s is kept (saved once); without GPS it is used,

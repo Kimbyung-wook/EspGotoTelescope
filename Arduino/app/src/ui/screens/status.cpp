@@ -9,7 +9,7 @@ void GpsStatusScreen::render(Frame& f, const UiContext& ctx, char /*blink*/) {
   renderTitle(f);
   f.set(2, "Date: 20%02d/%02d/%02d", t.gps.year % 100, t.gps.month % 100, t.gps.day % 100);
   f.set(3, "Time:   %02d:%02d:%02d.%03d", t.gps.hour % 100, t.gps.minute % 100, t.gps.seconds % 100, t.gps.milliseconds % 1000);
-  f.set(4, "%5s Sat %2d", fix, t.gps.satellites);
+  f.set(4, "%5s Sat %2d%s", fix, t.gps.satellites, t.gps.link ? "" : " NoLink");   // values above: last received
   f.set(5, "Pos %-4s Time %s", loc::sourceText(t.obs.loc_source), loc::timeSourceText(t.obs.time_source));
   f.set(6, " %c %12.8f DEG", t.gps.lat_hemi, t.gps.latitude);
   f.set(7, " %c %12.8f DEG", t.gps.lon_hemi, t.gps.longitude);

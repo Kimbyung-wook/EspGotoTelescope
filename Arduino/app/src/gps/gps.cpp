@@ -59,5 +59,6 @@ GpsRaw Gps::data() const {
   g.latitude     = ((double)device_.latitude_fixed)  * 1E-7;
   g.longitude    = ((double)device_.longitude_fixed) * 1E-7;
   g.altitude_m   = device_.altitude;
+  g.link         = link_alive_;
   return g;
 }

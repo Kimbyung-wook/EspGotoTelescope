@@ -158,6 +158,13 @@ TEST(ui_status_menu_and_info_screens) {
   CHECK_STR(u.f.lines[4], "  GPS Sat  8");
   CHECK_STR(u.f.lines[5], "Pos GPS  Time GPS");
   CHECK_STR(u.f.lines[6], " N  37.50000000 DEG");
+  t.gps.link = false;                            // no NMEA for 3 s: last values + NoLink
+  u.step(0);
+  CHECK_STR(u.f.lines[4], "  GPS Sat  8 NoLink");
+  CHECK_STR(u.f.lines[2], "Date: 2026/11/21");
+  t.gps.link = true;
+  u.step(0);
+  CHECK_STR(u.f.lines[4], "  GPS Sat  8");
   u.step(4);                                     // info screens ignore the dial
   u.click();
   CHECK(u.ui.manager().depth() == 2);

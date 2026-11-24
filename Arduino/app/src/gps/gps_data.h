@@ -10,6 +10,7 @@ struct GpsRaw {
   char lat_hemi = ' ', lon_hemi = ' ';
   double latitude = 0.0, longitude = 0.0;   // [deg], signed (S/W negative)
   float  altitude_m = 0.0f;                 // above mean sea level
+  bool   link = true;                       // NMEA arrived within Gps::LINK_TIMEOUT_MS
 };
 
 #endif // _GPS_DATA_H_

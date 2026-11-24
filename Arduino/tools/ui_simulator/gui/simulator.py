@@ -40,6 +40,7 @@ GPS_FIELDS = [
     ("milliseconds", "ms", 0),
     ("lat", "위도 [deg, +N]", 37.5665), ("lon", "경도 [deg, +E]", 126.9780),
     ("fix", "Fix (0 NoFix/1 GPS/2 DGPS)", 1), ("sats", "위성 수", 8),
+    ("link", "링크 (1 연결/0 끊김)", 1),
 ]
 IMU_FIELDS = [
     ("ax", "ax [m/s²]", 0.0), ("ay", "ay [m/s²]", 0.0), ("az", "az [m/s²]", G),
@@ -47,7 +48,7 @@ IMU_FIELDS = [
     ("mx", "mx [uT]", 20.0), ("my", "my [uT]", 0.0), ("mz", "mz [uT]", -40.0),
     ("temp", "온도 [°C]", 22.0),
 ]
-INT_KEYS = {"year", "month", "day", "hour", "minute", "seconds", "milliseconds", "fix", "sats"}
+INT_KEYS = {"year", "month", "day", "hour", "minute", "seconds", "milliseconds", "fix", "sats", "link"}
 
 
 class Simulator:

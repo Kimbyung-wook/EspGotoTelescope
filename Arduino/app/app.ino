@@ -172,6 +172,8 @@ void loop() {
   astro_ran |= astro::updateTargetTelemetry(target_tracker, ui_ctx.state.track_target, ui_ctx.tel);
   if (astro_ran) perform_astro.toc();
   ui_ctx.tel.ra_calibrated = RA_DUTY_AT_SIDEREAL > 0.0f;
+  // Where the tube points (IMU on the tube, polar-aligned mount)
+  astro::updateScopeTelemetry(ui_ctx.tel, IMU_TUBE_OPTICAL_AXIS, IMU_TUBE_DEC_AXIS);
 
   // UI -> display
   frame.clear();

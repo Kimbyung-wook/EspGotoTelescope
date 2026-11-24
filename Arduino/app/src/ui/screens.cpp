@@ -234,30 +234,44 @@ void TargetMenuScreen::render(Frame& f, const UiContext& ctx, char blink) {
   }
 }
 
+void TargetScreen::onRotate(int delta, UiContext& ctx) {
+  if (editing_) ctx.state.track_offset += OFFSET_STEP * delta;
+  else cursor_.move(delta);
+}
+
 void TargetScreen::onClick(ScreenManager& mgr, UiContext& ctx) {
-  if (cursor_.selected() == 0) ctx.state.tracking = !ctx.state.tracking;
-  else mgr.pop();
+  if (editing_) { editing_ = false; return; }
+  switch (cursor_.selected()) {
+    case 0: ctx.state.tracking = !ctx.state.tracking; break;
+    case 1: editing_ = true; break;
+    default: mgr.pop(); break;
+  }
 }
 
 void TargetScreen::render(Frame& f, const UiContext& ctx, char blink) {
   const Telemetry& t = ctx.tel;
   const UiState& st = ctx.state;
   f.set(1, "*%s", astro::targetName(static_cast<astro::Target>(st.track_target)));
-  const bool ok = t.target_valid && t.target_index == st.track_target;
+  const bool pending = t.target_index != st.track_target;   // chosen this frame, computed next
+  const bool ok = !pending && t.target_valid;
   if (ok) {
     f.set(2, "R.A.  %10.5f DEG", t.target_ra_deg);
     f.set(3, "DEC.  %10.5f DEG", t.target_dec_deg);
-    f.set(4, "ALT %6.2f AZ %6.2f", t.target_alt_deg, t.target_az_deg);
-    f.set(5, "HA %8.3f D%8.4f", t.target_ha_deg, t.target_dist);
-    f.set(6, "%cTrack %-3s %7.4f\"/s", cursor_.mark(0, blink), st.tracking ? "ON" : "OFF",
-          t.target_rate_arcsec_s);
   } else {
     f.set(2, "R.A.         ---");
     f.set(3, "DEC.         ---");
-    f.set(4, "   no GPS fix");
-    f.blank(5);
-    f.set(6, "%cTrack %-3s", cursor_.mark(0, blink), st.tracking ? "ON" : "OFF");
   }
-  f.set(7, "%cBack%s", cursor_.mark(1, blink),
+  if (pending)            f.set(4, "   computing...");
+  else if (!ok)           f.set(4, "   no GPS fix");
+  else if (t.scope_valid) f.set(4, "TEL %8.3f %+8.3f", t.scope_ra_deg, t.scope_dec_deg);
+  else                    f.set(4, "TEL          ---");
+  if (ok) {
+    f.set(5, "%cTrack %-3s %7.4f\"/s", cursor_.mark(0, blink), st.tracking ? "ON" : "OFF",
+          t.target_rate_arcsec_s);
+  } else {
+    f.set(5, "%cTrack %-3s", cursor_.mark(0, blink), st.tracking ? "ON" : "OFF");
+  }
+  f.set(6, "%cOffset %+8.1f PWM", editing_ ? blink : cursor_.mark(1, blink), st.track_offset);
+  f.set(7, "%cBack%s", cursor_.mark(2, blink),
         (st.tracking && !t.ra_calibrated) ? "   (RA uncal)" : "");
 }

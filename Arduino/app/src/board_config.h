@@ -40,6 +40,12 @@
 // Planet Tracking then computes the rate but does not drive the motor.
 #define RA_DUTY_AT_SIDEREAL 0.0f
 
+// ICM20948 on the telescope tube: which IMU body axis (1 = x, 2 = y, 3 = z,
+// negative = opposite direction) runs along the optical axis and along the Dec axis.
+// (assumed) Check: point the tube at the celestial pole -> Planet Tracking "TEL" Dec ~ +90.
+#define IMU_TUBE_OPTICAL_AXIS  1
+#define IMU_TUBE_DEC_AXIS      2
+
 /************************************/
 // Devices
 /************************************/

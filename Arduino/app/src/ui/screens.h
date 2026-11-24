@@ -106,16 +106,20 @@ private:
   GyroBiasCalibScreen gyro_bias_;
 };
 
-// Planet Tracking : position of the chosen target, tracking on/off
+// Planet Tracking : position of the chosen target and of the tube, tracking on/off,
+// speed offset (click Offset, turn the dial, click again)
 class TargetScreen : public Screen {
 public:
-  TargetScreen() : cursor_(2) {}
-  void onEnter(UiContext& /*ctx*/) override { cursor_.reset(); }
-  void onRotate(int delta, UiContext& /*ctx*/) override { cursor_.move(delta); }
+  static constexpr float OFFSET_STEP = 1.0f;   // PWM duty per detent
+  TargetScreen() : cursor_(3) {}
+  void onEnter(UiContext& /*ctx*/) override { cursor_.reset(); editing_ = false; }
+  void onRotate(int delta, UiContext& ctx) override;
   void onClick(ScreenManager& mgr, UiContext& ctx) override;
   void render(Frame& f, const UiContext& ctx, char blink) override;
+  bool editing() const { return editing_; }
 private:
-  MenuCursor cursor_;   // 0 Track on/off, 1 Back
+  MenuCursor cursor_;   // 0 Track on/off, 1 Offset, 2 Back
+  bool editing_ = false;
 };
 
 // Planet Tracking menu : Moon, Mercury .. Saturn, Quit (scrolls)

@@ -163,7 +163,10 @@ TEST(ui_planet_tracking_select_and_toggle) {
   u.step(2); u.step(0, true);                    // Mars
   CHECK(u.ctx.state.track_target == 3);
   CHECK_STR(u.f.lines[1], "*Mars");
-  CHECK_STR(u.f.lines[4], "   no GPS fix");      // no telemetry yet
+  CHECK_STR(u.f.lines[4], "   computing...");    // chosen this frame, computed by the next loop
+  u.ctx.tel.target_index = 3;                    // computed, but the GPS has no fix
+  u.step();
+  CHECK_STR(u.f.lines[4], "   no GPS fix");
   u.step(0, true);                               // Track on
   CHECK(u.ctx.state.tracking);
   CHECK_STR(u.f.lines[7], " Back   (RA uncal)");
@@ -174,12 +177,26 @@ TEST(ui_planet_tracking_select_and_toggle) {
   u.ctx.tel.target_rate_arcsec_s = 15.0236; u.ctx.tel.ra_calibrated = true;
   u.step();
   CHECK_STR(u.f.lines[2], "R.A.   151.48000 DEG");
-  CHECK_STR(u.f.lines[4], "ALT -27.89 AZ  41.35");
-  CHECK_STR(u.f.lines[5], "HA  123.456 D  1.2515");
+  CHECK_STR(u.f.lines[3], "DEC.    13.93000 DEG");
+  CHECK_STR(u.f.lines[4], "TEL          ---");   // no scope pointing yet
+  u.ctx.tel.scope_valid = true; u.ctx.tel.scope_ra_deg = 151.2; u.ctx.tel.scope_dec_deg = 13.5;
+  u.step();
+  CHECK_STR(u.f.lines[4], "TEL  151.200  +13.500");
   CHECK_STR(u.f.lines[7], " Back");
-  CHECK(u.f.lines[6][0] != ' ');
-  CHECK_STR(u.f.lines[6] + 1, "Track ON  15.0236\"/s");
-  u.step(1); u.step(0, true);                    // Back : tracking stays on
+  CHECK(u.f.lines[5][0] != ' ');
+  CHECK_STR(u.f.lines[5] + 1, "Track ON  15.0236\"/s");
+  CHECK_STR(u.f.lines[6], " Offset     +0.0 PWM");
+  u.step(1); u.step(0, true);                    // Offset : edit with the dial
+  u.step(3);
+  CHECK_NEAR(u.ctx.state.track_offset, 3.0, 1e-6);
+  u.step(-5);
+  CHECK_NEAR(u.ctx.state.track_offset, -2.0, 1e-6);
+  CHECK_STR(u.f.lines[6] + 1, "Offset     -2.0 PWM");
+  u.step(0, true);                               // done; the dial moves the cursor again
+  u.step(1);
+  CHECK_NEAR(u.ctx.state.track_offset, -2.0, 1e-6);
+  CHECK(u.f.lines[7][0] != ' ');
+  u.step(0, true);                               // Back : tracking stays on
   CHECK(u.ctx.state.tracking);
   CHECK_STR(u.f.lines[1], "*10Planet Tracking");
   CHECK_STR(u.f.lines[5] + 1, "Mars     TRACKING");

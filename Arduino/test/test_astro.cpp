@@ -217,7 +217,7 @@ TEST(astro_tracker_switches_target_immediately) {
   CHECK_NEAR(tr.state().topo.dist, 1.2515, 0.01);  // AU
 }
 
-TEST(astro_tracking_drives_motor_only_when_calibrated) {
+TEST(astro_tracking_command_is_rate_plus_offset) {
   TargetTracker tr(Target::Moon, 1000);
   Telemetry t;
   UiState st;
@@ -229,11 +229,84 @@ TEST(astro_tracking_drives_motor_only_when_calibrated) {
   st.ra_speed_cmd = 7.0f;
   CHECK(!applyTracking(t, st, 100.0f));           // tracking off
   st.tracking = true;
-  CHECK(!applyTracking(t, st, 0.0f));             // not calibrated: manual command kept
-  CHECK_NEAR(st.ra_speed_cmd, 7.0, 1e-9);
+  CHECK(applyTracking(t, st, 0.0f));              // not calibrated: offset only
+  CHECK_NEAR(st.ra_speed_cmd, 0.0, 1e-9);
+  st.track_offset = 12.0f;
+  CHECK(applyTracking(t, st, 0.0f));
+  CHECK_NEAR(st.ra_speed_cmd, 12.0, 1e-9);
   CHECK(applyTracking(t, st, 100.0f));
-  CHECK_NEAR(st.ra_speed_cmd, 100.0 * t.target_rate_arcsec_s / SIDEREAL_RATE_ARCSEC_S, 1e-4);
+  CHECK_NEAR(st.ra_speed_cmd, 100.0 * t.target_rate_arcsec_s / SIDEREAL_RATE_ARCSEC_S + 12.0, 1e-4);
+  st.track_offset = 0.0f;
   CHECK_NEAR(trackingDuty(SIDEREAL_RATE_ARCSEC_S, 80.0f), 80.0, 1e-4);
   st.track_target = 4;                            // target changed, data not there yet
   CHECK(!applyTracking(t, st, 100.0f));
+}
+
+// ---- pointing from gravity (equatorial mount)
+static bool poseMatches(const MountPose c[2], double h, double d, double tol) {
+  for (int k = 0; k < 2; k++) {
+    double dh = c[k].ha_deg - h;
+    while (dh > 180) dh -= 360;
+    while (dh < -180) dh += 360;
+    if (fabs(dh) * cos(d * 3.14159265358979 / 180) < tol && fabs(c[k].dec_deg - d) < tol) return true;
+    if (fabs(fabs(d) - 90) < tol && fabs(c[k].dec_deg - d) < tol) return true;   // at the pole HA is free
+  }
+  return false;
+}
+
+TEST(astro_pointing_round_trip_both_pier_sides) {
+  const double lat = 37.5665;
+  const double has[] = {-150, -90, -45, -10, 0, 20, 60, 120, 175};
+  const double decs[] = {-30, 0, 15, 45, 80};
+  for (double h : has)
+    for (double d : decs) {
+      double up[3];
+      upInTubeFrame(h, d, lat, up);                         // normal pose
+      MountPose c[2];
+      CHECK(poseCandidatesFromUp(up, lat, c));
+      CHECK(poseMatches(c, h, d, 1e-6));
+      upInTubeFrame(h + 180.0, 180.0 - d, lat, up);         // flipped pose, same sky point
+      CHECK(poseCandidatesFromUp(up, lat, c));
+      CHECK(poseMatches(c, h, d, 1e-6));
+    }
+}
+
+TEST(astro_pointing_picks_the_candidate_near_the_hint) {
+  const double lat = 37.5665, lst = 100.0;
+  double up[3];
+  upInTubeFrame(-40.0, 20.0, lat, up);                      // east of the meridian
+  Equatorial q;
+  CHECK(pointingFromUp(up, lat, lst, 140.0, 20.0, q));      // hint: RA = lst + 40
+  CHECK_NEAR(q.ra_deg, 140.0, 1e-6);
+  CHECK_NEAR(q.dec_deg, 20.0, 1e-6);
+  // a hint on the other side picks the mirror image
+  CHECK(pointingFromUp(up, lat, lst, 60.0, 20.0, q));
+  CHECK(fabs(q.ra_deg - 140.0) > 1.0);
+  // not consistent with the latitude
+  const double bad[3] = {0.0, 1.0, 0.0};
+  CHECK(!pointingFromUp(bad, lat, lst, 0.0, 0.0, q));
+}
+
+TEST(astro_scope_from_roll_pitch_level_tube_on_meridian) {
+  // Default IMU axes (x optical, y Dec). Tube level, pointing south on the meridian:
+  // the RA axis tilted by lat, so a level tube points at Dec = lat - 90.
+  Telemetry t;
+  t.year = 26; t.month = 11; t.day = 22; t.hour = 12; t.fixquality = 1;
+  t.latitude = 37.5665; t.longitude = 126.9780;
+  double up[3];
+  upInTubeFromRollPitch(0.0, 0.0, 1, 2, up);
+  CHECK_NEAR(up[0], 0.0, 1e-12);
+  CHECK_NEAR(up[1], 0.0, 1e-12);
+  CHECK_NEAR(up[2], 1.0, 1e-12);
+  CHECK(updateScopeTelemetry(t, 1, 2));
+  CHECK(t.scope_valid);
+  CHECK_NEAR(t.scope_dec_deg, t.latitude - 90.0, 1e-6);
+  // nose raised by 90 - lat from the south horizon (pitch < 0: up gets a +x part) -> equator
+  upInTubeFromRollPitch(0.0, -(90.0 - t.latitude), 1, 2, up);
+  Equatorial q;
+  CHECK(pointingFromUp(up, t.latitude, 0.0, 0.0, 0.0, q));
+  CHECK_NEAR(fabs(q.dec_deg), 0.0, 1e-6);
+  t.fixquality = 0;
+  CHECK(!updateScopeTelemetry(t, 1, 2));
+  CHECK(!t.scope_valid);
 }

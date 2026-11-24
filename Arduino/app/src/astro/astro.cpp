@@ -328,4 +328,64 @@ TargetState targetState(Target target, double jd_ut, const Observer& obs) {
   return s;
 }
 
+void upInTubeFrame(double h, double d, double lat, double up[3]) {
+  const double cp = cosd(lat), sp = sind(lat);
+  up[0] = cp * cosd(d) * cosd(h) + sp * sind(d);
+  up[1] = cp * sind(h);
+  up[2] = -cp * sind(d) * cosd(h) + sp * cosd(d);
+}
+
+namespace {
+MountPose foldPose(double h, double d) {
+  MountPose p;
+  d = wrap180(d);
+  if (d > 90.0)       { d = 180.0 - d;  h += 180.0; }
+  else if (d < -90.0) { d = -180.0 - d; h += 180.0; }
+  p.ha_deg = wrap180(h);
+  p.dec_deg = d;
+  return p;
+}
+
+double separationDeg(double ra1, double dec1, double ra2, double dec2) {
+  double c = sind(dec1) * sind(dec2) + cosd(dec1) * cosd(dec2) * cosd(ra1 - ra2);
+  if (c > 1.0) c = 1.0;
+  if (c < -1.0) c = -1.0;
+  return acos(c) * R2D;
+}
+}  // namespace
+
+bool poseCandidatesFromUp(const double up_in[3], double lat_deg, MountPose out[2]) {
+  const double n = sqrt(up_in[0] * up_in[0] + up_in[1] * up_in[1] + up_in[2] * up_in[2]);
+  if (n < 1e-9) return false;
+  const double ux = up_in[0] / n, uy = up_in[1] / n, uz = up_in[2] / n;
+  const double cp = cosd(lat_deg), sp = sind(lat_deg);
+  // u_y = cos(lat) sin(h);  u_x^2 + u_z^2 = cos^2(lat) cos^2(h) + sin^2(lat)
+  const double a2 = ux * ux + uz * uz - sp * sp;          // (cos(lat) cos h)^2
+  if (a2 < -0.05 || fabs(uy) > cp + 0.05) return false;   // allow sensor noise
+  const double a_abs = a2 > 0.0 ? sqrt(a2) : 0.0;
+  for (int k = 0; k < 2; k++) {
+    const double A = k == 0 ? a_abs : -a_abs;             // cos(lat) cos h, both signs
+    const double h = atan2(uy, A) * R2D;
+    const double d = atan2(sp * ux - A * uz, A * ux + sp * uz) * R2D;
+    out[k] = foldPose(h, d);
+  }
+  return true;
+}
+
+bool pointingFromUp(const double up[3], double lat_deg, double lst_deg,
+                    double hint_ra_deg, double hint_dec_deg, Equatorial& out) {
+  MountPose c[2];
+  if (!poseCandidatesFromUp(up, lat_deg, c)) return false;
+  int best = 0;
+  double best_sep = 1e9;
+  for (int k = 0; k < 2; k++) {
+    const double sep = separationDeg(wrap360(lst_deg - c[k].ha_deg), c[k].dec_deg, hint_ra_deg, hint_dec_deg);
+    if (sep < best_sep) { best_sep = sep; best = k; }
+  }
+  out.ra_deg = wrap360(lst_deg - c[best].ha_deg);
+  out.dec_deg = c[best].dec_deg;
+  out.dist = 0.0;
+  return true;
+}
+
 }  // namespace astro

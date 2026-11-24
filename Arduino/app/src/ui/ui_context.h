@@ -33,6 +33,10 @@ struct Telemetry {
   double target_rate_arcsec_s = 0.0;
   bool   ra_calibrated = false;            // RA_DUTY_AT_SIDEREAL is set (motor can track)
 
+  // Where the tube points, from the estimated roll/pitch (polar-aligned equatorial mount)
+  bool   scope_valid = false;
+  double scope_ra_deg = 0.0, scope_dec_deg = 0.0;
+
   // IMU
   ImuData imu;                              // raw (gyro bias not removed)
   ImuData imu_corr;                         // gyro bias removed
@@ -56,6 +60,7 @@ struct UiState {
   float accel_bias[3] = {0.0f, 0.0f, 0.0f}; // [m/s^2] (calibration not implemented)
   int   track_target = 1;                   // astro::Target index (1 = Mercury)
   bool  tracking = false;                   // RA motor follows the target rate
+  float track_offset = 0.0f;                // added to the tracking command [PWM duty]
 };
 
 struct UiContext {

@@ -391,7 +391,7 @@ void test_att_estimator_uses_gyro_bias() {
 }
 
 // Planet Tracking with the default GPS (2026-11-21 12:00:00 UT, Seoul); values from targetState().
-// RA_DUTY_AT_SIDEREAL is 0 (not calibrated), so tracking must not move the motor.
+// RA_DUTY_AT_SIDEREAL is 0 (not calibrated), so only the Offset moves the motor.
 void test_planet_tracking() {
   Sim s;
   s.boot();
@@ -401,13 +401,22 @@ void test_planet_tracking() {
   EXPECT_LINE(s, 3, "?Mercury");
   s.rotate(2);
   s.click();
+  EXPECT_LINE(s, 4, "   computing...");   // the first frame after choosing
   s.tick(1);
-  EXPECT_SCREEN(s, {"*Mars", "R.A.   151.06717 DEG", "DEC.    14.04876 DEG", "ALT -28.09 AZ  40.75",
-                    "HA -143.586 D  1.2602", "?Track OFF 15.0234\"/s", " Back"});
+  // TEL: the default IMU is level, so the tube points at the horizon; of the two mirror
+  // answers the one nearer Mars (north horizon, Dec = 90 - lat) is shown.
+  EXPECT_SCREEN(s, {"*Mars", "R.A.   151.06717 DEG", "DEC.    14.04876 DEG", "TEL  187.481  +52.434",
+                    "?Track OFF 15.0234\"/s", " Offset     +0.0 PWM", " Back"});
   s.click();   // Track on
-  EXPECT_LINE(s, 6, "?Track ON  15.0234\"/s");
+  EXPECT_LINE(s, 5, "?Track ON  15.0234\"/s");
   EXPECT_LINE(s, 7, " Back   (RA uncal)");
-  CHECK(s.motor().pwm == 0);
+  CHECK(s.motor().pwm == 0);   // not calibrated and no offset: the motor stays still
+  s.rotate(1);
+  s.click();   // edit Offset
+  s.rotate(20);
+  EXPECT_LINE(s, 6, "?Offset    +20.0 PWM");
+  CHECK(s.motor().pwm != 0);   // the offset alone drives the motor
+  s.click();   // done
   s.rotate(1);
   s.click();   // Back to the target list
   EXPECT_LINE(s, 5, "?Mars     TRACKING");

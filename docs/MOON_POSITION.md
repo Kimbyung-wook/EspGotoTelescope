@@ -189,7 +189,7 @@ Meeus, *Astronomical Algorithms* 예제 47.a(1992-04-12 0h)와 비교했습니�
 |---|---|
 | `Arduino/app/src/astro/astro.{h,cpp}` | JD, GMST/LST(IAU 1982), 태양·달(Schlyter + 섭동항), 행성(Standish J2000 요소, trackingPlanet.m과 같은 값), 관측지 보정(WGS84 벡터 차), 고도·방위, `moonState()`(±30 s 중앙차분으로 추적 속도 계산) |
 | `astro/target_tracker.h` | GPS 날짜 검사(2자리 연도 → 2000+), 대상(달·행성)별로 1 s 주기로만 다시 계산, 대상을 바꾸면 바로 계산, fix가 없으면 무효 |
-| `astro/target_telemetry.h` | `Telemetry`의 GPS 값 → 달 값 / 추적 대상 값, 추적 중 RA 모터 지령(`applyTracking`). `app.ino`와 UI 시뮬레이터가 함께 씀 |
+| `astro/target_telemetry.h` | `Telemetry`의 GPS 값 → 달 값 / 추적 대상 값, 추적 중 RA 모터 지령(`applyTracking`, 속도 + Offset), 경통 IMU 롤/피치 → 망원경 RA/Dec(`updateScopeTelemetry`). `app.ino`와 UI 시뮬레이터가 함께 씀 |
 | `Arduino/test/test_astro.cpp` | PC 정확도 시험 (아래 표) |
 | `Arduino/tools/astro_bench/` | 실측 시험 스케치: 보드에서 같은 예제를 계산해 PC 값과 비교하고, 함수별 실행 시간(µs)을 Serial/OLED로 출력 |
 
@@ -233,5 +233,5 @@ $env:SKETCH = 'tools/astro_bench'; bash Arduino/scripts/build.sh --library app/s
 
 **남은 일**
 
-- RA 모터 보정: 추적은 `RRcmd = RA_DUTY_AT_SIDEREAL × 추적속도 / 15.041`(개루프, 선형)로 모터 지령을 정합니다. `board_config.h`의 `RA_DUTY_AT_SIDEREAL`이 0이라 아직 모터는 움직이지 않습니다. 1 RA Speed 화면에서 별 하나를 따라가는 RRcmd 값을 찾아 넣어야 합니다. DC 모터는 PWM과 속도가 선형이 아니므로, 필요하면 여러 점을 측정해 표로 바꿉니다.
+- RA 모터 보정: 추적은 `RRcmd = RA_DUTY_AT_SIDEREAL × 추적속도 / 15.041`(개루프, 선형)로 모터 지령을 정합니다. 여기에 사용자 Offset(10 Planet Tracking > Offset, PWM)을 더합니다. `board_config.h`의 `RA_DUTY_AT_SIDEREAL`이 0이라 아직은 Offset만으로 모터가 돕니다. 별 하나를 따라가는 Offset 값을 찾아 `RA_DUTY_AT_SIDEREAL`에 넣어야 합니다. DC 모터는 PWM과 속도가 선형이 아니므로, 필요하면 여러 점을 측정해 표로 바꿉니다.
 - Yaw(방위) 추정이 없어 마운트가 달을 향하는지는 아직 판단하지 않습니다.

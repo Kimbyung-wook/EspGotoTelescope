@@ -121,6 +121,7 @@ void FirmwareUi::frame(unsigned long now_ms, const InputSnapshot& input,
   astro::updateMoonTelemetry(*moon_tracker_, ctx_->tel);
   astro::updateTargetTelemetry(*target_tracker_, ctx_->state.track_target, ctx_->tel);
   ctx_->tel.ra_calibrated = kRaDutyAtSidereal > 0.0f;
+  astro::updateScopeTelemetry(ctx_->tel, IMU_TUBE_OPTICAL_AXIS, IMU_TUBE_DEC_AXIS);
 
   ::Frame f;   // the firmware's frame type
   ui_->step(delta, input.clicked(), *ctx_, f);

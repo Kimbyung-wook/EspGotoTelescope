@@ -106,6 +106,23 @@ struct TargetState {
 };
 TargetState targetState(Target target, double jd_ut, const Observer& obs);
 
+// ---- telescope pointing from gravity, for a polar-aligned equatorial mount
+// Tube frame: x = optical axis, y = Dec axis, z = x cross y (toward increasing Dec
+// on the normal side). axis_ha_deg is the RA-axis angle (0: Dec axis horizontal,
+// east-west, tube on the meridian), dec_axis_deg the Dec-axis angle; |dec_axis| > 90
+// is the flipped (other pier side) pose.
+// Forward model: the local "up" unit vector seen in the tube frame.
+void upInTubeFrame(double axis_ha_deg, double dec_axis_deg, double lat_deg, double up[3]);
+
+struct MountPose { double ha_deg; double dec_deg; };   // where the tube points (HA -180..180)
+// Gravity alone leaves two answers, mirror images about the meridian. Returns
+// both (pointing HA/Dec, flipped poses already folded back). False if 'up' is
+// inconsistent with the latitude (mount not polar aligned or bad data).
+bool poseCandidatesFromUp(const double up[3], double lat_deg, MountPose out[2]);
+// Picks the candidate closest to a hint direction (normally the chosen target).
+bool pointingFromUp(const double up[3], double lat_deg, double lst_deg,
+                    double hint_ra_deg, double hint_dec_deg, Equatorial& out);
+
 using MoonState = TargetState;
 inline MoonState moonState(double jd_ut, const Observer& obs) {
   return targetState(Target::Moon, jd_ut, obs);

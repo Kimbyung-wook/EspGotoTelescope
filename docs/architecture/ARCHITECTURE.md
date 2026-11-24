@@ -137,7 +137,7 @@ flowchart LR
   MOON --> UISTEP["⑤ ui.step<br/>Frame 8×21"]
   IN --> UISTEP
   UISTEP --> DISP["OLED 출력"]
-  UISTEP -- "UiState<br/>ra_speed_cmd · gyro_bias<br/>track_target · tracking" --> OUT["⑥ 출력<br/>applyTracking → ra_motor.setSpeed"]
+  UISTEP -- "UiState<br/>ra_speed_cmd · gyro_bias<br/>track_target · tracking · track_offset" --> OUT["⑥ 출력<br/>applyTracking → ra_motor.setSpeed"]
   UISTEP -. "gyro_bias" .-> TEL
   OUT --> WAIT["⑦ LoopTimer 대기<br/>yield()"]
 ```

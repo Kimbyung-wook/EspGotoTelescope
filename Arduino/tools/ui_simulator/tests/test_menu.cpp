@@ -1,6 +1,9 @@
-// Menu tests for the runner with the real firmware UI (SimpleGoToUi):
-// input sequence -> expected screen lines. Drives sim::Session, the same code
-// path the GUI uses, so the protocol layer is covered too.
+// Simulator tests: the whole loop with the real firmware UI (SimpleGoToUi):
+// protocol message -> sensors -> app::Core -> screen lines and motor output.
+// Drives sim::Session, the same code path the GUI uses, so the protocol layer is
+// covered too. Here: boot, reset, protocol, sensor values on screen, estimator,
+// motor output, flash across a reset. How one screen reacts to the dial and the
+// button is tested by the unit tests (test/test_ui.cpp), not repeated here.
 // Build and run with ../run_tests.sh.
 #include <cmath>
 #include <cstdio>
@@ -74,11 +77,6 @@ void expectScreen(Sim& s, const char* const (&pat)[7], int src_line) {
 }
 #define EXPECT_SCREEN(s, ...) do { const char* const _p[7] = __VA_ARGS__; expectScreen(s, _p, __LINE__); } while (0)
 
-const int kMain = 7;
-const char* const kItems[kMain] = {
-  "1Target", "2Polar Align", "3Status", "4Calibration", "5Settings", "6RA Speed", "Sleep",
-};
-
 // Main menu item k -> its screen (cursor starts on the first item)
 void openMain(Sim& s, int k) { s.rotate(-20); s.rotate(k); s.click(); }
 // RA Speed: set RRcmd to v and go back to the main menu
@@ -142,73 +140,6 @@ void test_reset_restarts_ui() {
   EXPECT_LINE(s, 2, "?1Target");
 }
 
-void test_cursor_blinks() {
-  Sim s;
-  s.boot();
-  char a = s.line(2)[0];
-  s.tick();
-  char b = s.line(2)[0];
-  CHECK((a == '>' && b == '-') || (a == '-' && b == '>'));
-}
-
-void test_main_menu_scrolls() {
-  Sim s;
-  s.boot();
-  s.rotate(5);   // cursor reaches the last visible row
-  EXPECT_LINE(s, 7, "?6RA Speed");
-  s.rotate(1);   // one more step scrolls the list by one line
-  EXPECT_SCREEN(s, {"Main Menu", " 2Polar Align", " 3Status", " 4Calibration",
-                    " 5Settings", " 6RA Speed", "?Sleep"});
-  s.rotate(10);  // clamps at the last item
-  EXPECT_LINE(s, 7, "?Sleep");
-  s.rotate(-1);
-  EXPECT_LINE(s, 2, " 1Target");
-  EXPECT_LINE(s, 7, "?6RA Speed");
-  s.rotate(-20);
-  EXPECT_LINE(s, 2, "?1Target");
-}
-
-// Every main menu item can be entered and left; the cursor comes back to it.
-void test_enter_and_leave_every_screen() {
-  struct Item { const char* title; int exit_rotate; };   // rotations to Back/Quit; -1 = click leaves
-  const Item items[kMain] = {
-    {"*1Target", 5},         // cursor starts on Mercury (1); Quit is item 6
-    {"*2Polar Align", 1},    // Confirm, Back
-    {"*3Status", 6},         // 6 screens, Back
-    {"*4Calibration", 2},    // Gyro, Accel, Back
-    {"*5Settings", 7},       // 8 items
-    {"*6RA Speed", 2},       // RRcmd, RRate, Quit
-    {" ", -1},               // Sleep
-  };
-  for (int k = 0; k < kMain; k++) {
-    Sim s;
-    s.boot();
-    s.rotate(k);
-    s.click();
-    EXPECT_LINE(s, 1, items[k].title);
-    EXPECT_LINE(s, 0, "T 12: 0: 0.0 V 12.60");
-    CHECK(s.depth() == 2);
-    if (items[k].exit_rotate >= 0) {
-      s.rotate(items[k].exit_rotate);
-      s.click();
-    } else {
-      s.rotate(3);   // Sleep ignores rotation
-      EXPECT_LINE(s, 1, items[k].title);
-      s.click();
-    }
-    CHECK(s.depth() == 1);
-    EXPECT_LINE(s, 1, "Main Menu");
-    CHECK(s.ui.ui().mainMenu().selected() == k);
-    bool found = false;   // cursor drawn on item k
-    for (int r = 2; r < 8; r++) {
-      std::string pat = std::string("?") + kItems[k];
-      if (lineMatches(s.line(r), pat.c_str())) found = true;
-    }
-    g_checks++;
-    if (!found) { g_failures++; std::printf("  FAIL [%s] cursor not on item %d\n", g_test, k); }
-  }
-}
-
 void test_ra_speed_edit_drives_motor() {
   Sim s;
   s.send("{\"type\":\"sensors\",\"imu\":{\"ax\":0.5}}");
@@ -218,8 +149,6 @@ void test_ra_speed_edit_drives_motor() {
   EXPECT_SCREEN(s, {"*6RA Speed", "?RRcmd    0.00000PWM", " RRate    0.00000DPS", " Quit",
                     " ROL    0.00000  DEG", " LAT N 37.566500DEG", " PIT   -2.91874  DEG"});
   s.click();   // RRcmd -> edit mode
-  EXPECT_LINE(s, 1, "*Set RA Speed");
-  EXPECT_LINE(s, 4, " Exit");
   s.rotate(5);
   EXPECT_LINE(s, 2, "?RRcmd    5.00000PWM");
   CHECK(s.motor().in1 == 0 && s.motor().in2 == 1 && s.motor().pwm == 5);
@@ -230,14 +159,9 @@ void test_ra_speed_edit_drives_motor() {
   CHECK(s.motor().in1 == 0 && s.motor().in2 == 0 && s.motor().pwm == 0);
   s.rotate(300);
   CHECK(s.motor().pwm == 255);   // duty limited by RaMotor
-  s.click();   // finish editing, cursor back on RRcmd
-  EXPECT_LINE(s, 1, "*6RA Speed");
+  s.click();   // finish editing
   EXPECT_LINE(s, 2, "?RRcmd  300.00000PWM");
-  s.rotate(1);   // RRate is read-only
-  s.click();
-  EXPECT_LINE(s, 1, "*6RA Speed");
-  EXPECT_LINE(s, 3, "?RRate    0.00000DPS");
-  s.rotate(1);
+  s.rotate(2);
   s.click();   // Quit
   EXPECT_LINE(s, 1, "Main Menu");
   CHECK(s.motor().pwm == 255);   // motor keeps running after leaving
@@ -359,23 +283,6 @@ void test_moon_target() {
   EXPECT_LINE(s, 2, "R.A.         ---");
 }
 
-void test_calibration_menu() {
-  Sim s;
-  s.boot();
-  openMain(s, 3);
-  EXPECT_SCREEN(s, {"*4Calibration", "?Gyro Bias", " Accel 6-pos", " Back", " ", " ", " "});
-  s.rotate(1);
-  s.click();
-  EXPECT_LINE(s, 1, "*Accel Calib");
-  EXPECT_LINE(s, 2, "Step 1/6 X+ up");
-  s.click();                 // Cancel
-  EXPECT_LINE(s, 3, "?Accel 6-pos");
-  s.rotate(1);
-  s.click();                 // Back
-  EXPECT_LINE(s, 1, "Main Menu");
-  EXPECT_LINE(s, 5, "?4Calibration");
-}
-
 // DES-CAL-03 and DES-SYS-02: the motor stops while calibrating, then runs again.
 void test_gyro_bias_calibration() {
   Sim s;
@@ -389,12 +296,8 @@ void test_gyro_bias_calibration() {
   EXPECT_LINE(s, 2, "Keep still  0/30 s");
   CHECK(s.depth() == 3);
   CHECK(s.motor().pwm == 0);
-  s.tick(160);
-  EXPECT_LINE(s, 2, "Measuring 15/30 s");
-  s.tick(160);
+  s.tick(320);
   EXPECT_LINE(s, 2, "Done. Apply?");
-  EXPECT_LINE(s, 3, "bWx   +0.50000 dps");
-  EXPECT_LINE(s, 7, "?Apply   Discard");
   CHECK(s.motor().pwm == 0);
   s.click();                 // Apply
   EXPECT_LINE(s, 2, "?Gyro Bias");   // back on the item we came from
@@ -621,11 +524,10 @@ int main() {
   struct { const char* name; void (*fn)(); } tests[] = {
 #define T(f) {#f, f}
     T(test_boot_then_main_menu), T(test_boot_failures), T(test_input_ignored_during_boot),
-    T(test_reset_restarts_ui), T(test_cursor_blinks), T(test_main_menu_scrolls),
-    T(test_enter_and_leave_every_screen), T(test_ra_speed_edit_drives_motor),
+    T(test_reset_restarts_ui), T(test_ra_speed_edit_drives_motor),
     T(test_gps_screen_shows_sensor_values), T(test_last_gps_fix_is_kept), T(test_last_gps_needs_good_hdop),
     T(test_imu_screens),
-    T(test_moon_target), T(test_calibration_menu), T(test_gyro_bias_calibration),
+    T(test_moon_target), T(test_gyro_bias_calibration),
     T(test_att_estimator_converges), T(test_att_estimator_uses_gyro_bias), T(test_polar_align),
     T(test_target_tracking), T(test_settings_survive_reset), T(test_sleep_and_health),
     T(test_phone_time_power_and_wifi), T(test_protocol_messages),

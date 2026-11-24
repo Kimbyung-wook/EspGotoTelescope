@@ -33,6 +33,7 @@ class OLED{
     int setup_display();
     void writeln(int line_in, char* text_in, unsigned int size_in);
     void print();
+    void setPower(bool on);   // SSD1306 display on/off (Sleep), sent only on a change
 
   public:
     char msg[DISP_LINE_COLUMN][DISP_LINE_ROW];
@@ -40,6 +41,7 @@ class OLED{
 
   private:
     Adafruit_SSD1306 display_device;
+    bool power_on = true;
 
 
 };

@@ -78,6 +78,7 @@ public:
 class SleepScreen : public InfoScreen {
 public:
   SleepScreen() : InfoScreen("Sleep") {}
+  void tick(UiContext& ctx) override { ctx.state.display_off = true; }   // OLED off
   void render(Frame& f, const UiContext& ctx, char blink) override;
 };
 

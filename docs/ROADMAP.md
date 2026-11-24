@@ -1,6 +1,6 @@
 # SimpleGoTo 할 일과 설계 공백
 
-2026-11-24, v0.2.0 기준입니다. 각 항목의 근거 문서를 괄호 안에 적었습니다. 기능 범위는 [REQUIREMENTS.md](REQUIREMENTS.md)가 기준입니다.
+2026-11-24, v0.3.0 기준입니다. 각 항목의 근거 문서를 괄호 안에 적었습니다. 기능 범위는 [REQUIREMENTS.md](REQUIREMENTS.md)가 기준입니다.
 표시: **[실물]** 하드웨어로만 확인 가능, **[설계]** 방식을 먼저 정해야 함, **[구현]** 방식은 정해져 있고 코드만 남음.
 
 ## 1. 지금 가장 먼저 (실물 확인, 다른 일의 전제)
@@ -14,6 +14,7 @@
 | 5 | **[실물] 달 계산 시간 측정**: `moonGeocentric`, `moonState`, 1 Hz 부하 µs 표 채우기 (MOON_POSITION.md) | 루프 여유 확인 |
 | 6 | **[실물] 보정 문턱값**: 충격 감지(`CAL_SHOCK_GYRO_DPS` 2 °/s, `CAL_SHOCK_ACCEL_MPS2` 0.5 m/s²)가 손 떨림·모터 진동에 너무 민감하거나 둔하지 않은지. 가속도 6방향 자세 판정(0.8 g / 0.35 g) (DES-CAL-02, 04) | 보정이 실물에서 끝까지 되는지 |
 | 7 | **[실물] 극축 정렬과 북극성 시계**: 고도 허용 0.5°(`PA_ALT_TOL_DEG`)가 맞출 만한지, `Polaris at h:mm`이 극축 망원경 눈금과 같은 방향인지(맨눈 기준, 상이 뒤집히면 6시간 차) (DES-PA-03, 04) | 정렬 확인 뒤 지향(`?` 없음)을 믿을 수 있는지 |
+| 8 | **[실물] 전압 측정**: A0에 직렬 저항(가정 1.2 MΩ)을 달고 `VBAT_SENSE_ENABLE 1`, 멀티미터와 비교해 `VBAT_FULL_SCALE_V` 맞추기. Wi-Fi 켠 채 0.5초 읽기가 연결을 흔들지 않는지 (board_config.h) | 상태바 전압이 맞는지 |
 
 ## 2. 정해진 방향 (2026-11-24)
 
@@ -37,11 +38,7 @@
 | 항목 | 지금 | 근거 |
 |---|---|---|
 | **지자기와 방위** | 원시값만 읽음. 지자기 보정 화면(4Calibration → Mag), 자편각 설정, 기울기 보정 방위, Yaw, 극축 정렬의 `dAZ`와 방위 OK, 지향 방법 A와 A/B 비교가 모두 이것에 걸려 있음 | DES-MAG-01~04, DES-ATT-02~03, DES-PA-02, 04, DES-PNT-01, 03 |
-| 전원 전압 측정 | 상태바 `V 12.60` 고정값. 분압 저항을 A0에 달고 읽기 | ARCHITECTURE.md, UI.md |
-| Sleep | 화면만 비움. OLED 전원은 그대로 | UI.md 7절 |
 | 원격 전용 위젯 | Offset 슬라이더, Track 버튼. 다이얼로 충분한지 실물에서 본 뒤 | REMOTE_UI_PLAN.md 3단계 |
-| PC 데모의 Wi-Fi 표시 | 시뮬레이터 상태바에는 `w`/`W`가 안 나옴(러너가 원격 상태를 모름) | web_bridge.py |
-| 폰 시각 | 원격 UI 접속 때 폰 시각을 받아 GPS 없을 때 쓰기 | DES-LOC-05 |
 
 ## 4. 미뤄 둔 것 (필요할 때)
 
@@ -52,4 +49,3 @@
 ## 5. 문서 정리
 
 - `TelescopeUi` 등 코드 이름은 SimpleGoTo로 바꾸지 않았습니다(필요하면 따로).
-- ARCHITECTURE.md, MOON_POSITION.md, REMOTE_UI_PLAN.md, 시뮬레이터 PROTOCOL.md에 옛 메뉴 이름(Planet Tracking, Axis for Moon 등)이 남아 있을 수 있습니다.

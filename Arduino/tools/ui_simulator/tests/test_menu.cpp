@@ -89,7 +89,7 @@ void setRrcmd(Sim& s, int v) {
 void test_boot_then_main_menu() {
   Sim s;
   s.tick();
-  EXPECT_LINE(s, 0, "SimpleGoTo v0.2.0");
+  EXPECT_LINE(s, 0, "SimpleGoTo v0.3.0");
   EXPECT_LINE(s, 1, "");
   s.tick(sim::FirmwareUi::kBootLineFrames * 7);   // 8 lines: the screen is full
   EXPECT_LINE(s, 1, "1. Display ON 160MHz");
@@ -99,7 +99,7 @@ void test_boot_then_main_menu() {
   s.tick(sim::FirmwareUi::kBootLineFrames * 2);   // 10 lines: scrolled, line 0 stays
   EXPECT_SCREEN(s, {"Acc +-16G", "Gyro 250 dps", "Mag 10 Hz", "3. GPS is ON",
                     "4. Buttons are ON", "5. GPIO/PWM is ON", "6. Settings new"});
-  EXPECT_LINE(s, 0, "SimpleGoTo v0.2.0");
+  EXPECT_LINE(s, 0, "SimpleGoTo v0.3.0");
   s.tick(sim::FirmwareUi::kBootHoldFrames - 1);
   EXPECT_LINE(s, 7, "6. Settings new");   // boot log is still held
   s.tick();
@@ -511,7 +511,7 @@ void test_settings_survive_reset() {
 
   s.send("{\"type\":\"reset\"}");
   s.tick();
-  EXPECT_LINE(s, 0, "SimpleGoTo v0.2.0");
+  EXPECT_LINE(s, 0, "SimpleGoTo v0.3.0");
   s.boot();
   openMain(s, 4);
   EXPECT_LINE(s, 2, "Flash: loaded");
@@ -544,6 +544,29 @@ void test_sleep_and_health() {
                     "GPS     650", "IMU    1250", "EST     180 AST  4000"});
 }
 
+void test_phone_time_power_and_wifi() {
+  Sim s;
+  s.send("{\"type\":\"sensors\",\"gps\":{\"fix\":0,\"sats\":0}}");
+  s.boot();
+  EXPECT_LINE(s, 0, "T 12: 0: 0.0 V 12.60");   // no fix, no clock: GPS fields as they are
+  s.send("{\"type\":\"sensors\",\"power\":{\"v\":11.84},\"remote\":{\"state\":1}}");
+  s.tick();
+  EXPECT_LINE(s, 0, "T 12: 0: 0.0 V 11.84w");
+  // page connects and sends its clock (2026-11-25 03:04:05.6 UTC)
+  s.send("{\"type\":\"sensors\",\"remote\":{\"state\":2}}");
+  s.send("{\"type\":\"phone_time\",\"unix_s\":1795575845,\"ms\":600}");
+  s.tick();
+  EXPECT_LINE(s, 0, "P  3: 4: 5.6 V 11.84W");
+  s.tick(10);                                  // runs on with the frames
+  EXPECT_LINE(s, 0, "P  3: 4: 6.6 V 11.84W");
+  openMain(s, 2);                              // Status > GPS shows the source
+  s.click();
+  EXPECT_LINE(s, 5, "Pos ---  Time PHN");
+  s.send("{\"type\":\"sensors\",\"gps\":{\"fix\":1,\"sats\":8}}");
+  s.tick();
+  EXPECT_LINE(s, 5, "Pos GPS  Time GPS");      // GPS fix wins again
+}
+
 void test_protocol_messages() {
   Sim s;
   s.send("{\"type\":\"hello\"}");
@@ -557,7 +580,7 @@ void test_protocol_messages() {
   s.tick(3);
   CHECK(s.replies.size() == 3);
   CHECK(s.replies[2].find("\"seq\":2,\"t_ms\":200") != std::string::npos);
-  CHECK(s.replies[0].find("\"lines\":[\"SimpleGoTo v0.2.0\",\"\"") != std::string::npos);
+  CHECK(s.replies[0].find("\"lines\":[\"SimpleGoTo v0.3.0\",\"\"") != std::string::npos);
   std::vector<std::string> r;
   CHECK(s.session.handleLine("{\"type\":\"quit\"}", r) == false);
 }
@@ -574,7 +597,7 @@ int main() {
     T(test_moon_target), T(test_calibration_menu), T(test_gyro_bias_calibration),
     T(test_att_estimator_converges), T(test_att_estimator_uses_gyro_bias), T(test_polar_align),
     T(test_target_tracking), T(test_settings_survive_reset), T(test_sleep_and_health),
-    T(test_protocol_messages),
+    T(test_phone_time_power_and_wifi), T(test_protocol_messages),
 #undef T
   };
   for (auto& t : tests) {

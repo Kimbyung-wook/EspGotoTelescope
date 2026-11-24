@@ -6,13 +6,14 @@
 // Where and when the observer is (docs/REQUIREMENTS.md DES-LOC-01..04)
 //   position : GPS fix -> last GPS fix (saved) -> manual (saved), or manual only
 //   time     : GPS (with a fix) -> manual clock (set on the Time screen, not saved)
+//              -> phone clock (remote UI page, DES-LOC-05, not saved)
 // Pure C++ (no Arduino calls).
 /************************************/
 namespace loc {
 
 enum Mode { MODE_AUTO = 0, MODE_MANUAL = 1 };              // config::LocationMode
 enum Source { SRC_NONE = 0, SRC_GPS, SRC_LAST, SRC_MANUAL };
-enum TimeSource { TIME_NONE = 0, TIME_GPS, TIME_MANUAL };
+enum TimeSource { TIME_NONE = 0, TIME_GPS, TIME_MANUAL, TIME_PHONE };
 
 struct Position {
   double lat_deg = 0.0;   // north positive
@@ -21,7 +22,7 @@ struct Position {
 };
 
 const char* sourceText(int src);        // "GPS", "LAST", "MAN", "---"
-const char* timeSourceText(int src);    // "GPS", "MAN", "---"
+const char* timeSourceText(int src);    // "GPS", "MAN", "PHN", "---"
 
 // DES-LOC-01. Returns the Source used (SRC_NONE: no position, out unchanged)
 int resolvePosition(int mode, bool gps_fix, const Position& gps,

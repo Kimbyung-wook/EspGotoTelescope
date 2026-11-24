@@ -31,6 +31,8 @@ struct ImuState {
 struct SensorState {
   GpsState gps;
   ImuState imu;
+  double voltage = 12.60;   // supply [V] (A0), shown in the status bar
+  int remote = 0;           // phone remote UI: 0 off, 1 AP waiting ('w'), 2 connected ('W')
 };
 
 // Which devices pretend to start correctly at boot.
@@ -46,6 +48,10 @@ struct InputSnapshot {
   int count = 0;
   int clicks = 0;
   bool clicked() const { return clicks > 0; }
+  // Phone clock sent by the remote UI page since the previous frame (DES-LOC-05)
+  bool phone_time = false;
+  unsigned long phone_unix_s = 0;
+  int phone_ms = 0;
 };
 
 // H-bridge output for the RA motor.

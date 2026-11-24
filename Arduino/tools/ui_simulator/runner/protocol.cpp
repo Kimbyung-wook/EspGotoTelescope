@@ -70,6 +70,7 @@ std::string Session::step() {
   f.clear();
   backend_->frame(now_ms_, pending_, sensors_, f, motor_);
   pending_.clicks = 0;
+  pending_.phone_time = false;
   frame_ = f;
 
   char head[96];
@@ -108,6 +109,13 @@ bool Session::handleLine(const std::string& line, std::vector<std::string>& repl
   } else if (type == "sensors") {
     if (const json::Value* g = msg.get("gps")) readGps(*g, sensors_.gps);
     if (const json::Value* m = msg.get("imu")) readImu(*m, sensors_.imu);
+    if (const json::Value* p = msg.get("power")) sensors_.voltage = p->getNumber("v", sensors_.voltage);
+    if (const json::Value* r = msg.get("remote")) sensors_.remote = r->getInt("state", sensors_.remote);
+  } else if (type == "phone_time") {
+    const double s = msg.getNumber("unix_s", 0.0);
+    pending_.phone_time = s > 0.0;
+    pending_.phone_unix_s = s > 0.0 ? (unsigned long)s : 0;
+    pending_.phone_ms = msg.getInt("ms", 0);
   } else if (type == "tick") {
     int n = msg.getInt("n", 1);
     if (n < 1) n = 1;

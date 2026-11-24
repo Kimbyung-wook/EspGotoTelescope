@@ -25,10 +25,11 @@ SimpleGoTo(망원경 적도의 제어 펌웨어)를 SSD1306 OLED(128×64)와 로
 ```
 
 - **상태바(줄0)**: 어느 화면에서든 늘 보입니다.
-  - 첫 글자는 시각 출처입니다: `T` GPS, `M` 손으로 맞춘 시각(DES-LOC-04). 시각이 없으면 `T  0: 0: 0.0`입니다.
+  - 첫 글자는 시각 출처입니다: `T` GPS, `M` 손으로 맞춘 시각(DES-LOC-04), `P` 폰 시각(DES-LOC-05). 시각이 없으면 `T  0: 0: 0.0`입니다.
+  - 쓰는 순서는 GPS(fix 있을 때) → 수동 시각 → 폰 시각입니다. 폰 시각은 원격 UI 페이지가 접속할 때마다 보내고, 2020년 이전 시각은 버립니다. 저장하지 않습니다.
   - 시각은 UTC입니다(지역 시각은 5 Settings → Time 화면에서 봅니다).
-  - 전압은 아직 고정값 `12.60`이고, 측정 회로가 연결되면 실제 값으로 바뀔 자리입니다.
-  - 마지막 칸은 폰 원격 UI 표시입니다: 원격 UI를 끈 빌드는 비어 있고, AP만 켜져 있으면 `w`, 폰이 붙어 있으면 `W`입니다.
+  - 전압은 A0에서 0.5초마다 읽어 거른 값입니다(`src/sensors/battery.h`). 분압 저항을 달고 `board_config.h`의 `VBAT_SENSE_ENABLE`을 1로 바꾸기 전에는 `V --.--`입니다. 배율은 `VBAT_FULL_SCALE_V`(가정: 직렬 1.2 MΩ, 15.2 V). 시뮬레이터는 `sensors`의 `power.v`(기본 12.60)를 씁니다.
+  - 마지막 칸은 폰 원격 UI 표시입니다: 원격 UI를 끈 빌드는 비어 있고, AP만 켜져 있으면 `w`, 폰이 붙어 있으면 `W`입니다. PC 데모(`web_bridge.py`)도 페이지 접속 여부에 따라 `w`/`W`를 보여 줍니다.
 - **제목줄(줄1)**: 메인 메뉴 문자열 앞에 `*`를 붙여 지금 어느 화면에 있는지 표시합니다. 대상 화면은 대상 이름과 상태(`computing...`, `no loc/time`, `ON TARGET`)를 보여 줍니다.
 - **내용 영역(줄2~7)**: 한 번에 6줄을 보여줍니다. 이보다 긴 화면은 스크롤 창으로 보여줍니다.
 
@@ -189,7 +190,7 @@ Pos GPS  Time GPS        Wx    XXXX.XXXXX dps     Temp XXXX.XXXXX 'c
  N  37.56650000 DEG      Wy    XXXX.XXXXX dps
  E 126.97800000 DEG      Wz    XXXX.XXXXX dps
 ```
-- GPS 화면 4번째 줄은 Fix 상태(NoFix/GPS/DGPS)와 위성 수, 5번째 줄은 지금 쓰는 위치 출처(`GPS`/`LAST`/`MAN`/`---`)와 시각 출처(`GPS`/`MAN`/`---`)입니다(DES-LOC-01).
+- GPS 화면 4번째 줄은 Fix 상태(NoFix/GPS/DGPS)와 위성 수, 5번째 줄은 지금 쓰는 위치 출처(`GPS`/`LAST`/`MAN`/`---`)와 시각 출처(`GPS`/`MAN`/`PHN`/`---`)입니다(DES-LOC-01).
 - Acc/Gyro, Mag/Temp는 보정 전 원시값입니다.
 
 ```
@@ -309,7 +310,7 @@ In use GPS 21:00:08     ← 지금 쓰는 시각을 지역 시각으로
 RRcmd를 편집하면 추적이 꺼집니다. 별을 따라가는 RRcmd를 찾아 5Settings의 `RAduty = RRcmd`로 저장합니다(DES-MOT-01).
 
 ### Sleep
-상태바만 남기고 내용 영역을 비웁니다. 버튼을 누르면 메인 메뉴로 돌아갑니다.
+OLED를 끕니다(SSD1306 display off). 폰 원격 UI에는 상태바만 남은 빈 화면이 계속 갑니다. 버튼을 누르면 화면을 켜고 메인 메뉴로 돌아갑니다.
 
 ## 7. 설계와 현재 코드의 차이
 
@@ -321,7 +322,6 @@ RRcmd를 편집하면 추적이 꺼집니다. 별을 따라가는 RRcmd를 찾�
 | Mag/Temp | DES-MAG-03: 방위 HEAD | 온도 표시 |
 | Att.Estimator | DES-ATT-03: Yaw | Roll/Pitch만 |
 | Settings | DES-CFG-05: 자편각 | 자편각 없음(DES-MAG-02) |
-| Sleep | 화면 끄기 | 빈 화면. 디스플레이 전원은 끄지 않음 |
 | 숫자 서식 | `%9.4f` | 대부분 `%10.5f` |
 
 ## 8. 이후 구조 구상 (`Arduino/archive/ws/menu_display.h`, 미완성)

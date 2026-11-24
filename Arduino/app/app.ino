@@ -15,6 +15,7 @@
 #include "src/util/loop_timer.h"
 #include "src/input/rotary.h"
 #include "src/sensors/imu.h"
+#include "src/sensors/battery.h"
 #include "src/motor/ra_motor.h"
 #include "src/estimation/attitude_estimator.h"
 #include "src/app/loop_logic.h"
@@ -31,6 +32,8 @@ GPS*    gps     = new GPS(&GPS_PORT);
 Imu     imu;
 RaMotor ra_motor(MOTOR_PWM, MOTOR_IN1, MOTOR_IN2);
 Rotary  rotary(BUTTON_S1, BUTTON_S2, BUTTON_KEY);
+BatteryMonitor battery(VBAT_FULL_SCALE_V, VBAT_FILTER_ALPHA);
+unsigned long  battery_read_ms = 0;
 
 /************************************/
 // Estimation
@@ -180,6 +183,14 @@ void updateTelemetry(Telemetry& t) {
   t.est_us  = perform_est.getdt();
   t.astro_us = perform_astro.getdt();
   t.remote   = remote::state();   // status bar Wi-Fi mark
+#if VBAT_SENSE_ENABLE
+  if (!battery.valid() || t.now_ms - battery_read_ms >= VBAT_PERIOD_MS) {
+    battery.update(analogRead(A0));
+    battery_read_ms = t.now_ms;
+  }
+#endif
+  t.voltage_valid = battery.valid();
+  t.voltage       = battery.volts();
 }
 
 void loop() {
@@ -212,7 +223,12 @@ void loop() {
   ui_ctx.tel.roll_est_deg  = att_est.rollDeg();
   ui_ctx.tel.pitch_est_deg = att_est.pitchDeg();
 
-  // Position and time in use: GPS, last GPS fix, manual (DES-LOC)
+  // Phone time from the remote UI page (DES-LOC-05), then position and time in use:
+  // GPS, last GPS fix, manual, phone (DES-LOC)
+  unsigned long phone_s = 0;
+  int phone_ms = 0;
+  if (remote::takePhoneTime(phone_s, phone_ms))
+    app::setPhoneClock(ui_ctx.state, ui_ctx.tel.now_ms, phone_s, phone_ms);
   app::updateLocationTime(ui_ctx.tel, ui_ctx.state, last_gps);
 
   // Moon and target (each only on the frames where its 1 s period has passed),
@@ -225,8 +241,11 @@ void loop() {
   // UI -> display
   frame.clear();
   ui.step(delta, click, ui_ctx, frame);
-  memcpy(monitor->msg, frame.lines, sizeof(frame.lines));
-  monitor->print();
+  monitor->setPower(!ui_ctx.state.display_off);   // Sleep: OLED off, phone still mirrors
+  if (!ui_ctx.state.display_off) {
+    memcpy(monitor->msg, frame.lines, sizeof(frame.lines));
+    monitor->print();
+  }
   remote::publish(frame);   // phone mirror (only when the lines changed)
   config::serviceRequests(settings_store, settings, ui_ctx);   // Save / Reset from the UI
 

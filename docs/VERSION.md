@@ -21,6 +21,12 @@
 
 ## 기록
 
+### 0.3.0 (2026-11-24)
+- 전원 전압: A0 분압 측정(`VBAT_SENSE_ENABLE`, 기본 0), 거르기, 측정 전에는 `V --.--`.
+- Sleep: OLED 전원을 끄고 버튼으로 다시 켬.
+- 폰 시각(DES-LOC-05): 원격 UI 페이지가 접속할 때 보내는 시각을 GPS도 수동 시각도 없을 때 씀. 상태바 `P`, 출처 `PHN`.
+- PC 데모: `web_bridge.py`가 페이지 접속 여부를 상태바 `w`/`W`로, 페이지 시각을 러너 `phone_time`으로 넘김.
+
 ### 0.2.0 (2026-11-24)
 REQUIREMENTS.md 5절의 보정, 위치·시각, 극축 정렬, 지향 안내·추적, 메뉴 재구성(지자기 제외):
 - 메뉴를 쓰는 순서대로 다시 묶음: 1Target / 2Polar Align / 3Status / 4Calibration / 5Settings / 6RA Speed / Sleep. Axis for Moon은 Target에 합침.

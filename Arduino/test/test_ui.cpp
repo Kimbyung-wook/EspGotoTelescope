@@ -8,6 +8,7 @@ struct UiFixture {
   TelescopeUi ui;
   UiContext ctx;
   Frame f;
+  UiFixture() { ctx.tel.voltage_valid = true; ctx.tel.voltage = 12.6f; }   // as measured
   void step(int delta = 0, bool click = false) {
     f.clear();
     ui.step(delta, click, ctx, f);
@@ -42,6 +43,37 @@ TEST(ui_status_bar_format) {
   u.ctx.tel.time_source = loc::TIME_MANUAL;       // manual clock (DES-LOC-04)
   u.step();
   CHECK_STR(u.f.lines[0], "M 21: 3: 7.4 V 12.60");
+  u.ctx.tel.time_source = loc::TIME_PHONE;        // phone clock (DES-LOC-05)
+  u.step();
+  CHECK_STR(u.f.lines[0], "P 21: 3: 7.4 V 12.60");
+}
+
+TEST(ui_status_bar_voltage) {
+  UiFixture u;
+  u.ctx.tel.voltage_valid = false;                // A0 not wired / not read yet
+  u.ctx.tel.remote = Telemetry::REMOTE_CONNECTED;
+  u.step();
+  CHECK_STR(u.f.lines[0], "T  0: 0: 0.0 V --.--W");
+  u.ctx.tel.voltage_valid = true;
+  u.ctx.tel.voltage = 9.876f;
+  u.step();
+  CHECK_STR(u.f.lines[0], "T  0: 0: 0.0 V  9.88W");
+  u.ctx.tel.voltage = 123.0f;                     // clamped: the line stays 20 + 1 characters
+  u.step();
+  CHECK_STR(u.f.lines[0], "T  0: 0: 0.0 V 99.99W");
+}
+
+TEST(ui_sleep_turns_the_display_off) {
+  UiFixture u;
+  u.step();
+  CHECK(!u.ctx.state.display_off);
+  u.open(6);                                      // Sleep
+  CHECK(u.ctx.state.display_off);
+  u.step(3);                                      // rotation keeps it asleep
+  CHECK(u.ctx.state.display_off);
+  u.click();                                      // wake
+  CHECK(!u.ctx.state.display_off);
+  CHECK_STR(u.f.lines[1], "Main Menu");
 }
 
 TEST(ui_status_bar_wifi_mark) {

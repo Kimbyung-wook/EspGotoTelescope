@@ -21,7 +21,7 @@ struct Telemetry {
   int    loc_source = 0;                    // loc::Source : NONE / GPS / LAST / MANUAL
   double obs_lat_deg = 0.0, obs_lon_deg = 0.0;
   float  obs_alt_m = 0.0f;
-  int    time_source = 0;                   // loc::TimeSource : NONE / GPS / MANUAL
+  int    time_source = 0;                   // loc::TimeSource : NONE / GPS / MANUAL / PHONE
   double jd_ut = 0.0;                       // valid when time_source != NONE
   int    clock_hour = 0, clock_minute = 0, clock_second = 0, clock_ms = 0;   // UTC, status bar
 
@@ -32,14 +32,14 @@ struct Telemetry {
   double moon_alt_deg = 0.0, moon_az_deg = 0.0;   // az from north, east positive
   double moon_rate_arcsec_s = 0.0;                // RA-axis tracking rate
 
-  // Tracking target chosen on the Planet Tracking screen (index of astro::Target)
+  // Tracking target chosen on the 1Target menu (index of astro::Target)
   int    target_index = 0;                 // which target the fields below belong to
   bool   target_valid = false;
   double target_ra_deg = 0.0, target_dec_deg = 0.0, target_ha_deg = 0.0;
   double target_alt_deg = 0.0, target_az_deg = 0.0;
   double target_dist = 0.0;                // Moon: Earth radii, planets: AU
   double target_rate_arcsec_s = 0.0;
-  bool   ra_calibrated = false;            // RA_DUTY_AT_SIDEREAL is set (motor can track)
+  bool   ra_calibrated = false;            // RAduty setting is not 0 (motor can track)
 
   // Where the tube points, from the estimated roll/pitch (polar-aligned equatorial mount)
   bool   scope_valid = false;
@@ -56,8 +56,9 @@ struct Telemetry {
   float roll_acc_deg = 0.0f, pitch_acc_deg = 0.0f;  // tilt from gravity only
   float roll_est_deg = 0.0f, pitch_est_deg = 0.0f;  // complementary filter
 
-  // Power
-  float voltage = 12.60f;                   // not measured yet
+  // Power (src/sensors/battery.h): status bar shows "V --.--" until measured
+  bool  voltage_valid = false;
+  float voltage = 0.0f;                     // [V] supply, filtered
 
   // Phone remote UI (src/remote): status bar mark in the last column
   enum RemoteState { REMOTE_OFF = 0, REMOTE_WAITING = 1, REMOTE_CONNECTED = 2 };
@@ -109,6 +110,13 @@ struct UiState {
   bool   manual_clock_valid = false;
   double manual_clock_jd = 0.0;
   unsigned long manual_clock_ms = 0;
+  // Phone clock (DES-LOC-05), not saved: sent by the remote UI page when it connects
+  bool   phone_clock_valid = false;
+  double phone_clock_jd = 0.0;
+  unsigned long phone_clock_ms = 0;
+
+  // Display off (Sleep screen): cleared every frame, set by the Sleep screen in tick()
+  bool  display_off = false;
 
   // Requests to the main loop (config::serviceRequests clears them)
   bool settings_save_request = false;       // write the current values to flash

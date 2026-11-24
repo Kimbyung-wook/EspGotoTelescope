@@ -44,6 +44,9 @@ unsigned long sent_ms = 0;
 char  json[16 + Frame::LINES * ((Frame::COLS - 1) * 6 + 3)];
 
 int pending_rotate = 0, pending_clicks = 0;  // since takeInput()
+bool phone_time = false;                     // since takePhoneTime()
+unsigned long phone_s = 0;
+int  phone_ms = 0;
 
 // JSON string body of one screen line (same escaping as the UI simulator runner)
 size_t appendLine(char* out, size_t pos, const char* line) {
@@ -78,6 +81,17 @@ bool findInt(const char* msg, const char* key, long& value) {
   return end != p + 1;
 }
 
+// Unsigned value of "key" (Unix seconds do not fit a signed long after 2038)
+bool findUnsigned(const char* msg, const char* key, unsigned long& value) {
+  const char* p = strstr(msg, key);
+  if (!p) return false;
+  p = strchr(p + strlen(key), ':');
+  if (!p) return false;
+  char* end = nullptr;
+  value = strtoul(p + 1, &end, 10);
+  return end != p + 1;
+}
+
 void onWsEvent(uint8_t num, WStype_t type, uint8_t* payload, size_t length) {
   if (type == WStype_CONNECTED) {
     ws.sendTXT(num, INPUT_ENABLED ? HELLO_INPUT : HELLO_MIRROR);
@@ -98,6 +112,14 @@ void onWsEvent(uint8_t num, WStype_t type, uint8_t* payload, size_t length) {
   long v = 0;
   if (findInt(msg, "\"rotate\"", v) && v >= -100 && v <= 100) pending_rotate += (int)v;
   if (findInt(msg, "\"click\"", v) && v > 0 && pending_clicks < MAX_PENDING_CLICKS) pending_clicks += 1;
+  unsigned long s = 0;
+  if (findUnsigned(msg, "\"time_s\"", s)) {
+    long ms = 0;
+    findInt(msg, "\"time_ms\"", ms);
+    phone_s = s;
+    phone_ms = (ms >= 0 && ms <= 999) ? (int)ms : 0;
+    phone_time = true;
+  }
 }
 
 } // namespace
@@ -162,6 +184,14 @@ void takeInput(int& rotate, bool& click) {
   pending_rotate = 0;
   click = pending_clicks > 0;
   if (click) pending_clicks--;
+}
+
+bool takePhoneTime(unsigned long& unix_s, int& ms) {
+  if (!phone_time) return false;
+  phone_time = false;
+  unix_s = phone_s;
+  ms = phone_ms;
+  return true;
 }
 
 int clients() { return ws.connectedClients(); }

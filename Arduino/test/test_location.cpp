@@ -1,5 +1,6 @@
 #include "test_main.h"
 #include "../app/src/app/loop_logic.h"
+#include "../app/src/sensors/battery.h"
 
 using namespace loc;
 
@@ -102,6 +103,45 @@ TEST(loc_manual_clock_runs_with_millis) {
   app::updateLocationTime(t, st, rec);
   CHECK(t.loc_source == SRC_MANUAL);
   CHECK_NEAR(t.obs_lat_deg, -33.8688, 1e-12);
+}
+
+TEST(loc_phone_clock_after_gps_and_manual) {
+  Telemetry t; UiState st; LastGpsRecorder rec;
+  app::setPhoneClock(st, 1000, 1500000000UL, 0);     // 2017: phone clock not set, ignored
+  CHECK(!st.phone_clock_valid);
+  app::setPhoneClock(st, 1000, 1795575845UL, 600);   // 2026-11-25 03:04:05.600 UTC
+  CHECK(st.phone_clock_valid);
+  CHECK_NEAR(st.phone_clock_jd, astro::julianDate({2026, 11, 25, 3, 4, 5.6}), 1e-8);
+  t.now_ms = 3000;                                   // 2 s later
+  app::updateLocationTime(t, st, rec);
+  CHECK(t.time_source == TIME_PHONE);
+  CHECK(t.clock_hour == 3 && t.clock_minute == 4 && t.clock_second == 7);
+  CHECK(t.clock_ms >= 599 && t.clock_ms <= 601);
+  CHECK(std::strcmp(timeSourceText(t.time_source), "PHN") == 0);
+  st.manual_clock_valid = true;                      // a clock set by hand wins
+  st.manual_clock_jd = astro::julianDate({2026, 11, 25, 9, 0, 0.0});
+  st.manual_clock_ms = 3000;
+  app::updateLocationTime(t, st, rec);
+  CHECK(t.time_source == TIME_MANUAL && t.clock_hour == 9);
+  gpsFix(t);                                         // and GPS wins over both
+  app::updateLocationTime(t, st, rec);
+  CHECK(t.time_source == TIME_GPS);
+}
+
+TEST(battery_scale_and_filter) {
+  BatteryMonitor b(15.2f, 0.5f);
+  CHECK(!b.valid());
+  b.update(1023);
+  CHECK(b.valid());
+  CHECK_NEAR(b.volts(), 15.2, 1e-4);                 // first sample: no filtering
+  b.update(0);
+  CHECK_NEAR(b.volts(), 7.6, 1e-4);                  // half way with alpha 0.5
+  b.update(2000);                                    // out of range: clamped to 1023
+  CHECK_NEAR(b.volts(), 11.4, 1e-4);
+  BatteryMonitor c(15.2f, 0.2f);
+  c.update(846);                                     // 12.57 V
+  for (int i = 0; i < 50; i++) c.update(i & 1 ? 850 : 842);   // ADC noise +-4
+  CHECK_NEAR(c.volts(), 846 * 15.2 / 1023.0, 0.02);
 }
 
 TEST(loc_jd_calendar_round_trip) {

@@ -7,6 +7,8 @@ Serves app/src/remote/web/index.html over HTTP, runs ../build/ui_runner.exe at 1
 talks to the page with the remote UI messages (docs/REMOTE_UI_PLAN.md):
     bridge -> page : {"hello":{"input":true,"name":..,"version":..}}, {"lines":[8 lines]}  (on change, at least every 1 s)
     page -> bridge : {"rotate":n}, {"click":1}                       (forwarded as runner "input")
+                     {"time_s":s,"time_ms":ms} after the hello          (runner "phone_time")
+    status bar mark : runner "sensors" remote state 1 ('w') / 2 ('W', a page is connected)
 Standard library only (a minimal RFC 6455 text-frame WebSocket server).
 """
 import argparse
@@ -68,6 +70,14 @@ class Runner:
         with self.lock:
             self._send({"type": "input", "rotate": rotate, "click": click})
 
+    def sensors(self, **fields):
+        with self.lock:
+            self._send(dict(type="sensors", **fields))
+
+    def phone_time(self, unix_s, ms):
+        with self.lock:
+            self._send({"type": "phone_time", "unix_s": unix_s, "ms": ms})
+
     def tick(self):
         with self.lock:
             self._send({"type": "tick"})
@@ -100,6 +110,10 @@ class Clients:
     def remove(self, s):
         with self.lock:
             self.socks.discard(s)
+
+    def count(self):
+        with self.lock:
+            return len(self.socks)
 
     def broadcast(self, text):
         with self.lock:
@@ -180,6 +194,11 @@ def make_ws_handler(clients, runner):
                         msg = json.loads(data)
                     except ValueError:
                         continue
+                    ts = msg.get("time_s")
+                    if isinstance(ts, int) and ts > 0:   # phone clock (DES-LOC-05)
+                        ms = msg.get("time_ms", 0)
+                        runner.phone_time(ts, ms if isinstance(ms, int) else 0)
+                        continue
                     r = msg.get("rotate", 0)
                     c = 1 if msg.get("click") else 0
                     if isinstance(r, int) and -100 <= r <= 100 and (r or c):
@@ -231,10 +250,14 @@ def main():
         threading.Thread(target=srv.serve_forever, daemon=True).start()
     print("remote UI page: http://localhost:%d/  (WebSocket %d)" % (args.port, args.port + 1), flush=True)
 
-    prev, sent_at = None, 0.0
+    prev, sent_at, remote = None, 0.0, None
     next_t = time.monotonic()
     try:
         while True:
+            state = 2 if clients.count() else 1   # status bar 'W' connected / 'w' AP waiting
+            if state != remote:
+                runner.sensors(remote={"state": state})
+                remote = state
             frame = runner.tick()
             now = time.monotonic()
             if frame["lines"] != prev or now - sent_at >= 1.0:   # same rule as the firmware

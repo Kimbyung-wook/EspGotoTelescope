@@ -65,6 +65,10 @@ void fillTelemetry(unsigned long now_ms, const SensorState& s, const UiState& st
   t.imu.mz = (float)m.mz;
   t.imu.temperature = (float)m.temperature;
 
+  t.voltage_valid = true;        // the simulator always "measures" the supply
+  t.voltage = (float)s.voltage;
+  t.remote = s.remote;
+
   // Health: typical numbers from the board (the simulator does not time it)
   t.loop_hz = 10.0f;
   t.loop_us = 100000;
@@ -134,6 +138,8 @@ void FirmwareUi::frame(unsigned long now_ms, const InputSnapshot& input,
   att_est_->update(ctx_->tel.imu_corr, kFrameMs / 1000.0f);
   ctx_->tel.roll_est_deg = att_est_->rollDeg();
   ctx_->tel.pitch_est_deg = att_est_->pitchDeg();
+  if (input.phone_time)
+    app::setPhoneClock(ctx_->state, now_ms, input.phone_unix_s, input.phone_ms);
   app::updateLocationTime(ctx_->tel, ctx_->state, *last_gps_);
   app::updateAstro(*moon_tracker_, *target_tracker_, ctx_->tel, ctx_->state,
                    IMU_TUBE_OPTICAL_AXIS, IMU_TUBE_DEC_AXIS);

@@ -36,14 +36,14 @@
 #define MOTOR_IN1   GPIO_D0 // direction
 #define MOTOR_IN2   GPIO_D3 // direction
 // Default RRcmd (PWM duty) that turns the RA axis at the sidereal rate (15.041"/s).
-// The value in use is a setting (11Settings > "RAduty = RRcmd" after finding
-// the RRcmd on 1RA Speed by following a star); this is only the factory default.
-// 0 = not calibrated: Planet Tracking then drives the motor with the Offset only.
+// The value in use is a setting (5Settings > "RAduty = RRcmd" after finding
+// the RRcmd on 6RA Speed by following a star); this is only the factory default.
+// 0 = not calibrated: tracking then drives the motor with the Offset only.
 #define RA_DUTY_AT_SIDEREAL 0.0f
 
 // ICM20948 on the telescope tube: which IMU body axis (1 = x, 2 = y, 3 = z,
 // negative = opposite direction) runs along the optical axis and along the Dec axis.
-// (assumed) Check: point the tube at the celestial pole -> Planet Tracking "T.DEC." ~ +90.
+// (assumed) Check: point the tube at the celestial pole -> 1Target "T.DEC." ~ +90.
 #define IMU_TUBE_OPTICAL_AXIS  1
 #define IMU_TUBE_DEC_AXIS      2
 
@@ -56,6 +56,20 @@
 #define PA_ALT_TOL_DEG  0.5f
 #define PA_AZ_TOL_DEG   2.0f
 #define PA_OK_HOLD_MS   2000
+
+/************************************/
+// Supply voltage on A0 (status bar "V 12.60")
+//   NodeMCU has 220k/100k on A0 (pin 0..3.2 V -> ADC 0..1 V). A series resistor
+//   from the battery + to A0 extends that: full scale = 1.0 V * (R + 320k) / 100k.
+//   (assumed) R = 1.2M -> 15.2 V full scale. Set VBAT_SENSE_ENABLE 1 once it is
+//   wired; with 0 the status bar shows "V --.--" (A0 open reads noise).
+/************************************/
+#ifndef VBAT_SENSE_ENABLE
+#define VBAT_SENSE_ENABLE 0
+#endif
+#define VBAT_FULL_SCALE_V  15.2f   // [V] at ADC 1023
+#define VBAT_FILTER_ALPHA  0.2f    // low-pass per sample
+#define VBAT_PERIOD_MS     500     // analogRead every 0.5 s (frequent reads disturb Wi-Fi)
 
 /************************************/
 // Devices

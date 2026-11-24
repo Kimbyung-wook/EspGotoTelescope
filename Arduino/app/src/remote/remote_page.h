@@ -136,6 +136,9 @@ function connect() {
     if (m.hello) {
       inputOk = !!m.hello.input; inp.className = inputOk ? 'on' : '';
       if (m.hello.version) document.getElementById('ver').textContent = 'v' + m.hello.version;
+      // phone clock for the mount when it has no GPS (DES-LOC-05)
+      var now = Date.now();
+      if (ws.readyState === 1) ws.send(JSON.stringify({ time_s: Math.floor(now / 1000), time_ms: now % 1000 }));
     }
   };
   ws.onclose = function () {
@@ -201,5 +204,5 @@ connect();
 </body></html>
 )PAGE";
 // HTTP ETag: the phone keeps the page and only revalidates (304) until it changes
-static const char REMOTE_PAGE_ETAG[] = "\"d7707c0cd325\"";
+static const char REMOTE_PAGE_ETAG[] = "\"85f05095cf64\"";
 }  // namespace remote

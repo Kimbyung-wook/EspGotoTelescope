@@ -21,7 +21,27 @@ inline void correctImu(Telemetry& t, const UiState& st) {
   t.pitch_acc_deg = pitchFromAccelDeg(t.imu_corr);
 }
 
-// Position and time in use (DES-LOC-01, DES-LOC-04) from the raw GPS fields of
+// A clock set to 'jd' at millis() 'set_ms', running with millis(): jd_ut and the
+// status bar fields
+inline void runClock(Telemetry& t, double jd, unsigned long set_ms) {
+  t.jd_ut = jd + (double)(unsigned long)(t.now_ms - set_ms) / 86400000.0;
+  astro::UtcTime m;
+  astro::utcFromJd(t.jd_ut + 0.0005 / 86400.0, m);   // round to the millisecond (jd keeps ~10 us)
+  t.clock_hour = m.hour; t.clock_minute = m.minute;
+  t.clock_second = (int)m.second;
+  t.clock_ms = (int)((m.second - (int)m.second) * 1000.0);
+}
+
+// Phone time from the remote UI page (DES-LOC-05): Unix seconds and milliseconds.
+// Times before 2020 are ignored (a phone with no clock set).
+inline void setPhoneClock(UiState& st, unsigned long now_ms, unsigned long unix_s, int ms) {
+  if (unix_s < 1577836800UL || ms < 0 || ms > 999) return;   // 2020-01-01
+  st.phone_clock_valid = true;
+  st.phone_clock_jd = 2440587.5 + ((double)unix_s + ms / 1000.0) / 86400.0;
+  st.phone_clock_ms = now_ms;
+}
+
+// Position and time in use (DES-LOC-01, DES-LOC-04, DES-LOC-05) from the raw GPS fields of
 // Telemetry and the settings in UiState; keeps the last good fix (DES-LOC-02,
 // asks the main loop to save it).
 inline void updateLocationTime(Telemetry& t, UiState& st, loc::LastGpsRecorder& last_rec) {
@@ -59,14 +79,12 @@ inline void updateLocationTime(Telemetry& t, UiState& st, loc::LastGpsRecorder& 
     t.jd_ut = astro::julianDate(u);
     t.clock_hour = t.hour; t.clock_minute = t.minute;
     t.clock_second = t.seconds; t.clock_ms = t.milliseconds;
-  } else if (st.manual_clock_valid) {
+  } else if (st.manual_clock_valid) {     // set by the user on purpose: before the phone
     t.time_source = loc::TIME_MANUAL;
-    t.jd_ut = st.manual_clock_jd + (double)(unsigned long)(t.now_ms - st.manual_clock_ms) / 86400000.0;
-    astro::UtcTime m;
-    astro::utcFromJd(t.jd_ut, m);
-    t.clock_hour = m.hour; t.clock_minute = m.minute;
-    t.clock_second = (int)m.second;
-    t.clock_ms = (int)((m.second - (int)m.second) * 1000.0);
+    runClock(t, st.manual_clock_jd, st.manual_clock_ms);
+  } else if (st.phone_clock_valid) {
+    t.time_source = loc::TIME_PHONE;
+    runClock(t, st.phone_clock_jd, st.phone_clock_ms);
   } else {
     t.time_source = loc::TIME_NONE;   // status bar keeps the GPS clock fields
     t.clock_hour = t.hour; t.clock_minute = t.minute;

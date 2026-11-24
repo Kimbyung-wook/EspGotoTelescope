@@ -35,6 +35,13 @@ int OLED::setup_display()
 //   strncpy(&msg[line][0], text_in, size);
 // }
 
+void OLED::setPower(bool on)
+{
+  if (on == power_on) return;
+  display_device.ssd1306_command(on ? SSD1306_DISPLAYON : SSD1306_DISPLAYOFF);
+  power_on = on;
+}
+
 void OLED::print()
 {
   perform_print.tic();

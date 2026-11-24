@@ -16,6 +16,7 @@ const char* timeSourceText(int src) {
   switch (src) {
     case TIME_GPS:    return "GPS";
     case TIME_MANUAL: return "MAN";
+    case TIME_PHONE:  return "PHN";
     default:          return "---";
   }
 }

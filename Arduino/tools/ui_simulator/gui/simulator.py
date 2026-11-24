@@ -40,6 +40,7 @@ GPS_FIELDS = [
     ("milliseconds", "ms", 0),
     ("lat", "위도 [deg, +N]", 37.5665), ("lon", "경도 [deg, +E]", 126.9780),
     ("fix", "Fix (0 NoFix/1 GPS/2 DGPS)", 1), ("sats", "위성 수", 8),
+    ("hdop", "HDOP", 1.0),
     ("link", "링크 (1 연결/0 끊김)", 1),
 ]
 IMU_FIELDS = [

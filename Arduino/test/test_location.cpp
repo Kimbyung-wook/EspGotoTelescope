@@ -11,7 +11,7 @@ Position at(double lat, double lon, float alt = 0.0f) {
 }
 void gpsFix(Telemetry& t, int fix = 1, int sats = 8) {
   t.gps.year = 26; t.gps.month = 11; t.gps.day = 24; t.gps.hour = 12; t.gps.minute = 30; t.gps.seconds = 15; t.gps.milliseconds = 500;
-  t.gps.fixquality = fix; t.gps.satellites = sats;
+  t.gps.fixquality = fix; t.gps.satellites = sats; t.gps.hdop = 1.0f;
   t.gps.latitude = 37.5665; t.gps.longitude = 126.9780; t.gps.altitude_m = 38.0f;
 }
 }
@@ -37,29 +37,31 @@ TEST(loc_distance_km) {
   CHECK(distanceKm(at(37.5665, 126.978), at(37.5755, 126.978)) < 1.01);   // ~1.0 km north
 }
 
-TEST(loc_last_gps_needs_30_s_and_4_satellites) {
+TEST(loc_last_gps_needs_30_s_4_satellites_and_hdop) {
   LastGpsRecorder r;
   const Position p = at(37.5665, 126.978);
-  CHECK(!r.update(0, 1, 3, p, false, p));          // 3 satellites: not good enough
-  CHECK(!r.update(100, 1, 8, p, false, p));        // good fix starts the 30 s
-  CHECK(!r.update(20000, 1, 8, p, false, p));
-  CHECK(!r.update(25000, 0, 0, p, false, p));      // lost: starts over
-  CHECK(!r.update(26000, 1, 8, p, false, p));
-  CHECK(!r.update(55000, 1, 8, p, false, p));
-  CHECK(r.update(56000, 1, 8, p, false, p));       // held 30 s, nothing saved yet -> save
+  CHECK(!r.update(0, 1, 3, 1.0f, p, false, p));          // 3 satellites: not good enough
+  CHECK(!r.update(0, 1, 8, 2.5f, p, false, p));          // HDOP above 2: not good enough
+  CHECK(!r.update(0, 1, 8, 0.0f, p, false, p));          // no HDOP yet
+  CHECK(!r.update(100, 1, 8, 1.0f, p, false, p));        // good fix starts the 30 s
+  CHECK(!r.update(20000, 1, 8, 1.0f, p, false, p));
+  CHECK(!r.update(25000, 0, 0, 1.0f, p, false, p));      // lost: starts over
+  CHECK(!r.update(26000, 1, 8, 1.0f, p, false, p));
+  CHECK(!r.update(55000, 1, 8, 1.0f, p, false, p));
+  CHECK(r.update(56000, 1, 8, 1.0f, p, false, p));       // held 30 s, nothing saved yet -> save
   CHECK(r.done());
-  CHECK(!r.update(90000, 1, 8, p, false, p));      // once per power-on
+  CHECK(!r.update(90000, 1, 8, 1.0f, p, false, p));      // once per power-on
 }
 
 TEST(loc_last_gps_only_when_moved_1_km) {
   const Position p = at(37.5665, 126.978);
   LastGpsRecorder same;
-  same.update(0, 1, 8, p, false, p);
-  CHECK(!same.update(30000, 1, 8, p, true, at(37.5670, 126.978)));   // 55 m away: keep
+  same.update(0, 1, 8, 1.0f, p, false, p);
+  CHECK(!same.update(30000, 1, 8, 1.0f, p, true, at(37.5670, 126.978)));   // 55 m away: keep
   CHECK(same.done());
   LastGpsRecorder moved;
-  moved.update(0, 1, 8, p, false, p);
-  CHECK(moved.update(30000, 1, 8, p, true, at(35.1796, 129.0756)));  // Busan
+  moved.update(0, 1, 8, 1.0f, p, false, p);
+  CHECK(moved.update(30000, 1, 8, 1.0f, p, true, at(35.1796, 129.0756)));  // Busan
 }
 
 TEST(loc_update_uses_gps_and_records_the_fix) {

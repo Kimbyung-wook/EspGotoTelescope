@@ -47,6 +47,7 @@ app::FrameInput toInput(unsigned long now_ms, int delta, const InputSnapshot& in
   in.gps.milliseconds = g.milliseconds;
   in.gps.fixquality = g.fixquality;
   in.gps.satellites = g.satellites;
+  in.gps.hdop = (float)g.hdop;
   in.gps.link = g.link;
   // Adafruit_GPS: lat/lon hemisphere letters; latitude_fixed*1e-7 is the
   // signed angle (negative for S/W).

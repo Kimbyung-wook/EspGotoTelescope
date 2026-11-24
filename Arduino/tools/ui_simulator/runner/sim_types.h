@@ -17,6 +17,7 @@ struct GpsState {
   double longitude = 126.9780;              // deg, + east
   int fixquality = 1;                       // 0 NoFix, 1 GPS, 2 DGPS
   int satellites = 8;
+  double hdop = 1.0;                        // last GPS is kept only at HDOP <= 2 (DES-LOC-02)
   bool link = true;                         // false: no NMEA for 3 s (Status > GPS "NoLink")
 };
 

@@ -45,10 +45,11 @@ double distanceKm(const Position& a, const Position& b) {
   return 2.0 * R * asin(sqrt(h < 1.0 ? h : 1.0));
 }
 
-bool LastGpsRecorder::update(unsigned long now_ms, int fixquality, int satellites,
+bool LastGpsRecorder::update(unsigned long now_ms, int fixquality, int satellites, float hdop,
                              const Position& gps, bool last_valid, const Position& last) {
   if (done_) return false;
-  if (fixquality <= 0 || satellites < MIN_SATELLITES) { holding_ = false; return false; }
+  const bool good = fixquality > 0 && satellites >= MIN_SATELLITES && hdop > 0.0f && hdop <= MAX_HDOP;
+  if (!good) { holding_ = false; return false; }
   if (!holding_) { holding_ = true; since_ms_ = now_ms; return false; }
   if ((unsigned long)(now_ms - since_ms_) < HOLD_MS) return false;
   done_ = true;                    // at most one write per power-on

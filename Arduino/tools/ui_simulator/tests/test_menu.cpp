@@ -292,6 +292,21 @@ void test_last_gps_fix_is_kept() {
   EXPECT_LINE(s, 5, "Pos LAST Time ---");
 }
 
+// DES-LOC-02: a fix with a poor HDOP (above 2) is used while it lasts, but not kept
+void test_last_gps_needs_good_hdop() {
+  Sim s;
+  s.boot();
+  s.send("{\"type\":\"sensors\",\"gps\":{\"hdop\":3.5}}");
+  openMain(s, 2);
+  s.click();                 // GPS
+  s.tick(400);               // 40 s
+  CHECK(s.ui.settingsStore().writes == 0);
+  EXPECT_LINE(s, 5, "Pos GPS  Time GPS");
+  s.send("{\"type\":\"sensors\",\"gps\":{\"fix\":0,\"sats\":0}}");
+  s.tick();
+  EXPECT_LINE(s, 5, "Pos ---  Time ---");
+}
+
 void test_imu_screens() {
   Sim s;
   s.boot();
@@ -604,7 +619,8 @@ int main() {
     T(test_boot_then_main_menu), T(test_boot_failures), T(test_input_ignored_during_boot),
     T(test_reset_restarts_ui), T(test_cursor_blinks), T(test_main_menu_scrolls),
     T(test_enter_and_leave_every_screen), T(test_ra_speed_edit_drives_motor),
-    T(test_gps_screen_shows_sensor_values), T(test_last_gps_fix_is_kept), T(test_imu_screens),
+    T(test_gps_screen_shows_sensor_values), T(test_last_gps_fix_is_kept), T(test_last_gps_needs_good_hdop),
+    T(test_imu_screens),
     T(test_moon_target), T(test_calibration_menu), T(test_gyro_bias_calibration),
     T(test_att_estimator_converges), T(test_att_estimator_uses_gyro_bias), T(test_polar_align),
     T(test_target_tracking), T(test_settings_survive_reset), T(test_sleep_and_health),

@@ -20,6 +20,7 @@ void readGps(const json::Value& v, GpsState& g) {
   g.longitude = v.getNumber("lon", g.longitude);
   g.fixquality = v.getInt("fix", g.fixquality);
   g.satellites = v.getInt("sats", g.satellites);
+  g.hdop = v.getNumber("hdop", g.hdop);
   g.link = v.getBool("link", g.link);
 }
 

@@ -32,16 +32,18 @@ int resolvePosition(int mode, bool gps_fix, const Position& gps,
 // Great-circle distance [km]
 double distanceKm(const Position& a, const Position& b);
 
-// DES-LOC-02 : once per power-on, after a good fix held for 30 s, the last GPS
+// DES-LOC-02 : once per power-on, after a good fix (2D or 3D, at least 4 satellites,
+// HDOP at most MAX_HDOP) held for 30 s, the last GPS
 // position is replaced when there is none yet or it moved more than 1 km.
 class LastGpsRecorder {
 public:
   static const unsigned long HOLD_MS = 30000;
   static const int MIN_SATELLITES = 4;
+  static constexpr float MAX_HDOP = 2.0f;     // about 2 x the receiver accuracy, or better
   static constexpr double MOVE_KM = 1.0;
 
   // Call every frame. Returns true once, when 'gps' should become the last fix.
-  bool update(unsigned long now_ms, int fixquality, int satellites, const Position& gps,
+  bool update(unsigned long now_ms, int fixquality, int satellites, float hdop, const Position& gps,
               bool last_valid, const Position& last);
   bool done() const { return done_; }
   void reset() { holding_ = false; done_ = false; }

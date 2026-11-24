@@ -54,6 +54,7 @@ GpsRaw Gps::data() const {
   g.milliseconds = device_.milliseconds;
   g.fixquality   = device_.fixquality;
   g.satellites   = device_.satellites;
+  g.hdop         = device_.HDOP;
   g.lat_hemi     = device_.lat;
   g.lon_hemi     = device_.lon;
   g.latitude     = ((double)device_.latitude_fixed)  * 1E-7;

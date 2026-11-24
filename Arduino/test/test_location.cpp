@@ -10,9 +10,9 @@ Position at(double lat, double lon, float alt = 0.0f) {
   return p;
 }
 void gpsFix(Telemetry& t, int fix = 1, int sats = 8) {
-  t.year = 26; t.month = 11; t.day = 24; t.hour = 12; t.minute = 30; t.seconds = 15; t.milliseconds = 500;
-  t.fixquality = fix; t.satellites = sats;
-  t.latitude = 37.5665; t.longitude = 126.9780; t.altitude_m = 38.0f;
+  t.gps.year = 26; t.gps.month = 11; t.gps.day = 24; t.gps.hour = 12; t.gps.minute = 30; t.gps.seconds = 15; t.gps.milliseconds = 500;
+  t.gps.fixquality = fix; t.gps.satellites = sats;
+  t.gps.latitude = 37.5665; t.gps.longitude = 126.9780; t.gps.altitude_m = 38.0f;
 }
 }
 
@@ -67,42 +67,42 @@ TEST(loc_update_uses_gps_and_records_the_fix) {
   gpsFix(t);
   t.now_ms = 1000;
   app::updateLocationTime(t, st, rec);
-  CHECK(t.loc_source == SRC_GPS && t.time_source == TIME_GPS);
-  CHECK_NEAR(t.obs_lat_deg, 37.5665, 1e-12);
-  CHECK_NEAR(t.jd_ut, astro::julianDate({2026, 11, 24, 12, 30, 15.5}), 1e-9);
-  CHECK(t.clock_hour == 12 && t.clock_minute == 30 && t.clock_second == 15 && t.clock_ms == 500);
-  CHECK(!st.last_gps_valid);
+  CHECK(t.obs.loc_source == SRC_GPS && t.obs.time_source == TIME_GPS);
+  CHECK_NEAR(t.obs.lat_deg, 37.5665, 1e-12);
+  CHECK_NEAR(t.obs.jd_ut, astro::julianDate({2026, 11, 24, 12, 30, 15.5}), 1e-9);
+  CHECK(t.obs.clock_hour == 12 && t.obs.clock_minute == 30 && t.obs.clock_second == 15 && t.obs.clock_ms == 500);
+  CHECK(!st.cfg.last_gps_valid);
   t.now_ms = 31000;
   app::updateLocationTime(t, st, rec);
-  CHECK(st.last_gps_valid);                         // kept after 30 s of fix
+  CHECK(st.cfg.last_gps_valid);                         // kept after 30 s of fix
   CHECK(st.settings_save_request);
-  CHECK(st.last_year == 2026 && st.last_month == 11 && st.last_day == 24);
-  CHECK_NEAR(st.last_lat_deg, 37.5665, 1e-12);
+  CHECK(st.cfg.last_year == 2026 && st.cfg.last_month == 11 && st.cfg.last_day == 24);
+  CHECK_NEAR(st.cfg.last_lat_deg, 37.5665, 1e-12);
   // GPS lost: the last fix and no time
-  t.fixquality = 0;
+  t.gps.fixquality = 0;
   app::updateLocationTime(t, st, rec);
-  CHECK(t.loc_source == SRC_LAST);
-  CHECK(t.time_source == TIME_NONE);
+  CHECK(t.obs.loc_source == SRC_LAST);
+  CHECK(t.obs.time_source == TIME_NONE);
 }
 
 TEST(loc_manual_clock_runs_with_millis) {
   Telemetry t; UiState st; LastGpsRecorder rec;
-  st.manual_set = true; st.manual_lat_deg = -33.8688; st.manual_lon_deg = 151.2093;
+  st.cfg.manual_set = true; st.cfg.manual_lat_deg = -33.8688; st.cfg.manual_lon_deg = 151.2093;
   st.manual_clock_valid = true;
   st.manual_clock_jd = astro::julianDate({2026, 11, 24, 23, 59, 59.0});
   st.manual_clock_ms = 5000;
   t.now_ms = 7500;                                  // 2.5 s later
   app::updateLocationTime(t, st, rec);
-  CHECK(t.loc_source == SRC_MANUAL && t.time_source == TIME_MANUAL);
-  CHECK(t.clock_hour == 0 && t.clock_minute == 0 && t.clock_second == 1);
-  CHECK(t.clock_ms >= 499 && t.clock_ms <= 501);
+  CHECK(t.obs.loc_source == SRC_MANUAL && t.obs.time_source == TIME_MANUAL);
+  CHECK(t.obs.clock_hour == 0 && t.obs.clock_minute == 0 && t.obs.clock_second == 1);
+  CHECK(t.obs.clock_ms >= 499 && t.obs.clock_ms <= 501);
   gpsFix(t);                                        // a GPS fix wins (Auto)
   app::updateLocationTime(t, st, rec);
-  CHECK(t.loc_source == SRC_GPS && t.time_source == TIME_GPS);
-  st.location_mode = MODE_MANUAL;                   // Manual: GPS position ignored
+  CHECK(t.obs.loc_source == SRC_GPS && t.obs.time_source == TIME_GPS);
+  st.cfg.location_mode = MODE_MANUAL;                   // Manual: GPS position ignored
   app::updateLocationTime(t, st, rec);
-  CHECK(t.loc_source == SRC_MANUAL);
-  CHECK_NEAR(t.obs_lat_deg, -33.8688, 1e-12);
+  CHECK(t.obs.loc_source == SRC_MANUAL);
+  CHECK_NEAR(t.obs.lat_deg, -33.8688, 1e-12);
 }
 
 TEST(loc_time_order_gps_phone_manual) {
@@ -111,7 +111,7 @@ TEST(loc_time_order_gps_phone_manual) {
   st.manual_clock_jd = astro::julianDate({2026, 11, 25, 9, 0, 0.0});
   st.manual_clock_ms = 0;
   app::updateLocationTime(t, st, rec);
-  CHECK(t.time_source == TIME_MANUAL && t.clock_hour == 9);
+  CHECK(t.obs.time_source == TIME_MANUAL && t.obs.clock_hour == 9);
   app::setPhoneClock(st, 1000, 1500000000UL, 0);     // 2017: phone clock not set, ignored
   CHECK(!st.phone_clock_valid);
   app::setPhoneClock(st, 1000, 1795575845UL, 600);   // 2026-11-25 03:04:05.600 UTC
@@ -119,13 +119,13 @@ TEST(loc_time_order_gps_phone_manual) {
   CHECK_NEAR(st.phone_clock_jd, astro::julianDate({2026, 11, 25, 3, 4, 5.6}), 1e-8);
   t.now_ms = 3000;                                   // 2 s later
   app::updateLocationTime(t, st, rec);
-  CHECK(t.time_source == TIME_PHONE);                // the phone wins over the hand-set clock
-  CHECK(t.clock_hour == 3 && t.clock_minute == 4 && t.clock_second == 7);
-  CHECK(t.clock_ms >= 599 && t.clock_ms <= 601);
-  CHECK(std::strcmp(timeSourceText(t.time_source), "PHN") == 0);
+  CHECK(t.obs.time_source == TIME_PHONE);                // the phone wins over the hand-set clock
+  CHECK(t.obs.clock_hour == 3 && t.obs.clock_minute == 4 && t.obs.clock_second == 7);
+  CHECK(t.obs.clock_ms >= 599 && t.obs.clock_ms <= 601);
+  CHECK(std::strcmp(timeSourceText(t.obs.time_source), "PHN") == 0);
   gpsFix(t);                                         // and GPS wins over both
   app::updateLocationTime(t, st, rec);
-  CHECK(t.time_source == TIME_GPS);
+  CHECK(t.obs.time_source == TIME_GPS);
 }
 
 TEST(battery_scale_and_filter) {
@@ -158,15 +158,15 @@ TEST(loc_jd_calendar_round_trip) {
 
 TEST(loc_imu_correction_applies_gyro_and_accel) {
   Telemetry t; UiState st;
-  t.imu.ax = 0.1f; t.imu.ay = 0.0f; t.imu.az = 10.0f; t.imu.wx = 0.5f;
-  st.gyro_bias[0] = 0.5f;
-  st.accel_bias[0] = 0.1f; st.accel_bias[2] = 0.2f; st.accel_scale[2] = 1.0f;
+  t.imu.raw.ax = 0.1f; t.imu.raw.ay = 0.0f; t.imu.raw.az = 10.0f; t.imu.raw.wx = 0.5f;
+  st.cfg.gyro_bias[0] = 0.5f;
+  st.cfg.accel_bias[0] = 0.1f; st.cfg.accel_bias[2] = 0.2f; st.cfg.accel_scale[2] = 1.0f;
   app::correctImu(t, st);
-  CHECK_NEAR(t.imu_corr.wx, 0.0, 1e-6);
-  CHECK_NEAR(t.imu_corr.ax, 0.0, 1e-6);
-  CHECK_NEAR(t.imu_corr.az, 9.8, 1e-5);
-  CHECK_NEAR(t.pitch_acc_deg, 0.0, 1e-4);           // tilt from the corrected sample
-  CHECK_NEAR(t.imu.ax, 0.1, 1e-6);                  // raw sample unchanged
+  CHECK_NEAR(t.imu.corr.wx, 0.0, 1e-6);
+  CHECK_NEAR(t.imu.corr.ax, 0.0, 1e-6);
+  CHECK_NEAR(t.imu.corr.az, 9.8, 1e-5);
+  CHECK_NEAR(t.imu.pitch_acc_deg, 0.0, 1e-4);           // tilt from the corrected sample
+  CHECK_NEAR(t.imu.raw.ax, 0.1, 1e-6);                  // raw sample unchanged
 }
 
 TEST(loc_motor_inhibit_and_tracking_sign) {
@@ -177,16 +177,16 @@ TEST(loc_motor_inhibit_and_tracking_sign) {
   CHECK(app::motorCommand(t, st) == 0.0f);          // stopped, command kept
   CHECK(st.ra_speed_cmd == 40.0f);
   st.motor_inhibit = false;
-  st.tracking = true; st.ra_duty_at_sidereal = 100.0f;   // sidereal: no position needed
+  st.tracking = true; st.cfg.ra_duty_at_sidereal = 100.0f;   // sidereal: no position needed
   CHECK_NEAR(app::motorCommand(t, st), 100.0, 1e-4);
-  t.loc_source = SRC_MANUAL; t.obs_lat_deg = -33.0;      // southern hemisphere
+  t.obs.loc_source = SRC_MANUAL; t.obs.lat_deg = -33.0;      // southern hemisphere
   CHECK_NEAR(app::motorCommand(t, st), -100.0, 1e-4);
-  st.motor_reverse = true;                                // wiring flipped as well
+  st.cfg.motor_reverse = true;                                // wiring flipped as well
   CHECK_NEAR(app::motorCommand(t, st), 100.0, 1e-4);
-  st.track_mode = UiState::TRACK_LUNAR;                   // no Moon yet: command kept
+  st.cfg.track_mode = UiState::TRACK_LUNAR;                   // no Moon yet: command kept
   st.ra_speed_cmd = 7.0f;
   CHECK_NEAR(app::motorCommand(t, st), 7.0, 1e-6);
-  t.moon_valid = true; t.moon_rate_arcsec_s = 14.5;
-  t.obs_lat_deg = 37.0; st.motor_reverse = false;
+  t.moon.valid = true; t.moon.rate_arcsec_s = 14.5;
+  t.obs.lat_deg = 37.0; st.cfg.motor_reverse = false;
   CHECK_NEAR(app::motorCommand(t, st), 100.0 * 14.5 / astro::SIDEREAL_RATE_ARCSEC_S, 1e-4);
 }

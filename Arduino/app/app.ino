@@ -56,7 +56,6 @@ int         rotary_count_prev = 0;
 // Settings in flash (docs/REQUIREMENTS.md DES-CFG)
 /************************************/
 config::EepromSettingsStore settings_store;
-config::Settings            settings;
 
 static_assert(sizeof(frame.lines) == sizeof(monitor->msg), "Frame and OLED buffers must match");
 
@@ -137,9 +136,7 @@ void setup() {
   // Settings : calibration, RA duty, tracking offset (defaults if none or bad)
   /************************************/
   settings_store.begin();
-  const config::LoadResult settings_result = config::load(settings_store, settings);
-  config::applyToUi(settings, ui_ctx.state);
-  ui_ctx.tel.settings_status = config::statusAfterLoad(settings_result);
+  const config::LoadResult settings_result = app::loadSettings(settings_store, ui_ctx);
   bootLine(line, config::loadText(settings_result));
 
 #if REMOTE_UI_ENABLE
@@ -158,30 +155,30 @@ void setup() {
 void updateTelemetry(Telemetry& t) {
   const Adafruit_GPS* g = gps->gps_device;
   t.now_ms       = millis();
-  t.year         = g->year;
-  t.month        = g->month;
-  t.day          = g->day;
-  t.hour         = g->hour;
-  t.minute       = g->minute;
-  t.seconds      = g->seconds;
-  t.milliseconds = g->milliseconds;
-  t.fixquality   = g->fixquality;
-  t.satellites   = g->satellites;
-  t.lat_hemi     = g->lat;
-  t.lon_hemi     = g->lon;
-  t.latitude     = ((double)g->latitude_fixed)  * 1E-7;
-  t.longitude    = ((double)g->longitude_fixed) * 1E-7;
-  t.altitude_m   = g->altitude;
+  t.gps.year         = g->year;
+  t.gps.month        = g->month;
+  t.gps.day          = g->day;
+  t.gps.hour         = g->hour;
+  t.gps.minute       = g->minute;
+  t.gps.seconds      = g->seconds;
+  t.gps.milliseconds = g->milliseconds;
+  t.gps.fixquality   = g->fixquality;
+  t.gps.satellites   = g->satellites;
+  t.gps.lat_hemi     = g->lat;
+  t.gps.lon_hemi     = g->lon;
+  t.gps.latitude     = ((double)g->latitude_fixed)  * 1E-7;
+  t.gps.longitude    = ((double)g->longitude_fixed) * 1E-7;
+  t.gps.altitude_m   = g->altitude;
 
-  t.imu           = imu.data();
-  t.loop_hz = hz;
-  t.loop_us = perform_rest.getdt() + perform_main.getdt();
-  t.main_us = perform_main.getdt();
-  t.disp_us = monitor->perform_print.getdt();
-  t.gps_us  = gps->perform_read.getdt();
-  t.imu_us  = perform_imu.getdt();
-  t.est_us  = perform_est.getdt();
-  t.astro_us = perform_astro.getdt();
+  t.imu.raw           = imu.data();
+  t.health.loop_hz = hz;
+  t.health.loop_us = perform_rest.getdt() + perform_main.getdt();
+  t.health.main_us = perform_main.getdt();
+  t.health.disp_us = monitor->perform_print.getdt();
+  t.health.gps_us  = gps->perform_read.getdt();
+  t.health.imu_us  = perform_imu.getdt();
+  t.health.est_us  = perform_est.getdt();
+  t.health.astro_us = perform_astro.getdt();
   t.remote   = remote::state();   // status bar Wi-Fi mark
 #if VBAT_SENSE_ENABLE
   if (!battery.valid() || t.now_ms - battery_read_ms >= VBAT_PERIOD_MS) {
@@ -189,8 +186,8 @@ void updateTelemetry(Telemetry& t) {
     battery_read_ms = t.now_ms;
   }
 #endif
-  t.voltage_valid = battery.valid();
-  t.voltage       = battery.volts();
+  t.power.valid = battery.valid();
+  t.power.volts       = battery.volts();
 }
 
 void loop() {
@@ -218,10 +215,10 @@ void loop() {
 
   // Estimation
   perform_est.tic();
-  att_est.update(ui_ctx.tel.imu_corr, 1.0f / hz);
+  att_est.update(ui_ctx.tel.imu.corr, 1.0f / hz);
   perform_est.toc();
-  ui_ctx.tel.roll_est_deg  = att_est.rollDeg();
-  ui_ctx.tel.pitch_est_deg = att_est.pitchDeg();
+  ui_ctx.tel.imu.roll_est_deg  = att_est.rollDeg();
+  ui_ctx.tel.imu.pitch_est_deg = att_est.pitchDeg();
 
   // Phone time from the remote UI page (DES-LOC-05), then position and time in use:
   // GPS, last GPS fix, manual, phone (DES-LOC)
@@ -247,7 +244,7 @@ void loop() {
     monitor->print();
   }
   remote::publish(frame);   // phone mirror (only when the lines changed)
-  config::serviceRequests(settings_store, settings, ui_ctx);   // Save / Reset from the UI
+  app::serviceRequests(settings_store, ui_ctx);   // Save / Reset from the UI
 
   // Outputs (tracking overrides the manual RRcmd; calibration / Polar Align stop the motor)
   ra_motor.setSpeed(app::motorCommand(ui_ctx.tel, ui_ctx.state));

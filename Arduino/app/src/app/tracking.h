@@ -16,9 +16,9 @@ inline float trackingDuty(double rate_arcsec_s, float duty_at_sidereal) {
 
 // Tracking rate of the chosen mode (DES-TRK-01). Lunar needs the Moon position.
 inline bool trackingRate(const Telemetry& t, const UiState& st, double& rate_arcsec_s) {
-  if (st.track_mode == UiState::TRACK_LUNAR) {
-    if (!t.moon_valid) return false;
-    rate_arcsec_s = t.moon_rate_arcsec_s;
+  if (st.cfg.track_mode == UiState::TRACK_LUNAR) {
+    if (!t.moon.valid) return false;
+    rate_arcsec_s = t.moon.rate_arcsec_s;
     return true;
   }
   rate_arcsec_s = astro::SIDEREAL_RATE_ARCSEC_S;
@@ -28,8 +28,8 @@ inline bool trackingRate(const Telemetry& t, const UiState& st, double& rate_arc
 // Direction of the tracking command (DES-MOT-02): -1 in the southern hemisphere,
 // flipped again by the motor_reverse setting.
 inline float trackingSign(const Telemetry& t, const UiState& st) {
-  float s = (t.loc_source != loc::SRC_NONE && t.obs_lat_deg < 0.0) ? -1.0f : 1.0f;
-  return st.motor_reverse ? -s : s;
+  float s = (t.obs.loc_source != loc::SRC_NONE && t.obs.lat_deg < 0.0) ? -1.0f : 1.0f;
+  return st.cfg.motor_reverse ? -s : s;
 }
 
 // While tracking is on, drive the RA motor at the tracking rate plus the user
@@ -41,7 +41,7 @@ inline bool applyTracking(const Telemetry& t, UiState& st, float duty_at_siderea
   if (!st.tracking) return false;
   double rate = 0.0;
   if (!trackingRate(t, st, rate)) return false;
-  st.ra_speed_cmd = trackingSign(t, st) * (trackingDuty(rate, duty_at_sidereal) + st.track_offset);
+  st.ra_speed_cmd = trackingSign(t, st) * (trackingDuty(rate, duty_at_sidereal) + st.cfg.track_offset);
   return true;
 }
 

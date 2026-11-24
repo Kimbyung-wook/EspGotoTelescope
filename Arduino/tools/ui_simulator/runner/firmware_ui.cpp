@@ -37,53 +37,53 @@ void bootLines(const BootConfig& boot, const char* settings_text,
 void fillTelemetry(unsigned long now_ms, const SensorState& s, const UiState& st, Telemetry& t) {
   const GpsState& g = s.gps;
   t.now_ms = now_ms;
-  t.year = g.year;
-  t.month = g.month;
-  t.day = g.day;
-  t.hour = g.hour;
-  t.minute = g.minute;
-  t.seconds = g.seconds;
-  t.milliseconds = g.milliseconds;
-  t.fixquality = g.fixquality;
-  t.satellites = g.satellites;
+  t.gps.year = g.year;
+  t.gps.month = g.month;
+  t.gps.day = g.day;
+  t.gps.hour = g.hour;
+  t.gps.minute = g.minute;
+  t.gps.seconds = g.seconds;
+  t.gps.milliseconds = g.milliseconds;
+  t.gps.fixquality = g.fixquality;
+  t.gps.satellites = g.satellites;
   // Adafruit_GPS: lat/lon hemisphere letters; latitude_fixed*1e-7 is the
   // signed angle (negative for S/W).
-  t.lat_hemi = g.latitude >= 0 ? 'N' : 'S';
-  t.lon_hemi = g.longitude >= 0 ? 'E' : 'W';
-  t.latitude = g.latitude;
-  t.longitude = g.longitude;
+  t.gps.lat_hemi = g.latitude >= 0 ? 'N' : 'S';
+  t.gps.lon_hemi = g.longitude >= 0 ? 'E' : 'W';
+  t.gps.latitude = g.latitude;
+  t.gps.longitude = g.longitude;
 
   const ImuState& m = s.imu;
-  t.imu.ax = (float)m.ax;
-  t.imu.ay = (float)m.ay;
-  t.imu.az = (float)m.az;
-  t.imu.wx = (float)m.wx;
-  t.imu.wy = (float)m.wy;
-  t.imu.wz = (float)m.wz;
-  t.imu.mx = (float)m.mx;
-  t.imu.my = (float)m.my;
-  t.imu.mz = (float)m.mz;
-  t.imu.temperature = (float)m.temperature;
+  t.imu.raw.ax = (float)m.ax;
+  t.imu.raw.ay = (float)m.ay;
+  t.imu.raw.az = (float)m.az;
+  t.imu.raw.wx = (float)m.wx;
+  t.imu.raw.wy = (float)m.wy;
+  t.imu.raw.wz = (float)m.wz;
+  t.imu.raw.mx = (float)m.mx;
+  t.imu.raw.my = (float)m.my;
+  t.imu.raw.mz = (float)m.mz;
+  t.imu.raw.temperature = (float)m.temperature;
 
-  t.voltage_valid = true;        // the simulator always "measures" the supply
-  t.voltage = (float)s.voltage;
+  t.power.valid = true;        // the simulator always "measures" the supply
+  t.power.volts = (float)s.voltage;
   t.remote = s.remote;
 
   // Health: typical numbers from the board (the simulator does not time it)
-  t.loop_hz = 10.0f;
-  t.loop_us = 100000;
-  t.main_us = 24300;
-  t.disp_us = 21800;
-  t.gps_us = 650;
-  t.imu_us = 1250;
-  t.est_us = 180;
-  t.astro_us = 4000;   // targetState(Moon), about 4 ms at 160 MHz (tools/astro_bench measures it)
+  t.health.loop_hz = 10.0f;
+  t.health.loop_us = 100000;
+  t.health.main_us = 24300;
+  t.health.disp_us = 21800;
+  t.health.gps_us = 650;
+  t.health.imu_us = 1250;
+  t.health.est_us = 180;
+  t.health.astro_us = 4000;   // targetState(Moon), about 4 ms at 160 MHz (tools/astro_bench measures it)
 }
 
 }  // namespace
 
 FirmwareUi::FirmwareUi()
-    : store_(new config::RamSettingsStore()), settings_(new config::Settings()) {}
+    : store_(new config::RamSettingsStore()) {}
 FirmwareUi::~FirmwareUi() {}
 
 void FirmwareUi::begin(const BootConfig& boot, const SensorState&) {
@@ -98,10 +98,7 @@ void FirmwareUi::begin(const BootConfig& boot, const SensorState&) {
   target_tracker_.reset(new astro::TargetTracker(astro::Target::Mercury, 1000));
   last_gps_.reset(new loc::LastGpsRecorder());
   // setup(): settings after the motor, before the main loop
-  const config::LoadResult r = config::load(*store_, *settings_);
-  config::applyToUi(*settings_, ctx_->state);
-  ctx_->tel.settings_status = config::statusAfterLoad(r);
-  settings_load_ = (int)r;
+  settings_load_ = (int)app::loadSettings(*store_, *ctx_);
   att_est_->begin(kAttEstTauS, kFrameMs / 1000.0f);   // end of setup()
 }
 
@@ -135,9 +132,9 @@ void FirmwareUi::frame(unsigned long now_ms, const InputSnapshot& input,
   fillTelemetry(now_ms, sensors, ctx_->state, ctx_->tel);
   app::correctImu(ctx_->tel, ctx_->state);
   // Estimation, as in loop()
-  att_est_->update(ctx_->tel.imu_corr, kFrameMs / 1000.0f);
-  ctx_->tel.roll_est_deg = att_est_->rollDeg();
-  ctx_->tel.pitch_est_deg = att_est_->pitchDeg();
+  att_est_->update(ctx_->tel.imu.corr, kFrameMs / 1000.0f);
+  ctx_->tel.imu.roll_est_deg = att_est_->rollDeg();
+  ctx_->tel.imu.pitch_est_deg = att_est_->pitchDeg();
   if (input.phone_time)
     app::setPhoneClock(ctx_->state, now_ms, input.phone_unix_s, input.phone_ms);
   app::updateLocationTime(ctx_->tel, ctx_->state, *last_gps_);
@@ -152,7 +149,7 @@ void FirmwareUi::frame(unsigned long now_ms, const InputSnapshot& input,
     out.lines[i][kCols] = '\0';
   }
 
-  config::serviceRequests(*store_, *settings_, *ctx_);   // Save / Reset from the UI
+  app::serviceRequests(*store_, *ctx_);   // Save / Reset from the UI
   ::MotorOutput m = RaMotor::toOutput(app::motorCommand(ctx_->tel, ctx_->state));
   motor.in1 = m.in1;
   motor.in2 = m.in2;

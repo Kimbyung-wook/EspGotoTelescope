@@ -47,4 +47,7 @@ build remote_ui --build-property "compiler.cpp.extra_flags=-DREMOTE_UI_ENABLE=1"
 echo
 echo "=== sizes ==="
 printf '%s\n' "${sizes[@]}"
+
+step "code metrics"
+python "$HERE/scripts/metrics.py"
 echo "ALL OK"

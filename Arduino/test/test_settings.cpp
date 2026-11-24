@@ -15,11 +15,11 @@ Settings sample() {
   s.declination_deg = -8.5f;
   s.location_mode = LOCATION_MANUAL;
   s.manual_lat_deg = 37.5665123; s.manual_lon_deg = 126.9780456; s.manual_alt_m = 38.0f;
-  s.last_gps_valid = 1; s.last_lat_deg = -33.8688; s.last_lon_deg = 151.2093; s.last_alt_m = 58.0f;
+  s.last_gps_valid = true; s.last_lat_deg = -33.8688; s.last_lon_deg = 151.2093; s.last_alt_m = 58.0f;
   s.last_year = 2026; s.last_month = 11; s.last_day = 24;
   s.utc_offset_min = 540;
   s.ra_duty_at_sidereal = 187.5f;
-  s.motor_reverse = 1;
+  s.motor_reverse = true;
   s.track_offset = -3.0f;
   s.track_target = 4;
   s.guide_tolerance_deg = 0.5f;
@@ -126,40 +126,56 @@ TEST(settings_save_skips_identical_image) {
 
 TEST(settings_ui_requests_save_and_reset) {
   RamSettingsStore store;
-  Settings s = defaults();
   UiContext ctx;
-  applyToUi(s, ctx.state);
-  CHECK(!serviceRequests(store, s, ctx));             // nothing asked
+  CHECK(app::loadSettings(store, ctx) == LoadResult::Blank);
+  CHECK(same(ctx.state.cfg, defaults()));
+  CHECK(!app::serviceRequests(store, ctx));           // nothing asked
   CHECK(store.writes == 0);
 
-  ctx.state.gyro_bias[2] = 0.25f;
-  ctx.state.ra_duty_at_sidereal = 150.0f;
-  ctx.state.track_offset = 2.0f;
+  ctx.state.cfg.gyro_bias[2] = 0.25f;
+  ctx.state.cfg.ra_duty_at_sidereal = 150.0f;
+  ctx.state.cfg.track_offset = 2.0f;
+  ctx.state.cfg.mag_offset[0] = 7.5f;                 // no screen yet (DES-MAG), still saved
   ctx.state.settings_save_request = true;
-  CHECK(serviceRequests(store, s, ctx));
+  CHECK(app::serviceRequests(store, ctx));
   CHECK(!ctx.state.settings_save_request);
   CHECK(ctx.tel.settings_status == Telemetry::SETTINGS_SAVED);
 
-  Settings back;                                      // power cycle
-  CHECK(load(store, back) == LoadResult::Loaded);
-  UiContext fresh;
-  applyToUi(back, fresh.state);
-  CHECK(fresh.state.gyro_bias[2] == 0.25f);
-  CHECK(fresh.state.ra_duty_at_sidereal == 150.0f);
-  CHECK(fresh.state.track_offset == 2.0f);
+  UiContext fresh;                                    // power cycle
+  CHECK(app::loadSettings(store, fresh) == LoadResult::Loaded);
+  CHECK(fresh.tel.settings_status == Telemetry::SETTINGS_LOADED);
+  CHECK(fresh.state.cfg.gyro_bias[2] == 0.25f);
+  CHECK(fresh.state.cfg.ra_duty_at_sidereal == 150.0f);
+  CHECK(fresh.state.cfg.track_offset == 2.0f);
+  CHECK(fresh.state.cfg.mag_offset[0] == 7.5f);
 
   ctx.state.settings_reset_request = true;            // Settings > Reset defaults
-  CHECK(serviceRequests(store, s, ctx));
-  CHECK(ctx.state.gyro_bias[2] == 0.0f);
-  CHECK(ctx.state.track_offset == 0.0f);
+  CHECK(app::serviceRequests(store, ctx));
+  CHECK(ctx.state.cfg.gyro_bias[2] == 0.0f);
+  CHECK(ctx.state.cfg.track_offset == 0.0f);
+  Settings back;
   CHECK(load(store, back) == LoadResult::Loaded);
   CHECK(same(back, defaults()));
 
   store.fail_writes = true;
-  ctx.state.track_offset = 5.0f;
+  ctx.state.cfg.track_offset = 5.0f;
   ctx.state.settings_save_request = true;
-  CHECK(!serviceRequests(store, s, ctx));
+  CHECK(!app::serviceRequests(store, ctx));
   CHECK(ctx.tel.settings_status == Telemetry::SETTINGS_SAVE_FAILED);
+}
+
+TEST(settings_bad_flag_byte_reads_as_false) {
+  Settings s = sample();
+  s.manual_set = true;
+  uint8_t img[STORE_SIZE];
+  const size_t n = encode(s, img, sizeof(img));
+  CHECK(img[n - 1] == 1);                             // manual_set is the last byte
+  img[n - 1] = 2;
+  const uint32_t crc = crc32(img + HEADER_SIZE, n - HEADER_SIZE);
+  for (int i = 0; i < 4; i++) img[8 + i] = (uint8_t)(crc >> (8 * i));
+  Settings back;
+  CHECK(decode(img, n, back) == LoadResult::Loaded);
+  CHECK(!back.manual_set);
 }
 
 TEST(settings_load_text_fits_the_screen) {

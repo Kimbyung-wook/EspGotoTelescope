@@ -8,7 +8,7 @@ struct UiFixture {
   SimpleGoToUi ui;
   UiContext ctx;
   Frame f;
-  UiFixture() { ctx.tel.voltage_valid = true; ctx.tel.voltage = 12.6f; }   // as measured
+  UiFixture() { ctx.tel.power.valid = true; ctx.tel.power.volts = 12.6f; }   // as measured
   void step(int delta = 0, bool click = false) {
     f.clear();
     ui.step(delta, click, ctx, f);
@@ -26,8 +26,8 @@ struct UiFixture {
 };
 // Position and time known, as app::updateLocationTime() leaves them
 void known(Telemetry& t, double lat = 37.5) {
-  t.loc_source = loc::SRC_GPS; t.time_source = loc::TIME_GPS;
-  t.obs_lat_deg = lat; t.obs_lon_deg = 127.0;
+  t.obs.loc_source = loc::SRC_GPS; t.obs.time_source = loc::TIME_GPS;
+  t.obs.lat_deg = lat; t.obs.lon_deg = 127.0;
 }
 }
 
@@ -36,29 +36,29 @@ void known(Telemetry& t, double lat = 37.5) {
 /************************************/
 TEST(ui_status_bar_format) {
   UiFixture u;
-  u.ctx.tel.time_source = loc::TIME_GPS;
-  u.ctx.tel.clock_hour = 21; u.ctx.tel.clock_minute = 3; u.ctx.tel.clock_second = 7; u.ctx.tel.clock_ms = 450;
+  u.ctx.tel.obs.time_source = loc::TIME_GPS;
+  u.ctx.tel.obs.clock_hour = 21; u.ctx.tel.obs.clock_minute = 3; u.ctx.tel.obs.clock_second = 7; u.ctx.tel.obs.clock_ms = 450;
   u.step();
   CHECK_STR(u.f.lines[0], "T 21: 3: 7.4 V 12.60");
-  u.ctx.tel.time_source = loc::TIME_MANUAL;       // manual clock (DES-LOC-04)
+  u.ctx.tel.obs.time_source = loc::TIME_MANUAL;       // manual clock (DES-LOC-04)
   u.step();
   CHECK_STR(u.f.lines[0], "M 21: 3: 7.4 V 12.60");
-  u.ctx.tel.time_source = loc::TIME_PHONE;        // phone clock (DES-LOC-05)
+  u.ctx.tel.obs.time_source = loc::TIME_PHONE;        // phone clock (DES-LOC-05)
   u.step();
   CHECK_STR(u.f.lines[0], "P 21: 3: 7.4 V 12.60");
 }
 
 TEST(ui_status_bar_voltage) {
   UiFixture u;
-  u.ctx.tel.voltage_valid = false;                // A0 not wired / not read yet
+  u.ctx.tel.power.valid = false;                // A0 not wired / not read yet
   u.ctx.tel.remote = Telemetry::REMOTE_CONNECTED;
   u.step();
   CHECK_STR(u.f.lines[0], "T  0: 0: 0.0 V --.--W");
-  u.ctx.tel.voltage_valid = true;
-  u.ctx.tel.voltage = 9.876f;
+  u.ctx.tel.power.valid = true;
+  u.ctx.tel.power.volts = 9.876f;
   u.step();
   CHECK_STR(u.f.lines[0], "T  0: 0: 0.0 V  9.88W");
-  u.ctx.tel.voltage = 123.0f;                     // clamped: the line stays 20 + 1 characters
+  u.ctx.tel.power.volts = 123.0f;                     // clamped: the line stays 20 + 1 characters
   u.step();
   CHECK_STR(u.f.lines[0], "T  0: 0: 0.0 V 99.99W");
 }
@@ -78,7 +78,7 @@ TEST(ui_sleep_turns_the_display_off) {
 
 TEST(ui_status_bar_wifi_mark) {
   UiFixture u;
-  u.ctx.tel.clock_hour = 21; u.ctx.tel.clock_minute = 3; u.ctx.tel.clock_second = 7; u.ctx.tel.clock_ms = 450;
+  u.ctx.tel.obs.clock_hour = 21; u.ctx.tel.obs.clock_minute = 3; u.ctx.tel.obs.clock_second = 7; u.ctx.tel.obs.clock_ms = 450;
   u.ctx.tel.remote = Telemetry::REMOTE_WAITING;     // AP on, no phone
   u.step();
   CHECK_STR(u.f.lines[0], "T 21: 3: 7.4 V 12.60w");
@@ -144,9 +144,9 @@ TEST(ui_every_menu_item_opens_and_returns_to_same_item) {
 TEST(ui_status_menu_and_info_screens) {
   UiFixture u;
   Telemetry& t = u.ctx.tel;
-  t.year = 26; t.month = 11; t.day = 21; t.hour = 9; t.minute = 5; t.seconds = 1; t.milliseconds = 200;
-  t.fixquality = 1; t.satellites = 8; t.lat_hemi = 'N'; t.latitude = 37.5; t.lon_hemi = 'E'; t.longitude = 127.25;
-  t.loc_source = loc::SRC_GPS; t.time_source = loc::TIME_GPS;
+  t.gps.year = 26; t.gps.month = 11; t.gps.day = 21; t.gps.hour = 9; t.gps.minute = 5; t.gps.seconds = 1; t.gps.milliseconds = 200;
+  t.gps.fixquality = 1; t.gps.satellites = 8; t.gps.lat_hemi = 'N'; t.gps.latitude = 37.5; t.gps.lon_hemi = 'E'; t.gps.longitude = 127.25;
+  t.obs.loc_source = loc::SRC_GPS; t.obs.time_source = loc::TIME_GPS;
   u.open(2);
   CHECK_STR(u.f.lines[1], "*3Status");
   CHECK_STR(u.f.lines[2] + 1, "GPS");
@@ -162,7 +162,7 @@ TEST(ui_status_menu_and_info_screens) {
   u.click();
   CHECK(u.ui.manager().depth() == 2);
   u.step(3); u.click();                          // IMU Calib
-  u.ctx.state.accel_bias[0] = 0.125f; u.ctx.state.accel_scale[0] = 1.01f;
+  u.ctx.state.cfg.accel_bias[0] = 0.125f; u.ctx.state.cfg.accel_scale[0] = 1.01f;
   u.step();
   CHECK_STR(u.f.lines[1], "*IMU Calib");
   CHECK_STR(u.f.lines[2], "Ax b +0.1250 s1.0100");
@@ -201,8 +201,8 @@ TEST(ui_ra_speed_edit_changes_command) {
 /************************************/
 TEST(ui_gyro_calibration_apply_stops_motor_while_open) {
   UiFixture u;
-  u.ctx.tel.imu.az = 9.80665f;
-  u.ctx.tel.imu.wx = 0.5f; u.ctx.tel.imu.wy = -0.2f; u.ctx.tel.imu.wz = 0.1f;
+  u.ctx.tel.imu.raw.az = 9.80665f;
+  u.ctx.tel.imu.raw.wx = 0.5f; u.ctx.tel.imu.raw.wy = -0.2f; u.ctx.tel.imu.raw.wz = 0.1f;
   u.open(3);
   CHECK_STR(u.f.lines[1], "*4Calibration");
   CHECK(!u.ctx.state.motor_inhibit);
@@ -217,24 +217,24 @@ TEST(ui_gyro_calibration_apply_stops_motor_while_open) {
   CHECK_STR(u.f.lines[2], "Done. Apply?");
   CHECK(u.has(3, "+0.50000"));
   CHECK(u.has(7, "Apply") && u.has(7, "Discard"));
-  CHECK(u.ctx.state.gyro_bias[0] == 0.0f);       // not used before Apply
+  CHECK(u.ctx.state.cfg.gyro_bias[0] == 0.0f);       // not used before Apply
   u.click();                                     // Apply
   CHECK(u.ctx.state.settings_save_request);
-  CHECK_NEAR(u.ctx.state.gyro_bias[0], 0.5, 1e-4);
-  CHECK_NEAR(u.ctx.state.gyro_bias[1], -0.2, 1e-4);
+  CHECK_NEAR(u.ctx.state.cfg.gyro_bias[0], 0.5, 1e-4);
+  CHECK_NEAR(u.ctx.state.cfg.gyro_bias[1], -0.2, 1e-4);
   CHECK(u.ui.manager().depth() == 2);
   CHECK(!u.ctx.state.motor_inhibit);             // the motor may run again
 }
 
 TEST(ui_gyro_calibration_shock_and_discard) {
   UiFixture u;
-  u.ctx.tel.imu.az = 9.80665f;
+  u.ctx.tel.imu.raw.az = 9.80665f;
   u.open(3); u.click();
   u.runTo(5000);
-  u.ctx.tel.imu.wx = 20.0f;                      // someone touched the mount
+  u.ctx.tel.imu.raw.wx = 20.0f;                      // someone touched the mount
   u.runTo(5100);
   CHECK_STR(u.f.lines[2], "Shock detected.");
-  u.ctx.tel.imu.wx = 0.0f;
+  u.ctx.tel.imu.raw.wx = 0.0f;
   u.click();                                     // Retry
   CHECK_STR(u.f.lines[2], "Keep still  0/30 s");
   u.runTo(40000);
@@ -246,18 +246,18 @@ TEST(ui_gyro_calibration_shock_and_discard) {
 
 TEST(ui_accel_calibration_first_step_and_cancel) {
   UiFixture u;
-  u.ctx.tel.imu.az = 9.80665f;                   // Z up, but X+ is asked first
+  u.ctx.tel.imu.raw.az = 9.80665f;                   // Z up, but X+ is asked first
   u.open(3); u.step(1); u.click();
   CHECK_STR(u.f.lines[1], "*Accel Calib");
   CHECK_STR(u.f.lines[2], "Step 1/6 X+ up");
   CHECK_STR(u.f.lines[3], "Turn X+ up, hold");
   CHECK(u.ctx.state.motor_inhibit);
-  u.ctx.tel.imu.az = 0.0f; u.ctx.tel.imu.ax = 9.80665f;
+  u.ctx.tel.imu.raw.az = 0.0f; u.ctx.tel.imu.raw.ax = 9.80665f;
   u.runTo(500);
   CHECK_STR(u.f.lines[3], "Hold still...");
   u.click();                                     // Cancel
   CHECK(u.ui.manager().depth() == 2);
-  CHECK(u.ctx.state.accel_scale[0] == 1.0f);
+  CHECK(u.ctx.state.cfg.accel_scale[0] == 1.0f);
 }
 
 /************************************/
@@ -266,8 +266,8 @@ TEST(ui_accel_calibration_first_step_and_cancel) {
 TEST(ui_polar_align_altitude_guidance_and_confirm) {
   UiFixture u;
   known(u.ctx.tel, 37.5);
-  u.ctx.tel.tube_alt_deg = 36.0;
-  u.ctx.tel.polaris_valid = true; u.ctx.tel.polaris_ha_deg = 90.0;
+  u.ctx.tel.scope.tube_alt_deg = 36.0;
+  u.ctx.tel.scope.polaris_valid = true; u.ctx.tel.scope.polaris_ha_deg = 90.0;
   u.open(1);
   CHECK_STR(u.f.lines[1], "*2Polar Align");
   CHECK(u.ctx.state.motor_inhibit);              // DES-PA-01
@@ -280,10 +280,10 @@ TEST(ui_polar_align_altitude_guidance_and_confirm) {
   CHECK_STR(u.f.lines[7] + 1, "(Confirm: wait OK)");
   u.click();                                     // not OK yet: nothing
   CHECK(!u.ctx.state.polar_aligned);
-  u.ctx.tel.tube_alt_deg = 38.5;
+  u.ctx.tel.scope.tube_alt_deg = 38.5;
   u.step();
   CHECK_STR(u.f.lines[3], "dALT  +1.00 DOWN");
-  u.ctx.tel.tube_alt_deg = 37.6;
+  u.ctx.tel.scope.tube_alt_deg = 37.6;
   u.runTo(1000);
   CHECK_STR(u.f.lines[3], "dALT  +0.10 OK");
   CHECK_STR(u.f.lines[6], "State: adjust");      // held for 2 s first
@@ -305,7 +305,7 @@ TEST(ui_polar_align_altitude_guidance_and_confirm) {
 
 TEST(ui_polar_align_without_location) {
   UiFixture u;
-  u.ctx.tel.tube_alt_deg = 12.0;
+  u.ctx.tel.scope.tube_alt_deg = 12.0;
   u.open(1);
   CHECK_STR(u.f.lines[2], "ALT +12.00 LAT    ---");
   CHECK_STR(u.f.lines[3], "dALT   --- no loc");
@@ -323,8 +323,8 @@ TEST(ui_target_select_guidance_and_tracking) {
   CHECK_STR(u.f.lines[2] + 1, "Moon");
   CHECK(u.cursorAt(3) != ' ');                   // starts on the current target (Mercury)
   u.step(2); u.click();                          // Mars
-  CHECK(u.ctx.state.track_target == 3);
-  CHECK(u.ctx.state.track_mode == UiState::TRACK_SIDEREAL);
+  CHECK(u.ctx.state.cfg.track_target == 3);
+  CHECK(u.ctx.state.cfg.track_mode == UiState::TRACK_SIDEREAL);
   CHECK_STR(u.f.lines[1], "*Mars    computing...");
   t.target_index = 3;                            // computed, no position/time
   u.step();
@@ -338,9 +338,9 @@ TEST(ui_target_select_guidance_and_tracking) {
   u.click();                                     // Track on
   CHECK(u.ctx.state.tracking);
   // target and tube known, mount not confirmed aligned
-  t.target_valid = true;
-  t.target_ra_deg = 151.48; t.target_dec_deg = 13.93; t.target_alt_deg = 40.25; t.target_az_deg = 120.5;
-  t.scope_valid = true; t.scope_ra_deg = 140.0; t.scope_dec_deg = 15.0;
+  t.target.valid = true;
+  t.target.ra_deg = 151.48; t.target.dec_deg = 13.93; t.target.alt_deg = 40.25; t.target.az_deg = 120.5;
+  t.scope.valid = true; t.scope.ra_deg = 140.0; t.scope.dec_deg = 15.0;
   t.ra_calibrated = true;
   u.step();
   CHECK_STR(u.f.lines[1], "*Mars");
@@ -361,36 +361,36 @@ TEST(ui_target_select_guidance_and_tracking) {
   u.step(+2);                                    // back on Track
   CHECK(u.cursorAt(7) != ' ');
   // tube close to the target: ON TARGET (guide tolerance 1 deg)
-  t.scope_ra_deg = 151.2; t.scope_dec_deg = 13.5;
+  t.scope.ra_deg = 151.2; t.scope.dec_deg = 13.5;
   u.ctx.state.polar_aligned = true;
   u.step();
   CHECK_STR(u.f.lines[1], "*Mars    ON TARGET");
   CHECK(!u.has(2, "?"));
   CHECK_STR(u.f.lines[4], "dRA     +1.12 min E");
   CHECK_STR(u.f.lines[5], "dDEC    +0.43 deg N");
-  u.ctx.state.guide_tolerance_deg = 0.2f;
+  u.ctx.state.cfg.guide_tolerance_deg = 0.2f;
   u.step();
   CHECK_STR(u.f.lines[1], "*Mars");
   // Rate : Lunar needs the Moon
   u.step(1); u.click();
-  CHECK(u.ctx.state.track_mode == UiState::TRACK_LUNAR);
+  CHECK(u.ctx.state.cfg.track_mode == UiState::TRACK_LUNAR);
   CHECK_STR(u.f.lines[7] + 1, "Rate Lunar");
   CHECK_STR(u.f.lines[6], " Track ON    ---");
-  t.moon_valid = true; t.moon_rate_arcsec_s = 14.4856;
+  t.moon.valid = true; t.moon.rate_arcsec_s = 14.4856;
   u.step();
   CHECK_STR(u.f.lines[6], " Track ON  14.4856\"/s");
   u.click();
-  CHECK(u.ctx.state.track_mode == UiState::TRACK_SIDEREAL);
+  CHECK(u.ctx.state.cfg.track_mode == UiState::TRACK_SIDEREAL);
   // Offset : edit with the dial
   u.step(1); u.click();
   u.step(3);
-  CHECK_NEAR(u.ctx.state.track_offset, 3.0, 1e-6);
+  CHECK_NEAR(u.ctx.state.cfg.track_offset, 3.0, 1e-6);
   u.step(-5);
-  CHECK_NEAR(u.ctx.state.track_offset, -2.0, 1e-6);
+  CHECK_NEAR(u.ctx.state.cfg.track_offset, -2.0, 1e-6);
   CHECK_STR(u.f.lines[7] + 1, "Offset     -2.0 PWM");
   u.click();                                     // done; the dial moves the cursor again
   u.step(1);
-  CHECK_NEAR(u.ctx.state.track_offset, -2.0, 1e-6);
+  CHECK_NEAR(u.ctx.state.cfg.track_offset, -2.0, 1e-6);
   CHECK_STR(u.f.lines[7] + 1, "Back");
   t.ra_calibrated = false;
   u.step();
@@ -400,17 +400,17 @@ TEST(ui_target_select_guidance_and_tracking) {
   CHECK_STR(u.f.lines[1], "*1Target");
   CHECK_STR(u.f.lines[5] + 1, "Mars     TRACKING");
   u.step(-3); u.click();                         // Moon : starts stopped, lunar rate
-  CHECK(u.ctx.state.track_target == 0);
+  CHECK(u.ctx.state.cfg.track_target == 0);
   CHECK(!u.ctx.state.tracking);
-  CHECK(u.ctx.state.track_mode == UiState::TRACK_LUNAR);
+  CHECK(u.ctx.state.cfg.track_mode == UiState::TRACK_LUNAR);
   u.step(0);
   u.click();                                     // same target again keeps the settings
   CHECK(u.ctx.state.tracking);
   u.step(3); u.click();                          // Back to the target menu
   u.click();
-  CHECK(u.ctx.state.track_target == 0);
+  CHECK(u.ctx.state.cfg.track_target == 0);
   CHECK(u.ctx.state.tracking);
-  CHECK(u.ctx.state.track_mode == UiState::TRACK_LUNAR);
+  CHECK(u.ctx.state.cfg.track_mode == UiState::TRACK_LUNAR);
 }
 
 /************************************/
@@ -430,22 +430,22 @@ TEST(ui_settings_items_and_scrolling) {
   CHECK_STR(u.f.lines[6] + 1, "Time >");
   CHECK_STR(u.f.lines[7] + 1, "Motor dir Normal");
   u.click();                                     // RAduty = RRcmd
-  CHECK(u.ctx.state.ra_duty_at_sidereal == 123.0f);
+  CHECK(u.ctx.state.cfg.ra_duty_at_sidereal == 123.0f);
   CHECK(u.ctx.state.settings_save_request);
   CHECK_STR(u.f.lines[3], "RAduty    +123.0 PWM");
   u.ctx.state.settings_save_request = false;
   u.step(3); u.click();                          // Motor dir
-  CHECK(u.ctx.state.motor_reverse);
+  CHECK(u.ctx.state.cfg.motor_reverse);
   CHECK_STR(u.f.lines[7] + 1, "Motor dir Reverse");
   u.step(1);                                     // Guide tol : page scrolls
   CHECK_STR(u.f.lines[2], "RAduty    +123.0 PWM");
   CHECK_STR(u.f.lines[7] + 1, "Guide tol  1.00 deg");
   u.click(); u.step(5); u.click();
-  CHECK_NEAR(u.ctx.state.guide_tolerance_deg, 1.5, 1e-5);
+  CHECK_NEAR(u.ctx.state.cfg.guide_tolerance_deg, 1.5, 1e-5);
   u.step(-30);                                   // not editing: the cursor goes to the top
   CHECK(u.cursorAt(4) != ' ');
   u.step(4); u.click(); u.step(-30); u.click();  // tolerance clamps at 0.1
-  CHECK_NEAR(u.ctx.state.guide_tolerance_deg, 0.1, 1e-5);
+  CHECK_NEAR(u.ctx.state.cfg.guide_tolerance_deg, 0.1, 1e-5);
   u.step(1); u.click();                          // Save
   CHECK(u.ctx.state.settings_save_request);
 }
@@ -473,30 +473,30 @@ TEST(ui_location_manual_entry) {
   CHECK_STR(u.f.lines[3] + 1, "Mode Auto");
   CHECK_STR(u.f.lines[4], " Lat   +0.0000 deg");
   u.click();                                     // Mode
-  CHECK(u.ctx.state.location_mode == loc::MODE_MANUAL);
+  CHECK(u.ctx.state.cfg.location_mode == loc::MODE_MANUAL);
   CHECK_STR(u.f.lines[3] + 1, "Mode Manual");
   u.step(1); u.click();                          // edit Lat, tens first
   CHECK_STR(u.f.lines[1], "*Lat step 10");
   CHECK(u.cursorAt(4) == '*');
   u.step(3);
-  CHECK(u.ctx.state.manual_set);
+  CHECK(u.ctx.state.cfg.manual_set);
   u.click(); u.step(7);                          // ones
   u.click(); u.step(5);                          // tenths
   CHECK_STR(u.f.lines[4], "*Lat  +37.5000 deg");
   u.step(+20);                                   // clamped at 90
-  CHECK_NEAR(u.ctx.state.manual_lat_deg, 39.5, 1e-9);
+  CHECK_NEAR(u.ctx.state.cfg.manual_lat_deg, 39.5, 1e-9);
   for (int i = 0; i < 4; i++) u.click();         // through the last digit: done
   CHECK_STR(u.f.lines[1], "*Location");
   CHECK(u.cursorAt(4) != '*');
   u.step(3);                                     // Copy GPS fix: none
   CHECK_STR(u.f.lines[7] + 1, "Copy GPS fix (none)");
   u.click();
-  CHECK_NEAR(u.ctx.state.manual_lat_deg, 39.5, 1e-9);
-  t.fixquality = 1; t.latitude = 35.1796; t.longitude = 129.0756; t.altitude_m = 12.0f;
+  CHECK_NEAR(u.ctx.state.cfg.manual_lat_deg, 39.5, 1e-9);
+  t.gps.fixquality = 1; t.gps.latitude = 35.1796; t.gps.longitude = 129.0756; t.gps.altitude_m = 12.0f;
   u.click();
-  CHECK_NEAR(u.ctx.state.manual_lat_deg, 35.1796, 1e-9);
-  CHECK_NEAR(u.ctx.state.manual_lon_deg, 129.0756, 1e-9);
-  t.loc_source = loc::SRC_MANUAL;
+  CHECK_NEAR(u.ctx.state.cfg.manual_lat_deg, 35.1796, 1e-9);
+  CHECK_NEAR(u.ctx.state.cfg.manual_lon_deg, 129.0756, 1e-9);
+  t.obs.loc_source = loc::SRC_MANUAL;
   u.step(1); u.click();                          // Save
   CHECK(u.ctx.state.settings_save_request);
   u.step(-10);
@@ -520,7 +520,7 @@ TEST(ui_time_manual_clock) {
   CHECK_STR(u.f.lines[5], " Day    25");
   CHECK_STR(u.f.lines[6] + 1, "Hour   21");
   u.step(3); u.click(); u.step(36); u.click();   // UTC +09:00
-  CHECK(u.ctx.state.utc_offset_min == 540);
+  CHECK(u.ctx.state.cfg.utc_offset_min == 540);
   CHECK_STR(u.f.lines[7] + 1, "UTC +09:00");
   u.step(1); u.click();                          // Set clock
   CHECK(u.ctx.state.manual_clock_valid);
@@ -529,8 +529,8 @@ TEST(ui_time_manual_clock) {
   CHECK_NEAR(u.ctx.state.manual_clock_jd, astro::julianDate({2026, 11, 25, 12, 0, 0.0}), 1e-9);
   CHECK_STR(u.f.lines[7] + 1, "Set clock  (set)");
   // the loop now uses it; the page shows it in local time
-  u.ctx.tel.time_source = loc::TIME_MANUAL;
-  u.ctx.tel.jd_ut = u.ctx.state.manual_clock_jd;
+  u.ctx.tel.obs.time_source = loc::TIME_MANUAL;
+  u.ctx.tel.obs.jd_ut = u.ctx.state.manual_clock_jd;
   u.step(-10);
   CHECK_STR(u.f.lines[2], "In use MAN 21:00:00");
   u.step(10); u.click();
@@ -555,20 +555,20 @@ TEST(ui_lines_never_overflow) {
   Telemetry& t = u.ctx.tel;
   UiState& s = u.ctx.state;
   known(t, -89.9999);
-  t.jd_ut = astro::julianDate({2026, 11, 24, 23, 59, 59.9});
-  t.fixquality = 2; t.satellites = 24; t.latitude = -89.99999999; t.longitude = -179.99999999;
-  t.imu.ax = -156.9f; t.imu.wx = -999.0f; t.imu.mx = -4800.0f; t.imu.temperature = -40.0f;
-  t.imu_corr = t.imu;
-  t.roll_acc_deg = -180.0f; t.pitch_acc_deg = -90.0f; t.roll_est_deg = -180.0f; t.pitch_est_deg = -90.0f;
-  t.loop_us = 999999; t.loop_hz = 999.9f; t.main_us = 999999; t.est_us = 999999; t.astro_us = 99999;
-  t.tube_alt_deg = -90.0; t.polaris_valid = true; t.polaris_ha_deg = -179.99;
-  t.target_valid = true; t.target_index = 1; t.target_ra_deg = 359.99999; t.target_dec_deg = -89.9;
-  t.target_alt_deg = -90.0; t.target_az_deg = 359.99;
-  t.scope_valid = true; t.scope_ra_deg = 0.00001; t.scope_dec_deg = 89.9;
-  s.ra_speed_cmd = -9999.0f; s.ra_duty_at_sidereal = -9999.0f; s.track_offset = -9999.0f;
-  s.gyro_bias[0] = -999.0f; s.accel_bias[0] = -99.0f; s.accel_scale[0] = 1.1f;
-  s.manual_lat_deg = -90.0; s.manual_lon_deg = -180.0; s.manual_alt_m = -1000.0f;
-  s.utc_offset_min = -720; s.guide_tolerance_deg = 20.0f;
+  t.obs.jd_ut = astro::julianDate({2026, 11, 24, 23, 59, 59.9});
+  t.gps.fixquality = 2; t.gps.satellites = 24; t.gps.latitude = -89.99999999; t.gps.longitude = -179.99999999;
+  t.imu.raw.ax = -156.9f; t.imu.raw.wx = -999.0f; t.imu.raw.mx = -4800.0f; t.imu.raw.temperature = -40.0f;
+  t.imu.corr = t.imu.raw;
+  t.imu.roll_acc_deg = -180.0f; t.imu.pitch_acc_deg = -90.0f; t.imu.roll_est_deg = -180.0f; t.imu.pitch_est_deg = -90.0f;
+  t.health.loop_us = 999999; t.health.loop_hz = 999.9f; t.health.main_us = 999999; t.health.est_us = 999999; t.health.astro_us = 99999;
+  t.scope.tube_alt_deg = -90.0; t.scope.polaris_valid = true; t.scope.polaris_ha_deg = -179.99;
+  t.target.valid = true; t.target_index = 1; t.target.ra_deg = 359.99999; t.target.dec_deg = -89.9;
+  t.target.alt_deg = -90.0; t.target.az_deg = 359.99;
+  t.scope.valid = true; t.scope.ra_deg = 0.00001; t.scope.dec_deg = 89.9;
+  s.ra_speed_cmd = -9999.0f; s.cfg.ra_duty_at_sidereal = -9999.0f; s.cfg.track_offset = -9999.0f;
+  s.cfg.gyro_bias[0] = -999.0f; s.cfg.accel_bias[0] = -99.0f; s.cfg.accel_scale[0] = 1.1f;
+  s.cfg.manual_lat_deg = -90.0; s.cfg.manual_lon_deg = -180.0; s.cfg.manual_alt_m = -1000.0f;
+  s.cfg.utc_offset_min = -720; s.cfg.guide_tolerance_deg = 20.0f;
   // sub pages opened from each main item (-1 = none)
   static const int SUBS[SimpleGoToUi::MAIN_ITEMS][7] = {
     {1, -1},                          // Target menu : Mercury

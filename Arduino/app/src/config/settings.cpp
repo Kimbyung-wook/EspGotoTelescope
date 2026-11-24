@@ -18,6 +18,7 @@ struct Writer {
   void f64(double v) { uint64_t b; memcpy(&b, &v, 8); u64(b); }
   void i8(int8_t v) { u8((uint8_t)v); }
   void i16(int16_t v) { u16((uint16_t)v); }
+  void b8(bool v) { u8(v ? 1 : 0); }
 };
 
 // Reads until the payload ends; after that every read leaves the value as it is
@@ -39,6 +40,7 @@ struct Reader {
   void i16(int16_t& v)  { if (have(2)) v = (int16_t)raw(2); }
   void f32(float& v)    { if (have(4)) { uint32_t b = (uint32_t)raw(4); memcpy(&v, &b, 4); } }
   void f64(double& v)   { if (have(8)) { uint64_t b = raw(8); memcpy(&v, &b, 8); } }
+  void b8(bool& v)      { if (have(1)) v = raw(1) == 1; }   // 2..255: not a valid flag -> false
 };
 
 // The one list of fields, in stored order (append new fields at the end).
@@ -54,7 +56,7 @@ void fields(Io& io, S& s) {
   io.f64(s.manual_lat_deg);
   io.f64(s.manual_lon_deg);
   io.f32(s.manual_alt_m);
-  io.u8(s.last_gps_valid);
+  io.b8(s.last_gps_valid);
   io.f64(s.last_lat_deg);
   io.f64(s.last_lon_deg);
   io.f32(s.last_alt_m);
@@ -63,12 +65,12 @@ void fields(Io& io, S& s) {
   io.u8(s.last_day);
   io.i16(s.utc_offset_min);
   io.f32(s.ra_duty_at_sidereal);
-  io.u8(s.motor_reverse);
+  io.b8(s.motor_reverse);
   io.u8(s.track_mode);
   io.f32(s.track_offset);
   io.i8(s.track_target);
   io.f32(s.guide_tolerance_deg);
-  io.u8(s.manual_set);
+  io.b8(s.manual_set);
 }
 
 // Writer takes values, Reader takes references : small adapters for fields()
@@ -80,6 +82,7 @@ struct ConstWriter {
   void i16(int16_t v) { w.i16(v); }
   void f32(float v) { w.f32(v); }
   void f64(double v) { w.f64(v); }
+  void b8(bool v) { w.b8(v); }
 };
 
 // Counts the payload bytes without writing them
@@ -91,6 +94,7 @@ struct Counter {
   void i16(int16_t)  { n += 2; }
   void f32(float)    { n += 4; }
   void f64(double)   { n += 8; }
+  void b8(bool)      { n += 1; }
 };
 
 size_t payloadSize() {
@@ -118,10 +122,10 @@ Settings defaults() {
     s.mag_scale[i] = 1.0f;
   }
   s.location_mode = LOCATION_AUTO;
-  s.last_gps_valid = 0;
+  s.last_gps_valid = false;
   s.utc_offset_min = 0;
   s.ra_duty_at_sidereal = RA_DUTY_AT_SIDEREAL;
-  s.track_target = 1;              // Mercury, as UiState
+  s.track_target = 1;              // Mercury
   s.guide_tolerance_deg = 1.0f;
   return s;
 }
@@ -141,16 +145,13 @@ int sanitize(Settings& s) {
   n += fix(s.manual_lat_deg, d.manual_lat_deg, -90.0, 90.0);
   n += fix(s.manual_lon_deg, d.manual_lon_deg, -180.0, 180.0);
   n += fix(s.manual_alt_m, d.manual_alt_m, -1000.0, 10000.0);
-  if (s.last_gps_valid > 1) { s.last_gps_valid = 0; n++; }
   n += fix(s.last_lat_deg, d.last_lat_deg, -90.0, 90.0);
   n += fix(s.last_lon_deg, d.last_lon_deg, -180.0, 180.0);
   n += fix(s.last_alt_m, d.last_alt_m, -1000.0, 10000.0);
   n += fix(s.utc_offset_min, d.utc_offset_min, -12 * 60.0, 14 * 60.0);
   n += fix(s.ra_duty_at_sidereal, d.ra_duty_at_sidereal, -1023.0, 1023.0);
-  if (s.motor_reverse > 1) { s.motor_reverse = 0; n++; }
   if (s.track_mode > 1) { s.track_mode = 0; n++; }
-  if (s.manual_set > 1) { s.manual_set = 0; n++; }
-  if (s.last_month > 12 || s.last_day > 31) { s.last_gps_valid = 0; s.last_month = s.last_day = 0; n++; }
+  if (s.last_month > 12 || s.last_day > 31) { s.last_gps_valid = false; s.last_month = s.last_day = 0; n++; }
   n += fix(s.track_offset, d.track_offset, -1023.0, 1023.0);
   n += fix(s.track_target, d.track_target, 0.0, 15.0);
   n += fix(s.guide_tolerance_deg, d.guide_tolerance_deg, 0.05, 20.0);

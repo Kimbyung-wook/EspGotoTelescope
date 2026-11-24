@@ -12,7 +12,7 @@
 #include "board_config.h"   // Arduino/app/src (only #defines)
 
 class SimpleGoToUi;         // Arduino/app/src/ui/simplegoto_ui.h
-namespace config { struct Settings; class RamSettingsStore; }   // Arduino/app/src/config/settings.h
+namespace config { class RamSettingsStore; }   // Arduino/app/src/config/settings.h
 class AttitudeEstimator;   // Arduino/app/src/estimation/attitude_estimator.h
 namespace astro { class TargetTracker; }   // Arduino/app/src/astro/target_tracker.h
 namespace loc { class LastGpsRecorder; }   // Arduino/app/src/location/location.h
@@ -59,7 +59,6 @@ class FirmwareUi : public UiBackend {
   std::unique_ptr<astro::TargetTracker> target_tracker_;
   std::unique_ptr<loc::LastGpsRecorder> last_gps_;
   std::unique_ptr<config::RamSettingsStore> store_;
-  std::unique_ptr<config::Settings> settings_;
   int settings_load_ = 0;    // config::LoadResult of the last begin()
   BootConfig boot_;
   int boot_frame_ = 0;

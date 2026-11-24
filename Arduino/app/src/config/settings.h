@@ -12,6 +12,7 @@
 //   - A shorter payload (older version) is read up to its end; the fields it
 //     does not have keep their defaults. So new fields go at the END only.
 //   - Values out of range (or NaN) are replaced by their defaults on load.
+//   - bool fields are stored as one byte, 0 or 1 (any other byte reads as false).
 // Hardware independent : the flash storage is behind SettingsStore.
 /************************************/
 namespace config {
@@ -29,7 +30,7 @@ struct Settings {
   uint8_t location_mode;     // LOCATION_AUTO / LOCATION_MANUAL
   double  manual_lat_deg, manual_lon_deg;   // signed (S/W negative)
   float   manual_alt_m;
-  uint8_t last_gps_valid;    // 1 = last_* below hold a GPS fix
+  bool    last_gps_valid;    // last_* below hold a GPS fix
   double  last_lat_deg, last_lon_deg;
   float   last_alt_m;
   uint16_t last_year;        // date of that fix
@@ -38,7 +39,7 @@ struct Settings {
 
   // Motor and tracking (DES-MOT-01, DES-MOT-02, DES-TRK-01)
   float   ra_duty_at_sidereal;   // RRcmd that turns the RA axis at 15.041"/s, 0 = not set
-  uint8_t motor_reverse;         // 1 = swap the motor direction
+  bool    motor_reverse;         // swap the motor direction
   uint8_t track_mode;            // DES-TRK-01 : 0 = sidereal, 1 = lunar
   float   track_offset;          // [PWM duty]
   int8_t  track_target;          // astro::Target index
@@ -47,7 +48,7 @@ struct Settings {
   float guide_tolerance_deg;
 
   // Added after the first layout (still version 1: older images leave it 0)
-  uint8_t manual_set;            // 1 = manual_lat/lon/alt were entered (DES-LOC-01)
+  bool    manual_set;            // manual_lat/lon/alt were entered (DES-LOC-01)
 };
 
 enum LocationMode : uint8_t { LOCATION_AUTO = 0, LOCATION_MANUAL = 1 };

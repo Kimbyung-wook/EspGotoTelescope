@@ -41,11 +41,11 @@ SimpleGoToUi::SimpleGoToUi()
 void SimpleGoToUi::step(int rotate_delta, bool click, UiContext& ctx, Frame& f) {
   const Telemetry& t = ctx.tel;
   // 'T' GPS time, 'M' manual clock (DES-LOC-04), 'P' phone clock (DES-LOC-05)
-  const char src = t.time_source == loc::TIME_MANUAL ? 'M' : t.time_source == loc::TIME_PHONE ? 'P' : 'T';
+  const char src = t.obs.time_source == loc::TIME_MANUAL ? 'M' : t.obs.time_source == loc::TIME_PHONE ? 'P' : 'T';
   char volts[8] = "--.--";
-  if (t.voltage_valid) snprintf(volts, sizeof(volts), "%5.2f", t.voltage < 0.0f ? 0.0f : t.voltage > 99.99f ? 99.99f : t.voltage);
+  if (t.power.valid) snprintf(volts, sizeof(volts), "%5.2f", t.power.volts < 0.0f ? 0.0f : t.power.volts > 99.99f ? 99.99f : t.power.volts);
   f.set(0, "%c %2d:%2d:%2d.%1d V %s", src,
-        t.clock_hour % 100, t.clock_minute % 100, t.clock_second % 100, (t.clock_ms / 100) % 10, volts);
+        t.obs.clock_hour % 100, t.obs.clock_minute % 100, t.obs.clock_second % 100, (t.obs.clock_ms / 100) % 10, volts);
   // Wi-Fi mark in column 20 (the time/voltage text above is 20 characters)
   if (t.remote != Telemetry::REMOTE_OFF && strlen(f.lines[0]) == Frame::COLS - 2)
     f.lines[0][Frame::COLS - 2] = t.remote == Telemetry::REMOTE_CONNECTED ? 'W' : 'w';

@@ -178,9 +178,9 @@ using namespace app;
 
 // Position and time as app::updateLocationTime() leaves them
 static void known(Telemetry& t, const UtcTime& u, double lat, double lon, float alt = 0.0f) {
-  t.loc_source = loc::SRC_GPS; t.time_source = loc::TIME_GPS;
-  t.jd_ut = julianDate(u);
-  t.obs_lat_deg = lat; t.obs_lon_deg = lon; t.obs_alt_m = alt;
+  t.obs.loc_source = loc::SRC_GPS; t.obs.time_source = loc::TIME_GPS;
+  t.obs.jd_ut = julianDate(u);
+  t.obs.lat_deg = lat; t.obs.lon_deg = lon; t.obs.alt_m = alt;
 }
 
 TEST(astro_moon_tracker_period_and_fix) {
@@ -205,14 +205,14 @@ TEST(astro_moon_telemetry_matches_moon_state) {
   known(t, {2026, 11, 22, 12, 0, 0.0}, 37.5665, 126.9780, 40.0f);
   CHECK(updateMoonTelemetry(tr, t));
   const TargetState s = targetState(Target::Moon, julianDate({2026, 11, 22, 12, 0, 0.0}), Observer{37.5665, 126.9780, 40.0});
-  CHECK(t.moon_valid);
-  CHECK_NEAR(t.moon_ra_deg, s.topo.ra_deg, 1e-12);
-  CHECK_NEAR(t.moon_dec_deg, s.topo.dec_deg, 1e-12);
-  CHECK_NEAR(t.moon_alt_deg, s.hor.alt_deg, 1e-12);
-  CHECK_NEAR(t.moon_rate_arcsec_s, s.ha_rate_arcsec_s, 1e-12);
-  t.time_source = loc::TIME_NONE;                  // no time
+  CHECK(t.moon.valid);
+  CHECK_NEAR(t.moon.ra_deg, s.topo.ra_deg, 1e-12);
+  CHECK_NEAR(t.moon.dec_deg, s.topo.dec_deg, 1e-12);
+  CHECK_NEAR(t.moon.alt_deg, s.hor.alt_deg, 1e-12);
+  CHECK_NEAR(t.moon.rate_arcsec_s, s.ha_rate_arcsec_s, 1e-12);
+  t.obs.time_source = loc::TIME_NONE;                  // no time
   updateMoonTelemetry(tr, t);
-  CHECK(!t.moon_valid);
+  CHECK(!t.moon.valid);
 }
 
 TEST(astro_tracker_switches_target_immediately) {
@@ -234,29 +234,29 @@ TEST(astro_tracking_command_is_rate_plus_offset) {
   UiState st;
   t.now_ms = 1000;
   known(t, {2026, 11, 22, 12, 0, 0.0}, 37.5665, 126.9780);
-  st.track_target = 3;   // Mars
-  CHECK(updateTargetTelemetry(tr, st.track_target, t));
-  CHECK(t.target_valid && t.target_index == 3);
+  st.cfg.track_target = 3;   // Mars
+  CHECK(updateTargetTelemetry(tr, st.cfg.track_target, t));
+  CHECK(t.target.valid && t.target_index == 3);
   st.ra_speed_cmd = 7.0f;
   CHECK(!applyTracking(t, st, 100.0f));           // tracking off
   st.tracking = true;
   CHECK(applyTracking(t, st, 0.0f));              // not calibrated: offset only
   CHECK_NEAR(st.ra_speed_cmd, 0.0, 1e-9);
-  st.track_offset = 12.0f;
+  st.cfg.track_offset = 12.0f;
   CHECK(applyTracking(t, st, 0.0f));
   CHECK_NEAR(st.ra_speed_cmd, 12.0, 1e-9);
   CHECK(applyTracking(t, st, 100.0f));            // sidereal: follows the tube (DES-TRK-02)
   CHECK_NEAR(st.ra_speed_cmd, 112.0, 1e-4);
-  st.track_offset = 0.0f;
+  st.cfg.track_offset = 0.0f;
   CHECK_NEAR(trackingDuty(SIDEREAL_RATE_ARCSEC_S, 80.0f), 80.0, 1e-4);
-  st.track_target = 4;                            // target changed: sidereal goes on
+  st.cfg.track_target = 4;                            // target changed: sidereal goes on
   CHECK(applyTracking(t, st, 100.0f));
-  st.track_mode = UiState::TRACK_LUNAR;           // lunar needs the Moon
+  st.cfg.track_mode = UiState::TRACK_LUNAR;           // lunar needs the Moon
   CHECK(!applyTracking(t, st, 100.0f));
   TargetTracker moon(Target::Moon, 1000);
   CHECK(updateMoonTelemetry(moon, t));
   CHECK(applyTracking(t, st, 100.0f));
-  CHECK_NEAR(st.ra_speed_cmd, 100.0 * t.moon_rate_arcsec_s / SIDEREAL_RATE_ARCSEC_S, 1e-4);
+  CHECK_NEAR(st.ra_speed_cmd, 100.0 * t.moon.rate_arcsec_s / SIDEREAL_RATE_ARCSEC_S, 1e-4);
   CHECK(st.ra_speed_cmd < 100.0f);                // the Moon lags the stars
 }
 
@@ -342,18 +342,18 @@ TEST(astro_scope_from_roll_pitch_level_tube_on_meridian) {
   CHECK_NEAR(up[1], 0.0, 1e-12);
   CHECK_NEAR(up[2], 1.0, 1e-12);
   CHECK(updateScopeTelemetry(t, 1, 2));
-  CHECK(t.scope_valid);
-  CHECK_NEAR(t.scope_dec_deg, t.obs_lat_deg - 90.0, 1e-6);
-  CHECK_NEAR(t.tube_alt_deg, 0.0, 1e-9);
-  CHECK(t.polaris_valid);
+  CHECK(t.scope.valid);
+  CHECK_NEAR(t.scope.dec_deg, t.obs.lat_deg - 90.0, 1e-6);
+  CHECK_NEAR(t.scope.tube_alt_deg, 0.0, 1e-9);
+  CHECK(t.scope.polaris_valid);
   // nose raised by 90 - lat from the south horizon (pitch < 0: up gets a +x part) -> equator
-  upInTubeFromRollPitch(0.0, -(90.0 - t.obs_lat_deg), 1, 2, up);
+  upInTubeFromRollPitch(0.0, -(90.0 - t.obs.lat_deg), 1, 2, up);
   Equatorial q;
-  CHECK(pointingFromUp(up, t.obs_lat_deg, 0.0, 0.0, 0.0, q));
+  CHECK(pointingFromUp(up, t.obs.lat_deg, 0.0, 0.0, 0.0, q));
   CHECK_NEAR(fabs(q.dec_deg), 0.0, 1e-6);
-  t.pitch_est_deg = (float)-t.obs_lat_deg;         // tube raised by the latitude (Dec 90 pose)
-  t.loc_source = loc::SRC_NONE;                    // no position: tube altitude only
+  t.imu.pitch_est_deg = (float)-t.obs.lat_deg;         // tube raised by the latitude (Dec 90 pose)
+  t.obs.loc_source = loc::SRC_NONE;                    // no position: tube altitude only
   CHECK(!updateScopeTelemetry(t, 1, 2));
-  CHECK(!t.scope_valid && !t.polaris_valid);
-  CHECK_NEAR(t.tube_alt_deg, 37.5665, 1e-4);
+  CHECK(!t.scope.valid && !t.scope.polaris_valid);
+  CHECK_NEAR(t.scope.tube_alt_deg, 37.5665, 1e-4);
 }

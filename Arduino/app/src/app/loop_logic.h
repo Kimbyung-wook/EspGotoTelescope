@@ -3,7 +3,7 @@
 // the same logic:
 //   updateTelemetry (sensors -> Telemetry raw fields)
 //   correctImu -> attitude estimator -> updateLocationTime -> updateAstro
-//   -> SimpleGoToUi::step -> config::serviceRequests -> motorCommand
+//   -> SimpleGoToUi::step -> app::serviceRequests -> motorCommand
 #pragma once
 #include "app_state.h"
 #include "sky.h"
@@ -17,21 +17,21 @@ namespace app {
 // Calibration applied to the raw IMU sample (DES-ATT-01): gyro bias, accelerometer
 // bias and scale; tilt from gravity uses the corrected accelerometer.
 inline void correctImu(Telemetry& t, const UiState& st) {
-  t.imu_corr = cal::withAccelCalibration(withoutGyroBias(t.imu, st.gyro_bias),
-                                         st.accel_bias, st.accel_scale);
-  t.roll_acc_deg = rollFromAccelDeg(t.imu_corr);
-  t.pitch_acc_deg = pitchFromAccelDeg(t.imu_corr);
+  t.imu.corr = cal::withAccelCalibration(withoutGyroBias(t.imu.raw, st.cfg.gyro_bias),
+                                         st.cfg.accel_bias, st.cfg.accel_scale);
+  t.imu.roll_acc_deg = rollFromAccelDeg(t.imu.corr);
+  t.imu.pitch_acc_deg = pitchFromAccelDeg(t.imu.corr);
 }
 
 // A clock set to 'jd' at millis() 'set_ms', running with millis(): jd_ut and the
 // status bar fields
 inline void runClock(Telemetry& t, double jd, unsigned long set_ms) {
-  t.jd_ut = jd + (double)(unsigned long)(t.now_ms - set_ms) / 86400000.0;
+  t.obs.jd_ut = jd + (double)(unsigned long)(t.now_ms - set_ms) / 86400000.0;
   astro::UtcTime m;
-  astro::utcFromJd(t.jd_ut + 0.0005 / 86400.0, m);   // round to the millisecond (jd keeps ~10 us)
-  t.clock_hour = m.hour; t.clock_minute = m.minute;
-  t.clock_second = (int)m.second;
-  t.clock_ms = (int)((m.second - (int)m.second) * 1000.0);
+  astro::utcFromJd(t.obs.jd_ut + 0.0005 / 86400.0, m);   // round to the millisecond (jd keeps ~10 us)
+  t.obs.clock_hour = m.hour; t.obs.clock_minute = m.minute;
+  t.obs.clock_second = (int)m.second;
+  t.obs.clock_ms = (int)((m.second - (int)m.second) * 1000.0);
 }
 
 // Phone time from the remote UI page (DES-LOC-05): Unix seconds and milliseconds.
@@ -48,49 +48,49 @@ inline void setPhoneClock(UiState& st, unsigned long now_ms, unsigned long unix_
 // asks the main loop to save it).
 inline void updateLocationTime(Telemetry& t, UiState& st, loc::LastGpsRecorder& last_rec) {
   astro::UtcTime u;
-  const bool fix = t.fixquality > 0;
-  const bool gps_date = utcFromGps(t.year, t.month, t.day, t.hour, t.minute, t.seconds,
-                                   t.milliseconds, u);
+  const bool fix = t.gps.fixquality > 0;
+  const bool gps_date = utcFromGps(t.gps.year, t.gps.month, t.gps.day, t.gps.hour, t.gps.minute, t.gps.seconds,
+                                   t.gps.milliseconds, u);
   loc::Position gps, last, manual, used;
-  gps.lat_deg = t.latitude;          gps.lon_deg = t.longitude;          gps.alt_m = t.altitude_m;
-  last.lat_deg = st.last_lat_deg;    last.lon_deg = st.last_lon_deg;    last.alt_m = st.last_alt_m;
-  manual.lat_deg = st.manual_lat_deg; manual.lon_deg = st.manual_lon_deg; manual.alt_m = st.manual_alt_m;
+  gps.lat_deg = t.gps.latitude;          gps.lon_deg = t.gps.longitude;          gps.alt_m = t.gps.altitude_m;
+  last.lat_deg = st.cfg.last_lat_deg;    last.lon_deg = st.cfg.last_lon_deg;    last.alt_m = st.cfg.last_alt_m;
+  manual.lat_deg = st.cfg.manual_lat_deg; manual.lon_deg = st.cfg.manual_lon_deg; manual.alt_m = st.cfg.manual_alt_m;
 
-  if (last_rec.update(t.now_ms, t.fixquality, t.satellites, gps, st.last_gps_valid, last)) {
-    st.last_gps_valid = true;
-    st.last_lat_deg = gps.lat_deg;
-    st.last_lon_deg = gps.lon_deg;
-    st.last_alt_m = gps.alt_m;
-    st.last_year = gps_date ? u.year : 0;
-    st.last_month = gps_date ? u.month : 0;
-    st.last_day = gps_date ? u.day : 0;
+  if (last_rec.update(t.now_ms, t.gps.fixquality, t.gps.satellites, gps, st.cfg.last_gps_valid, last)) {
+    st.cfg.last_gps_valid = true;
+    st.cfg.last_lat_deg = gps.lat_deg;
+    st.cfg.last_lon_deg = gps.lon_deg;
+    st.cfg.last_alt_m = gps.alt_m;
+    st.cfg.last_year = gps_date ? u.year : 0;
+    st.cfg.last_month = gps_date ? u.month : 0;
+    st.cfg.last_day = gps_date ? u.day : 0;
     st.settings_save_request = true;
     last = gps;
   }
 
-  t.loc_source = loc::resolvePosition(st.location_mode, fix, gps, st.last_gps_valid, last,
-                                      st.manual_set, manual, used);
-  if (t.loc_source != loc::SRC_NONE) {
-    t.obs_lat_deg = used.lat_deg;
-    t.obs_lon_deg = used.lon_deg;
-    t.obs_alt_m = used.alt_m;
+  t.obs.loc_source = loc::resolvePosition(st.cfg.location_mode, fix, gps, st.cfg.last_gps_valid, last,
+                                      st.cfg.manual_set, manual, used);
+  if (t.obs.loc_source != loc::SRC_NONE) {
+    t.obs.lat_deg = used.lat_deg;
+    t.obs.lon_deg = used.lon_deg;
+    t.obs.alt_m = used.alt_m;
   }
 
   if (fix && gps_date) {
-    t.time_source = loc::TIME_GPS;
-    t.jd_ut = astro::julianDate(u);
-    t.clock_hour = t.hour; t.clock_minute = t.minute;
-    t.clock_second = t.seconds; t.clock_ms = t.milliseconds;
+    t.obs.time_source = loc::TIME_GPS;
+    t.obs.jd_ut = astro::julianDate(u);
+    t.obs.clock_hour = t.gps.hour; t.obs.clock_minute = t.gps.minute;
+    t.obs.clock_second = t.gps.seconds; t.obs.clock_ms = t.gps.milliseconds;
   } else if (st.phone_clock_valid) {      // network time of the phone: before a hand-set clock
-    t.time_source = loc::TIME_PHONE;
+    t.obs.time_source = loc::TIME_PHONE;
     runClock(t, st.phone_clock_jd, st.phone_clock_ms);
   } else if (st.manual_clock_valid) {
-    t.time_source = loc::TIME_MANUAL;
+    t.obs.time_source = loc::TIME_MANUAL;
     runClock(t, st.manual_clock_jd, st.manual_clock_ms);
   } else {
-    t.time_source = loc::TIME_NONE;   // status bar keeps the GPS clock fields
-    t.clock_hour = t.hour; t.clock_minute = t.minute;
-    t.clock_second = t.seconds; t.clock_ms = t.milliseconds;
+    t.obs.time_source = loc::TIME_NONE;   // status bar keeps the GPS clock fields
+    t.obs.clock_hour = t.gps.hour; t.obs.clock_minute = t.gps.minute;
+    t.obs.clock_second = t.gps.seconds; t.obs.clock_ms = t.gps.milliseconds;
   }
 }
 
@@ -98,8 +98,8 @@ inline void updateLocationTime(Telemetry& t, UiState& st, loc::LastGpsRecorder& 
 inline bool updateAstro(astro::TargetTracker& moon, astro::TargetTracker& target, Telemetry& t,
                         const UiState& st, int optical_axis, int dec_axis) {
   bool ran = updateMoonTelemetry(moon, t);
-  ran |= updateTargetTelemetry(target, st.track_target, t);
-  t.ra_calibrated = st.ra_duty_at_sidereal != 0.0f;
+  ran |= updateTargetTelemetry(target, st.cfg.track_target, t);
+  t.ra_calibrated = st.cfg.ra_duty_at_sidereal != 0.0f;
   updateScopeTelemetry(t, optical_axis, dec_axis);
   return ran;
 }
@@ -108,7 +108,7 @@ inline bool updateAstro(astro::TargetTracker& moon, astro::TargetTracker& target
 // a calibration or Polar Align screen stops the motor (DES-SYS-02) without
 // changing RRcmd or the tracking state.
 inline float motorCommand(const Telemetry& t, UiState& st) {
-  applyTracking(t, st, st.ra_duty_at_sidereal);
+  applyTracking(t, st, st.cfg.ra_duty_at_sidereal);
   return st.motor_inhibit ? 0.0f : st.ra_speed_cmd;
 }
 

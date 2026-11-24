@@ -46,7 +46,7 @@ inline void setPhoneClock(UiState& st, unsigned long now_ms, unsigned long unix_
 // asks the main loop to save it).
 inline void updateLocationTime(Telemetry& t, UiState& st, loc::LastGpsRecorder& last_rec) {
   astro::UtcTime u;
-  const bool fix = t.gps.fixquality > 0;
+  const bool fix = gpsFixUsable(t.gps);   // link lost: the GPS fields are stale
   const bool gps_date = utcFromGps(t.gps.year, t.gps.month, t.gps.day, t.gps.hour, t.gps.minute, t.gps.seconds,
                                    t.gps.milliseconds, u);
   loc::Position gps, last, manual, used;
@@ -54,7 +54,7 @@ inline void updateLocationTime(Telemetry& t, UiState& st, loc::LastGpsRecorder& 
   last.lat_deg = st.cfg.last_lat_deg;    last.lon_deg = st.cfg.last_lon_deg;    last.alt_m = st.cfg.last_alt_m;
   manual.lat_deg = st.cfg.manual_lat_deg; manual.lon_deg = st.cfg.manual_lon_deg; manual.alt_m = st.cfg.manual_alt_m;
 
-  if (last_rec.update(t.now_ms, t.gps.fixquality, t.gps.satellites, gps, st.cfg.last_gps_valid, last)) {
+  if (last_rec.update(t.now_ms, fix ? t.gps.fixquality : 0, t.gps.satellites, gps, st.cfg.last_gps_valid, last)) {
     st.cfg.last_gps_valid = true;
     st.cfg.last_lat_deg = gps.lat_deg;
     st.cfg.last_lon_deg = gps.lon_deg;

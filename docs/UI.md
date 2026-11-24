@@ -190,7 +190,7 @@ Pos GPS  Time GPS        Wx    XXXX.XXXXX dps     Temp XXXX.XXXXX 'c
  N  37.56650000 DEG      Wy    XXXX.XXXXX dps
  E 126.97800000 DEG      Wz    XXXX.XXXXX dps
 ```
-- GPS 화면 4번째 줄은 Fix 상태(NoFix/GPS/DGPS)와 위성 수입니다. 3초 넘게 GPS에서 NMEA 문장이 오지 않으면(배선 끊김, 전원) 줄 끝에 `NoLink`가 붙습니다(예: `  GPS Sat  8 NoLink`). 이때 날짜·시각·좌표는 마지막으로 받은 값입니다.
+- GPS 화면 4번째 줄은 Fix 상태(NoFix/GPS/DGPS)와 위성 수입니다. 3초 넘게 GPS에서 NMEA 문장이 오지 않으면(배선 끊김, 전원) 줄 끝에 `NoLink`가 붙습니다(예: `  GPS Sat  8 NoLink`). 이때 날짜·시각·좌표는 마지막으로 받은 값이고, 위치·시각 출처로는 쓰지 않습니다(5번째 줄이 `LAST`/`MAN`/`---`로 바뀜. Location의 `Copy GPS fix`도 `(none)`).
 - GPS 화면 5번째 줄은 지금 쓰는 위치 출처(`GPS`/`LAST`/`MAN`/`---`)와 시각 출처(`GPS`/`MAN`/`PHN`/`---`)입니다(DES-LOC-01).
 - Acc/Gyro, Mag/Temp는 보정 전 원시값입니다.
 

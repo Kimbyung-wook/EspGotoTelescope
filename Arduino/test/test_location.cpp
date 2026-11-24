@@ -85,6 +85,25 @@ TEST(loc_update_uses_gps_and_records_the_fix) {
   CHECK(t.obs.time_source == TIME_NONE);
 }
 
+// GPS unplugged: the fields keep the last fix, but it is not used any more
+TEST(loc_link_lost_drops_the_stale_gps_fix) {
+  Telemetry t; UiState st; LastGpsRecorder rec;
+  st.cfg.manual_set = true; st.cfg.manual_lat_deg = -33.8688; st.cfg.manual_lon_deg = 151.2093;
+  gpsFix(t);
+  t.gps.link = false;
+  for (unsigned long ms = 0; ms <= 40000; ms += 1000) {   // longer than the 30 s of DES-LOC-02
+    t.now_ms = ms;
+    app::updateLocationTime(t, st, rec);
+  }
+  CHECK(t.obs.loc_source == SRC_MANUAL);
+  CHECK(t.obs.time_source == TIME_NONE);
+  CHECK(!st.cfg.last_gps_valid);                        // a stale fix is not recorded
+  CHECK(!gpsFixUsable(t.gps));
+  t.gps.link = true;                                    // back
+  app::updateLocationTime(t, st, rec);
+  CHECK(t.obs.loc_source == SRC_GPS && t.obs.time_source == TIME_GPS);
+}
+
 TEST(loc_manual_clock_runs_with_millis) {
   Telemetry t; UiState st; LastGpsRecorder rec;
   st.cfg.manual_set = true; st.cfg.manual_lat_deg = -33.8688; st.cfg.manual_lon_deg = 151.2093;

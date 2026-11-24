@@ -228,5 +228,5 @@
   - `Tictok_us`(`tic`/`toc`/`getdt`)는 헤더 하나짜리 `StopwatchUs`(`start`/`stop`/`last() const`)가 되었습니다.
   - 필터: 쓰지 않던 `update()`의 `dt` 인자, `setTau`, `getTau`, `getXhigh`, `getXlow`를 지웠습니다. `AttitudeEstimator::update`도 `dt`를 받지 않습니다(간격은 `begin`에서 정함). 계산식과 순서는 그대로입니다.
   - `HPF`는 지웠습니다. 펌웨어에서 쓰는 곳이 없고 테스트 2개만 있었습니다(테스트 107 → 105). 필요하면 git 기록(`f7d8be2` 이전)에서 되살리면 됩니다.
-  - GPS 링크 끊김(`Gps::linkAlive()`)은 6단계 뒤 따로 화면에 넣었습니다: Status > GPS 4번째 줄 끝 `NoLink`(`GpsRaw::link`, 시뮬레이터 프로토콜 `link`). IROM +32 B.
+  - GPS 링크 끊김(`Gps::linkAlive()`)은 6단계 뒤 따로 화면에 넣었습니다: Status > GPS 4번째 줄 끝 `NoLink`(`GpsRaw::link`, 시뮬레이터 프로토콜 `link`). IROM +32 B. 이어서 링크가 끊기면 남은 fix를 위치·시각 출처와 직전 GPS 저장에서 뺐습니다(`gpsFixUsable`).
   - IROM −320 / −320 B, IRAM 그대로. 펌웨어 빌드에서 우리 파일 경고는 없습니다.

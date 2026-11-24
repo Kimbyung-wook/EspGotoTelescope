@@ -259,9 +259,14 @@ void test_gps_screen_shows_sensor_values() {
   s.send("{\"type\":\"sensors\",\"gps\":{\"link\":false}}");   // GPS unplugged
   s.tick();
   EXPECT_LINE(s, 4, "NoFix Sat  0 NoLink");
+  s.send("{\"type\":\"sensors\",\"gps\":{\"fix\":1,\"sats\":8}}");   // last values were a fix
+  s.tick();
+  EXPECT_LINE(s, 4, "  GPS Sat  8 NoLink");
+  EXPECT_LINE(s, 5, "Pos ---  Time ---");   // a stale fix is not used
   s.send("{\"type\":\"sensors\",\"gps\":{\"link\":1}}");
   s.tick();
-  EXPECT_LINE(s, 4, "NoFix Sat  0");
+  EXPECT_LINE(s, 4, "  GPS Sat  8");
+  EXPECT_LINE(s, 5, "Pos GPS  Time GPS");
 }
 
 // DES-LOC-02: a fix held for 30 s is kept (saved once); without GPS it is used,

@@ -132,7 +132,7 @@ void LocationScreen::onClick(ScreenManager& mgr, UiContext& ctx) {
       step_ = 0;
       break;
     case FROM_GPS:
-      if (t.gps.fixquality > 0) {
+      if (gpsFixUsable(t.gps)) {
         st.cfg.manual_lat_deg = t.gps.latitude;
         st.cfg.manual_lon_deg = t.gps.longitude;
         st.cfg.manual_alt_m = t.gps.altitude_m;
@@ -158,7 +158,7 @@ void LocationScreen::render(Frame& f, const UiContext& ctx, char blink) {
       case LAT: f.set(line, "%cLat %+9.4f deg", m, st.cfg.manual_lat_deg); break;
       case LON: f.set(line, "%cLon %+9.4f deg", m, st.cfg.manual_lon_deg); break;
       case ALT: f.set(line, "%cAlt %6.0f m", m, st.cfg.manual_alt_m); break;
-      case FROM_GPS: f.set(line, "%cCopy GPS fix%s", m, ctx.tel.gps.fixquality > 0 ? "" : " (none)"); break;
+      case FROM_GPS: f.set(line, "%cCopy GPS fix%s", m, gpsFixUsable(ctx.tel.gps) ? "" : " (none)"); break;
       case SAVE: f.set(line, "%cSave", m); break;
       default:  f.set(line, "%cBack", m); break;
     }

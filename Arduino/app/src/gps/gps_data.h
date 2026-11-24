@@ -13,4 +13,8 @@ struct GpsRaw {
   bool   link = true;                       // NMEA arrived within Gps::LINK_TIMEOUT_MS
 };
 
+// A fix that can be used now: fixed, and still arriving (after a link loss the
+// fields keep the last values)
+inline bool gpsFixUsable(const GpsRaw& g) { return g.link && g.fixquality > 0; }
+
 #endif // _GPS_DATA_H_

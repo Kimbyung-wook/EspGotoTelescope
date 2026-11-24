@@ -9,6 +9,10 @@ body{background:var(--bg);color:var(--fg);font-family:monospace;margin:0;padding
 #scr{font-size:min(calc((100vw - 48px) / 12.8),38px);line-height:1.15;white-space:pre;overflow:hidden;
  border:1px solid var(--line);padding:6px 8px;margin:0;min-height:calc(8 * 1.15em + 12px)}
 #scr .bar{color:var(--dim)}
+#dot{display:block;width:100%;aspect-ratio:2/1;background:#000;border:1px solid var(--line)}
+body.dot #scr{display:none}
+body:not(.dot) #dot{display:none}
+#mode{float:right;background:none;color:var(--dim);border:1px solid var(--line);font:12px monospace;padding:2px 8px}
 #st{font-size:14px;margin:10px 0;color:var(--dim)}
 #st.ok{color:var(--fg)}
 #in{display:none;gap:6px;margin-top:8px}
@@ -16,13 +20,74 @@ body{background:var(--bg);color:var(--fg);font-family:monospace;margin:0;padding
 #in button:active{background:#400}
 #in.on{display:flex}
 </style></head><body>
+<canvas id="dot" width="128" height="64"></canvas>
 <pre id="scr">connecting...</pre>
 <div id="in"><button data-r="-10">-10</button><button data-r="-1">-1</button><button data-c="1">OK</button><button data-r="1">+1</button><button data-r="10">+10</button></div>
-<div id="st">-</div>
+<div id="st">-</div><button id="mode">TEXT</button>
 <script>
 // Telescope remote UI page (docs/REMOTE_UI_PLAN.md). Served by the ESP8266 and by
 // tools/ui_simulator/gui/web_bridge.py. WebSocket port = HTTP port + 1 (ESP: 80 -> 81).
-var ws, last = 0, lock = null, inputOk = false;
+var ws, last = 0, lock = null, inputOk = false, cur = [];
+// Adafruit GFX classic 5x7 font (glcdfont.c, BSD license, Copyright (c) 2012 Adafruit
+// Industries): 256 glyphs x 5 column bytes, bit 0 = top pixel. Same glyphs as the OLED.
+var FONT = '00000000003e5b4f5b3e3e6b4f6b3e1c3e7c3e1c183c7e3c181c577d571c1c5e7f5e1c00183c1800ffe7c3e7ff0018241800ffe7dbe7ff30483a060e2629792926407f050507407f05253f5a3ce73c5a7f3e1c1c08081c1c3e7f14227f22145f5f005f5f06097f017f006689956a606060606094a2ffa29408047e040810207e201008082a1c08081c2a08081e101010100c1e0c1e0c30383e3830060e3e0e06000000000000005f00000007000700147f147f14242a7f2a12231308646236495620500008070300001c2241000041221c002a1c7f1c2a08083e080800807030000808080808000060600020100804023e5149453e00427f400072494949462141494d331814127f1027454545393c4a49493141211109073649494936464949291e0000140000004034000000081422411414141414004122140802015909063e415d594e7c1211127c7f494949363e414141227f4141413e7f494949417f090909013e414151737f0808087f00417f41002040413f017f081422417f404040407f021c027f7f0408107f3e4141413e7f090909063e4151215e7f09192946264949493203017f01033f4040403f1f2040201f3f4038403f631408146303047804036159494d43007f4141410204081020004141417f04020102044040404040000307080020545478407f284444383844444428384444287f385454541800087e090218a4a49c787f0804047800447d40002040403d007f1028440000417f40007c047804787c080404783844444438fc1824241818242418fc7c08040408485454542404043f44243c4040207c1c2040201c3c4030403c44281028444c9090907c4464544c4400083641000000770000004136080002010204023c2623263c1ea1a161123a4040207a385454555921555579412254547842215554784020545579400c1e5272123955555559395454545939555454580000457c410002457d420001457c407d1211127df0282528f07c545545002054547c547c0a097f4932494949323a4444443a324a4848303a4141217a3a42402078009da0a07d3d4242423d3d4040403d3c24ff2424487e4943662b2ffc2f2bff0929f620c0887e090320545479410000447d413048484a32384040227a007a0a0a727d0d19317d2629292f28262929292630484d4020380808080808080808382f10c8acba2f102834fa00007b000008142a142222142a14085500550055aa55aa55aaff55ff55ff000000ff00101010ff00141414ff001010ff00ff1010f010f0141414fc001414f700ff0000ff00ff1414f404fc141417101f10101f101f1414141f00101010f0000000001f101010101f10101010f010000000ff101010101010101010ff10000000ff140000ff00ff00001f10170000fc04f414141710171414f404f40000ff00f714141414141414f700f7141414171410101f101f141414f4141010f010f000001f101f0000001f14000000fc140000f010f01010ff10ff141414ff141010101f00000000f010fffffffffff0f0f0f0f0ffffff0000000000ffff0f0f0f0f0f3844443844fc4a4a4a347e02020606027e027e0263554941633844443c04407e201e2006027e020299a5e7a5991c2a492a1c4c7201724c304a4d4d303048784830bc625a463d3e494949007e0101017e2a2a2a2a2a44445f444440514a444040444a51400000ff0103e080ff000008086b6b083612362436060f090f06000018180000001010003040ff0101001f01011e00191d1712003c3c3c3c0000000000';
+var W = 128, H = 64, OFF = '#1a0303', ON = '#ff2a1a';
+var dot = document.getElementById('dot'), g = dot.getContext('2d');
+function glyph(c, col) { return parseInt(FONT.substr((c * 5 + col) * 2, 2), 16); }
+// Frame buffer like OLED::print(): 6x8 cells, wrap at 128 px, codes >= 176 shifted by one.
+function pixels(lines) {
+  var px = new Uint8Array(W * H), x = 0, y = 0;
+  var text = lines.map(function (l) { return l + '\n'; }).join('');
+  for (var i = 0; i < text.length; i++) {
+    var c = text.charCodeAt(i) & 0xFF;
+    if (c === 10) { x = 0; y += 8; continue; }
+    if (c === 13) continue;
+    if (x + 6 > W) { x = 0; y += 8; }
+    if (c >= 176) c = Math.min(c + 1, 255);
+    for (var col = 0; col < 5; col++) {
+      var bits = glyph(c, col);
+      for (var row = 0; row < 8; row++)
+        if (bits & (1 << row) && x + col < W && y + row < H) px[(y + row) * W + x + col] = 1;
+    }
+    x += 6;
+  }
+  return px;
+}
+// Each OLED pixel as a round dot; unlit dots faintly visible.
+function drawDots() {
+  var r = window.devicePixelRatio || 1, cw = Math.round(dot.clientWidth * r);
+  if (!cw) return;
+  var p = cw / W, rad = p * 0.42;
+  function dots(ctx, want, px) {
+    ctx.beginPath();
+    for (var y = 0; y < H; y++) for (var x = 0; x < W; x++) {
+      if (px && px[y * W + x] !== want) continue;
+      var cx = (x + 0.5) * p, cy = (y + 0.5) * p;
+      ctx.moveTo(cx + rad, cy); ctx.arc(cx, cy, rad, 0, 6.2832);
+    }
+    ctx.fill();
+  }
+  if (dot.width !== cw || !bg) {   // unlit dot grid, drawn once per size
+    dot.width = cw; dot.height = Math.round(cw / 2);
+    bg = document.createElement('canvas'); bg.width = dot.width; bg.height = dot.height;
+    var b = bg.getContext('2d');
+    b.fillStyle = '#000'; b.fillRect(0, 0, bg.width, bg.height);
+    b.fillStyle = OFF; dots(b, 0, null);
+  }
+  g.drawImage(bg, 0, 0);
+  g.fillStyle = ON; dots(g, 1, pixels(cur));
+}
+var bg = null;
+var dotMode = true;
+try { dotMode = localStorage.getItem('remote.view') !== 'text'; } catch (e) {}
+function setMode(d) {
+  dotMode = d; document.body.className = d ? 'dot' : '';
+  document.getElementById('mode').textContent = d ? 'TEXT' : 'DOT';
+  try { localStorage.setItem('remote.view', d ? 'dot' : 'text'); } catch (e) {}
+  if (d) drawDots();
+}
+document.getElementById('mode').addEventListener('click', function () { setMode(!dotMode); });
+window.addEventListener('resize', function () { if (dotMode) drawDots(); });
 var scr = document.getElementById('scr'), st = document.getElementById('st'), inp = document.getElementById('in');
 function wsUrl() {
   var p = location.port ? (+location.port + 1) : 81;
@@ -31,6 +96,8 @@ function wsUrl() {
 function esc(s) { return s.replace(/&/g, '&amp;').replace(/</g, '&lt;'); }
 function show(lines) {
   scr.innerHTML = '<span class="bar">' + esc(lines[0] || '') + '</span>\n' + lines.slice(1).map(esc).join('\n');
+  cur = lines;
+  if (dotMode) drawDots();
   last = Date.now();
 }
 function status() {
@@ -62,6 +129,7 @@ function keepAwake() {
 document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'visible') keepAwake(); });
 document.addEventListener('click', keepAwake);
 keepAwake();
+setMode(dotMode);
 setInterval(status, 500);
 connect();
 </script>

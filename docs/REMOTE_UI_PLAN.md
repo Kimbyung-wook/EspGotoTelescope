@@ -132,7 +132,8 @@ Arduino/scripts/build.sh --build-property "compiler.cpp.extra_flags=-DREMOTE_UI_
 - 폰 페이지 원본: `Arduino/app/src/remote/web/index.html`. 펌웨어와 PC 브리지가 같은 파일을 씁니다.
   - 펌웨어에는 `scripts/gen_remote_page.py`가 만든 `remote_page.h`(PROGMEM)로 들어갑니다. Arduino IDE는 빌드 스크립트를 못 돌리므로 생성 파일도 커밋합니다. 페이지를 고치면 스크립트를 다시 돌립니다(`tools/ui_simulator/run_tests.sh`가 `--check`로 확인).
   - WebSocket 포트는 HTTP 포트 + 1로 계산합니다(ESP 80 → 81, PC 8080 → 8081).
-  - 화면: 검은 바탕 빨간 고정폭 글씨 8줄, 상태바 줄은 어둡게. 폭에 맞춰 글자 크기 조절.
+  - 화면: 기본은 **도트 화면**입니다. OLED와 같은 Adafruit 5×7 폰트(glcdfont, BSD 라이선스)를 페이지에 넣고 128×64 점을 캔버스에 둥근 점으로 그립니다. 꺼진 점도 희미하게 보여 도트 매트릭스처럼 보입니다. 픽셀 규칙(6×8 칸, 128 px 줄바꿈, 176 이상 글리프 한 칸 밀림)은 GUI 시뮬레이터의 `oled_render.py`와 같고, 같은 화면을 넣어 8192 픽셀이 모두 같은 것을 확인했습니다.
+  - `TEXT` / `DOT` 버튼으로 글자 화면(검은 바탕 빨간 고정폭 글씨, 상태바 줄은 어둡게)과 바꿀 수 있고, 고른 방식은 브라우저에 기억합니다.
   - 상태 줄: `connected` / `connected, no data N s`(3초 넘게 프레임 없음) / `disconnected, retrying...`(1초마다 재접속).
   - 화면 꺼짐 방지: Wake Lock API를 씁니다. 다만 Wake Lock은 HTTPS 또는 localhost에서만 동작해서 `http://192.168.4.1`에서는 안 됩니다. 이때 상태 줄에 `keep-awake needs your phone setting`을 표시하니, 폰의 화면 꺼짐 시간을 길게 설정합니다.
 - 메시지: 접속하면 ESP가 `{"hello":{"input":false}}`를 보냅니다. 페이지는 `input`이 true일 때만 입력 버튼을 보여줍니다(2단계에서 true). 화면은 바뀔 때, 그리고 바뀌지 않아도 1초마다 보냅니다.

@@ -1,4 +1,4 @@
-# Automatic Telescope - wiring (WireViz draft)
+# SimpleGoTo - wiring (WireViz draft)
 #   Source of truth for MCU pins : Arduino/app/src/board_config.h
 #   Render : wireviz docs/architecture/wiring.yml   (needs Graphviz; on Korean Windows set PYTHONUTF8=1)
 #   Labels stay ASCII/English : Graphviz default font has no Hangul, and "->" breaks WireViz labels
@@ -10,7 +10,7 @@
 #   - Rotary : KY-040 style module (CLK/DT/SW)
 
 metadata:
-  title: Automatic Telescope - Wiring (draft)
+  title: SimpleGoTo - Wiring (draft)
 
 options:
   fontname: arial

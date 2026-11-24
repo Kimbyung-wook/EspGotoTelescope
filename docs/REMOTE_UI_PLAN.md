@@ -18,7 +18,7 @@ ESP8266(NodeMCU v3)에는 Bluetooth가 없고 Wi-Fi만 있습니다. Wi-Fi로 �
 ## 2. 구조
 
 ```
-[Android Chrome]  ←Wi-Fi (ESP8266 SoftAP "Telescope", WPA2)→  [ESP8266]
+[Android Chrome]  ←Wi-Fi (ESP8266 SoftAP "SimpleGoTo", WPA2)→  [ESP8266]
   웹 페이지                                                   HTTP: 페이지 1장 (PROGMEM, gzip)
   - 8줄×21자 화면 (빨간 글씨, 야간용)                          WebSocket: 화면 줄 ↔ 입력
   - 가상 다이얼(드래그) + 클릭 버튼 + ±1/±10 버튼
@@ -107,8 +107,8 @@ Arduino/scripts/build.sh --build-property "compiler.cpp.extra_flags=-DREMOTE_UI_
    - 9 Axis for Moon 화면의 Yaw가 함께 흔들리는지도 봅니다.
    - 차이가 크면 `REMOTE_UI_TX_DBM`을 낮춰 다시 잽니다.
 4. **폰 접속 절차**
-   1. 부팅 화면에 `6. WiFi AP Telescope`가 나오는지 확인.
-   2. 안드로이드 Wi-Fi 설정에서 `Telescope` 선택, 비밀번호 `telescope`. "인터넷 없음" 경고가 나오면 "연결 유지".
+   1. 부팅 화면에 `6. WiFi AP SimpleGoTo`가 나오는지 확인.
+   2. 안드로이드 Wi-Fi 설정에서 `SimpleGoTo` 선택, 비밀번호 `simplegoto`. "인터넷 없음" 경고가 나오면 "연결 유지".
    3. Chrome에서 `http://192.168.4.1/` 열기 → `connected`와 OLED와 같은 8줄이 보이는지(메뉴를 로터리로 움직이면 폰도 따라 바뀌는지, 지연 체감).
    4. `+1`, `OK` 버튼 → 페이지 아래 `ESP received: rotate 1, click 1`이 나오는지(이번 단계에서는 화면 커서는 움직이지 않는 것이 정상).
    5. 폰 Wi-Fi 끄기 → `disconnected` 표시 → 다시 켜면 1초 안에 자동 재접속되는지.
@@ -138,7 +138,7 @@ Arduino/scripts/build.sh --build-property "compiler.cpp.extra_flags=-DREMOTE_UI_
   - 화면 꺼짐 방지: Wake Lock API를 씁니다. 다만 Wake Lock은 HTTPS 또는 localhost에서만 동작해서 `http://192.168.4.1`에서는 안 됩니다. 이때 상태 줄에 `keep-awake needs your phone setting`을 표시하니, 폰의 화면 꺼짐 시간을 길게 설정합니다.
 - 메시지: 접속하면 ESP가 `{"hello":{"input":false}}`를 보냅니다. 페이지는 `input`이 true일 때만 입력 버튼을 보여줍니다(2단계부터 true). 화면은 바뀔 때, 그리고 바뀌지 않아도 1초마다 보냅니다.
 - PC 데모: `python Arduino/tools/ui_simulator/gui/web_bridge.py` → `http://localhost:8080/`. 펌웨어 UI 러너를 10 Hz로 돌리고 같은 페이지를 제공합니다. 데모에서는 입력 버튼(−10 −1 OK +1 +10)도 동작합니다. `--mirror-only`는 1단계 펌웨어처럼 입력을 무시합니다. 같은 Wi-Fi의 폰에서 `http://<PC IP>:8080/`으로 열어 볼 수도 있습니다(방화벽 허용 필요).
-- 실물 확인 (남음): `REMOTE_UI_ENABLE=1`로 올리고 폰을 `Telescope` AP(비밀번호 `telescope`)에 붙여 `http://192.168.4.1`을 엽니다. 폰 화면이 OLED와 같은지, Health 루프 주기가 흔들리지 않는지 확인합니다.
+- 실물 확인 (남음): `REMOTE_UI_ENABLE=1`로 올리고 폰을 `SimpleGoTo` AP(비밀번호 `simplegoto`)에 붙여 `http://192.168.4.1`을 엽니다. 폰 화면이 OLED와 같은지, Health 루프 주기가 흔들리지 않는지 확인합니다.
 
 ### 2단계. 입력 (다이얼, 클릭)
 - 폰 → ESP 입력을 `loop()`에서 합칩니다.
@@ -162,6 +162,16 @@ Arduino/scripts/build.sh --build-property "compiler.cpp.extra_flags=-DREMOTE_UI_
 - 접속 상태 표시(폰: 연결/끊김, OLED 상태바에 Wi-Fi 표시).
 - 자동 재접속, 페이지 캐시.
 - 필요하면 원격 전용 위젯: Offset 슬라이더, Track 버튼을 화면 아래에 따로 둠(메뉴를 거치지 않음).
+
+#### 3단계 구현 (2026-11-24)
+- 이름과 버전: 프로그램 이름을 **SimpleGoTo**로 정했습니다. AP 이름도 `SimpleGoTo`(비밀번호 `simplegoto`)로 바꿨습니다. 버전은 `app/src/version.h`(`docs/VERSION.md`)에 있고, 접속 인사에 실어 보냅니다: `{"hello":{"input":true,"name":"SimpleGoTo","version":"0.1.0"}}`. 페이지 맨 위에 `SimpleGoTo v0.1.0`으로 나옵니다.
+- OLED 상태바 마지막 칸(21번째)에 Wi-Fi 표시: AP만 켜져 있으면 `w`, 폰이 붙어 있으면 `W`. 원격 UI를 끈 빌드는 비어 있어 화면이 이전과 같습니다.
+- 폰 접속 상태: 끊기거나 3초 넘게 화면이 안 오면 화면을 흐리게 보여 지난 화면임을 알 수 있게 했습니다. 1초마다 재접속하고, 폰이 잠들었다가 페이지가 다시 보이면 기다리지 않고 바로 재접속합니다.
+- 페이지 캐시: `gen_remote_page.py`가 페이지 내용으로 ETag를 만들고, ESP는 `ETag` + `Cache-Control: no-cache`로 보냅니다. 폰은 페이지를 저장해 두고 다시 열 때 확인만 하며, 바뀌지 않았으면 ESP는 본문 없이 304만 보냅니다.
+- 고친 것: 원격 UI를 켠 빌드는 부팅 줄이 9줄이 되어 OLED 버퍼(8줄) 밖에 썼습니다. 화면이 차면 위로 밀어 올리게 고쳤습니다.
+- 원격 전용 위젯(Offset 슬라이더, Track 버튼)은 다이얼로 충분한지 실물에서 써 본 뒤 정하기로 하고 미뤘습니다.
+- 빌드: 기본 IRAM 30,319 B(변화 없음). `REMOTE_UI_ENABLE=1`은 IRAM 30,483 B, flash 367,924 B.
+- 실물 확인 (남음): 상태바 `w`/`W`가 폰 접속에 맞게 바뀌는지, 폰을 잠갔다 켰을 때 바로 다시 붙는지, 두 번째 접속부터 페이지가 304로 오는지.
 
 ### 4단계 (선택). 안드로이드 앱
 - 브라우저로 부족할 때만 합니다. 볼륨 키를 다이얼로 쓰기, 화면 켜짐 유지, 진동 피드백.

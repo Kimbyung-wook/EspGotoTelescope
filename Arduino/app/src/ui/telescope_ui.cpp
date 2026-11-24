@@ -34,5 +34,8 @@ void TelescopeUi::step(int rotate_delta, bool click, UiContext& ctx, Frame& f) {
   const Telemetry& t = ctx.tel;
   f.set(0, "T %2d:%2d:%2d.%1d V %5.2f",
         t.hour % 100, t.minute % 100, t.seconds % 100, (t.milliseconds / 100) % 10, t.voltage);
+  // Wi-Fi mark in column 20 (the time/voltage text above is 20 characters)
+  if (t.remote != Telemetry::REMOTE_OFF && strlen(f.lines[0]) == Frame::COLS - 2)
+    f.lines[0][Frame::COLS - 2] = t.remote == Telemetry::REMOTE_CONNECTED ? 'W' : 'w';
   mgr_.step(rotate_delta, click, ctx, f);
 }

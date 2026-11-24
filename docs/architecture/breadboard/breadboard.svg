@@ -13,7 +13,7 @@
   .h1 { fill:#222; font-size:16px; font-weight:700; }
 </style>
 <rect width="1150" height="1010" fill="#fafafa"/>
-<text x="20" y="28" class="h1">Automatic Telescope - Breadboard wiring (draft)</text>
+<text x="20" y="28" class="h1">SimpleGoTo - Breadboard wiring (draft)</text>
 <rect x="700" y="30" width="88" height="860" rx="4" fill="#f4f1e8" stroke="#b9b29c"/>
 <line x1="717.0" y1="52" x2="717.0" y2="882" stroke="#d62728" stroke-width="2" stroke-dasharray="2 3"/>
 <text transform="translate(720.0,36) rotate(90)" class="rail">3V3</text>

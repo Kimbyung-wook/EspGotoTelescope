@@ -5,7 +5,7 @@
 
 Serves app/src/remote/web/index.html over HTTP, runs ../build/ui_runner.exe at 10 Hz and
 talks to the page with the remote UI messages (docs/REMOTE_UI_PLAN.md):
-    bridge -> page : {"hello":{"input":true}}, {"lines":[8 lines]}  (on change, at least every 1 s)
+    bridge -> page : {"hello":{"input":true,"name":..,"version":..}}, {"lines":[8 lines]}  (on change, at least every 1 s)
     page -> bridge : {"rotate":n}, {"click":1}                       (forwarded as runner "input")
 Standard library only (a minimal RFC 6455 text-frame WebSocket server).
 """
@@ -26,8 +26,20 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 SIM = os.path.dirname(HERE)
 ARDUINO = os.path.dirname(os.path.dirname(SIM))
 PAGE = os.path.join(ARDUINO, "app", "src", "remote", "web", "index.html")
+VERSION_H = os.path.join(ARDUINO, "app", "src", "version.h")
 DEFAULT_RUNNER = os.path.join(SIM, "build", "ui_runner.exe" if os.name == "nt" else "ui_runner")
 WS_GUID = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
+
+
+def firmware_version():
+    """SIMPLEGOTO_NAME / SIMPLEGOTO_VERSION from app/src/version.h (same hello as the ESP)."""
+    found = {}
+    with open(VERSION_H, encoding="utf-8") as f:
+        for line in f:
+            parts = line.split(None, 2)
+            if len(parts) == 3 and parts[0] == "#define" and parts[1].startswith("SIMPLEGOTO_"):
+                found[parts[1]] = parts[2].strip().strip('"')
+    return found.get("SIMPLEGOTO_NAME", "SimpleGoTo"), found.get("SIMPLEGOTO_VERSION", "?")
 
 
 class Runner:
@@ -79,7 +91,9 @@ class Clients:
         with self.lock:
             self.socks.add(s)
             last = self.last
-        send_text(s, json.dumps({"hello": {"input": self.input_enabled}}))
+        name, version = firmware_version()
+        send_text(s, json.dumps({"hello": {"input": self.input_enabled,
+                                           "name": name, "version": version}}))
         if last:
             send_text(s, last)
 

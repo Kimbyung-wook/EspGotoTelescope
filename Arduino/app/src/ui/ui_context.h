@@ -46,6 +46,10 @@ struct Telemetry {
   // Power
   float voltage = 12.60f;                   // not measured yet
 
+  // Phone remote UI (src/remote): status bar mark in the last column
+  enum RemoteState { REMOTE_OFF = 0, REMOTE_WAITING = 1, REMOTE_CONNECTED = 2 };
+  int remote = REMOTE_OFF;                  // OFF: no mark, WAITING: 'w', CONNECTED: 'W'
+
   // Health [us]
   float loop_hz = 10.0f;
   unsigned long loop_us = 0, main_us = 0, disp_us = 0, gps_us = 0, imu_us = 0, est_us = 0, astro_us = 0;

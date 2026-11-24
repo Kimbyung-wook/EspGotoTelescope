@@ -19,6 +19,7 @@ void begin() {
 #include <stdlib.h>
 #include <string.h>
 
+#include "../version.h"
 #include "remote_page.h"   // web/index.html (scripts/gen_remote_page.py)
 
 namespace remote {
@@ -28,6 +29,10 @@ namespace {
 constexpr bool INPUT_ENABLED = true;
 constexpr int  MAX_PENDING_CLICKS = 3;      // clicks queued faster than 10 Hz
 constexpr unsigned long RESEND_MS = 1000;   // resend an unchanged frame (page "no data" check)
+
+#define HELLO_TAIL ",\"name\":\"" SIMPLEGOTO_NAME "\",\"version\":\"" SIMPLEGOTO_VERSION "\"}}"
+const char HELLO_INPUT[]  = "{\"hello\":{\"input\":true" HELLO_TAIL;
+const char HELLO_MIRROR[] = "{\"hello\":{\"input\":false" HELLO_TAIL;
 
 ESP8266WebServer http(REMOTE_UI_HTTP_PORT);
 WebSocketsServer ws(REMOTE_UI_WS_PORT);
@@ -75,7 +80,7 @@ bool findInt(const char* msg, const char* key, long& value) {
 
 void onWsEvent(uint8_t num, WStype_t type, uint8_t* payload, size_t length) {
   if (type == WStype_CONNECTED) {
-    ws.sendTXT(num, INPUT_ENABLED ? "{\"hello\":{\"input\":true}}" : "{\"hello\":{\"input\":false}}");
+    ws.sendTXT(num, INPUT_ENABLED ? HELLO_INPUT : HELLO_MIRROR);
     force_send = true;
     return;
   }
@@ -104,7 +109,17 @@ void begin() {
   // one station at a time : only one phone can drive the mount
   WiFi.softAP(REMOTE_UI_AP_SSID, REMOTE_UI_AP_PASS, REMOTE_UI_AP_CHANNEL, 0, 1);
 
-  http.on("/", []() { http.send_P(200, "text/html; charset=utf-8", REMOTE_PAGE); });
+  // The phone caches the page and revalidates it each time (a 304 is tiny).
+  http.collectHeaders("If-None-Match");
+  http.on("/", []() {
+    http.sendHeader("ETag", REMOTE_PAGE_ETAG);
+    http.sendHeader("Cache-Control", "no-cache");
+    if (http.header("If-None-Match") == REMOTE_PAGE_ETAG) {
+      http.send(304);
+      return;
+    }
+    http.send_P(200, "text/html; charset=utf-8", REMOTE_PAGE);
+  });
   http.onNotFound([]() { http.send(404, "text/plain", "not found"); });
   http.begin();
 
@@ -150,6 +165,8 @@ void takeInput(int& rotate, bool& click) {
 }
 
 int clients() { return ws.connectedClients(); }
+
+int state() { return ws.connectedClients() > 0 ? 2 : 1; }   // Telemetry::RemoteState
 
 } // namespace remote
 

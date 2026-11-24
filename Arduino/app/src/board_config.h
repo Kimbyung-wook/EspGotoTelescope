@@ -66,8 +66,8 @@
 #ifndef REMOTE_UI_ENABLE
 #define REMOTE_UI_ENABLE 0
 #endif
-#define REMOTE_UI_AP_SSID    "Telescope"
-#define REMOTE_UI_AP_PASS    "telescope"  // WPA2, at least 8 characters
+#define REMOTE_UI_AP_SSID    "SimpleGoTo"
+#define REMOTE_UI_AP_PASS    "simplegoto"  // WPA2, at least 8 characters
 #define REMOTE_UI_AP_CHANNEL 6
 #define REMOTE_UI_TX_DBM     10.0f        // 0 .. 20.5 dBm (lower = less current and Mag noise)
 #define REMOTE_UI_HTTP_PORT  80           // page : http://192.168.4.1/

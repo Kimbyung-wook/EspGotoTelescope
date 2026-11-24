@@ -1,9 +1,10 @@
 /************************************/
-// Automatic Telescope - NodeMCU v3 (ESP8266)
+// SimpleGoTo - NodeMCU v3 (ESP8266)
 //   OLED SSD1306, rotary encoder, ICM20948 IMU, Adafruit Ultimate GPS,
 //   RA axis DC motor on an H-bridge
 /************************************/
 #include "src/board_config.h"
+#include "src/version.h"
 
 #if defined(F_CPU) && F_CPU != 160000000L
 #warning "Build at 160 MHz (Arduino IDE: Tools > CPU Frequency > 160 MHz, or scripts/build.sh)"
@@ -58,9 +59,21 @@ Tictok_us perform_astro;
 const float   hz             = MAIN_LOOP_HZ;
 LoopTimer     loop_timer((unsigned long)(1000000.0f / hz));
 
+// One boot message per line; when the screen is full the lines scroll up
+// (line 0, the name and version, stays).
 void bootLine(int& line, const char* text) {
+  if (line >= DISP_LINE_COLUMN) {
+    memmove(monitor->msg[1], monitor->msg[2], (DISP_LINE_COLUMN - 2) * DISP_LINE_ROW);
+    line = DISP_LINE_COLUMN - 1;
+  }
   snprintf(monitor->msg[line++], DISP_LINE_ROW, "%s", text);
   monitor->print();
+}
+
+// Shows a "starting ..." text on the next line without moving to it
+void bootPending(int& line, const char* text) {
+  bootLine(line, text);
+  line--;                 // the next bootLine() overwrites it
 }
 
 void setup() {
@@ -72,6 +85,7 @@ void setup() {
   // Display
   /************************************/
   monitor->setup_display();
+  bootLine(line, SIMPLEGOTO_NAME " v" SIMPLEGOTO_VERSION);
   char cpu_line[DISP_LINE_ROW];
   snprintf(cpu_line, sizeof(cpu_line), "1. Display ON %uMHz", ESP.getCpuFreqMHz());
   bootLine(line, cpu_line);   // 160 MHz expected (Tools > CPU Frequency)
@@ -79,8 +93,7 @@ void setup() {
   /************************************/
   // IMU - ICM20948
   /************************************/
-  snprintf(monitor->msg[line], DISP_LINE_ROW, "2. Intialize IMU");
-  monitor->print();
+  bootPending(line, "2. Intialize IMU");
   bool imu_on = imu.begin();
   bootLine(line, imu_on ? "2. IMU is ON" : ">> IMU failed");
   bootLine(line, imu.accelRangeText());
@@ -90,16 +103,14 @@ void setup() {
   /************************************/
   // GPS
   /************************************/
-  snprintf(monitor->msg[line], DISP_LINE_ROW, "3. Intialize GPS");
-  monitor->print();
+  bootPending(line, "3. Intialize GPS");
   bool gps_on = gps->setup_gps();
   bootLine(line, gps_on ? "3. GPS is ON" : ">> GPS is timeout");
 
   /************************************/
   // Rotary encoder
   /************************************/
-  snprintf(monitor->msg[line], DISP_LINE_ROW, "4. Intialize Buttons");
-  monitor->print();
+  bootPending(line, "4. Intialize Buttons");
   rotary.begin();
   rotary_count_prev = rotary.count();
   bootLine(line, "4. Buttons are ON");
@@ -153,6 +164,7 @@ void updateTelemetry(Telemetry& t) {
   t.imu_us  = perform_imu.getdt();
   t.est_us  = perform_est.getdt();
   t.astro_us = perform_astro.getdt();
+  t.remote   = remote::state();   // status bar Wi-Fi mark
 }
 
 void loop() {

@@ -5,9 +5,10 @@
 #include "../ui/frame.h"
 
 /************************************/
-// Remote UI (stage 0 of docs/REMOTE_UI_PLAN.md)
+// Remote UI (docs/REMOTE_UI_PLAN.md)
 //   ESP8266 SoftAP + one small HTTP page + WebSocket server.
-//   ESP -> phone : {"lines":[8 lines]}         (only when the frame changed)
+//   ESP -> phone : {"hello":{"input":true,"name":..,"version":..}} on connect,
+//                  {"lines":[8 lines]}         (when the frame changed, at least every 1 s)
 //   phone -> ESP : {"rotate":n} / {"click":1}   (same keys as tools/ui_simulator/PROTOCOL.md)
 //   Stage 2: loop() adds the remote input to the rotary input every frame.
 //
@@ -24,12 +25,14 @@ void publish(const Frame& frame); // send the lines if they changed
 // takes one click per frame; further clicks wait for the next frames).
 void takeInput(int& rotate, bool& click);
 int  clients();                   // connected WebSocket clients
+int  state();                     // Telemetry::RemoteState : WAITING (AP on) or CONNECTED
 #else
 void begin();                     // Wi-Fi off (the SDK may boot with a saved mode)
 inline void poll() {}
 inline void publish(const Frame&) {}
 inline void takeInput(int& rotate, bool& click) { rotate = 0; click = false; }
 inline int  clients() { return 0; }
+inline int  state() { return 0; }  // Telemetry::REMOTE_OFF
 #endif
 
 } // namespace remote

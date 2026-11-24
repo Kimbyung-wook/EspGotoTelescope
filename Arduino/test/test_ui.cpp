@@ -23,6 +23,20 @@ TEST(ui_status_bar_format) {
   CHECK_STR(u.f.lines[0], "T 21: 3: 7.4 V 12.60");
 }
 
+TEST(ui_status_bar_wifi_mark) {
+  UiFixture u;
+  u.ctx.tel.hour = 21; u.ctx.tel.minute = 3; u.ctx.tel.seconds = 7; u.ctx.tel.milliseconds = 450;
+  u.ctx.tel.remote = Telemetry::REMOTE_WAITING;     // AP on, no phone
+  u.step();
+  CHECK_STR(u.f.lines[0], "T 21: 3: 7.4 V 12.60w");
+  u.ctx.tel.remote = Telemetry::REMOTE_CONNECTED;   // phone connected
+  u.step();
+  CHECK_STR(u.f.lines[0], "T 21: 3: 7.4 V 12.60W");
+  u.ctx.tel.remote = Telemetry::REMOTE_OFF;
+  u.step();
+  CHECK_STR(u.f.lines[0], "T 21: 3: 7.4 V 12.60");
+}
+
 TEST(ui_main_menu_first_page_and_blink) {
   UiFixture u;
   u.step();

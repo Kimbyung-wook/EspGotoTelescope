@@ -1,4 +1,4 @@
-"""Telescope OLED UI simulator (tkinter, Python 3.12, no extra packages).
+"""SimpleGoTo OLED UI simulator (tkinter, Python 3.12, no extra packages).
 
     python simulator.py [--runner PATH] [--backend firmware] [--scale 5] [--shots DIR]
 
@@ -67,7 +67,7 @@ class Simulator:
         self.vars = {}
         self.wheel_acc = 0
 
-        root.title("Telescope OLED UI Simulator  [backend: %s]" % self.client.hello["backend"])
+        root.title("SimpleGoTo OLED UI Simulator  [backend: %s]" % self.client.hello["backend"])
         root.protocol("WM_DELETE_WINDOW", self.quit)
         self._build()
         self._bind_keys()

@@ -4,7 +4,7 @@
 #   - Wire "via" points: {x: ..} moves horizontally, {y: ..} vertically. Rails accept a wire at any height.
 #   - MCU pins must match Arduino/app/src/board_config.h
 
-title: Automatic Telescope - Breadboard wiring (draft)
+title: SimpleGoTo - Breadboard wiring (draft)
 canvas: {w: 1150, h: 1010}
 stub: 40
 memo_at: 24

@@ -51,6 +51,77 @@ ESP8266(NodeMCU v3)에는 Bluetooth가 없고 Wi-Fi만 있습니다. Wi-Fi로 �
 - 실물에서 루프 주기(Health), 전류, Mag 값 변화를 잽니다.
 - 판단: IRAM이 넘치거나 루프가 크게 흔들리면 ESP32 교체를 검토합니다.
 
+#### 0단계 결과 (2026-11-24, 빌드만, 실물 측정 전)
+
+넣은 것:
+- `board_config.h`: `REMOTE_UI_ENABLE`(기본 0, `#ifndef`라 빌드 옵션으로 덮어쓸 수 있음), `REMOTE_UI_AP_SSID`/`_PASS`/`_CHANNEL`, `REMOTE_UI_TX_DBM`(기본 10 dBm), HTTP 포트 80, WebSocket 포트 81.
+- `src/remote/remote_ui.{h,cpp}`: `remote::begin/poll/publish/takeInput/clients`.
+  - 켬(1): `WiFi.softAP`(WPA2, 동시 접속 1대), `ESP8266WebServer`로 PROGMEM 페이지 1장(화면 8줄 + `-10 -1 OK +1 +10` 버튼), `WebSocketsServer`(포트 81).
+  - ESP → 폰: 화면 줄이 바뀐 프레임에만 `{"lines":[8줄]}`. 글자 이스케이프는 UI 시뮬레이터와 같음(0x20 미만, 0x7F 이상 → `\u00XX`).
+  - 폰 → ESP: `{"rotate":n}`(−100~100), `{"click":1}`를 세기만 하고, 받은 누계를 `{"rx":{"rotate":합,"click":합}}`로 되돌려 보냅니다(페이지 아래에 표시 → 왕복 확인용). **UI 입력에는 아직 합치지 않습니다(2단계).**
+  - 끔(0): `setup()` 맨 앞에서 `WiFi.persistent(false); WiFi.mode(WIFI_OFF)`. 네트워크 코드는 링크되지 않습니다.
+- `app.ino`: `monitor->print()` 다음에 `remote::publish(frame)`, 대기 루프에서 `yield()` 전에 `remote::poll()`. `TelescopeUi::step`은 그대로입니다.
+- 참고: core 3.x는 이미 부팅 때 Wi-Fi를 끈 채(모뎀 슬립) 시작합니다(`__disableWiFiAtBootTime`). 그래서 위험표의 "기본 Wi-Fi 상태"는 core 3.1.2에서는 이미 해결되어 있고, 명시 호출은 보험입니다.
+
+라이브러리: **WebSockets 2.7.2** (Markus Sattler, `links2004/arduinoWebSockets`). ESP8266 core에는 WebSocket 서버가 없어서 설치했습니다. Arduino 라이브러리 관리자에 있고 ESP8266에서 가장 널리 쓰이며, core의 `WiFiServer` 위에서 돌아 추가 의존성이 없습니다. `REMOTE_UI_ENABLE 1`로 빌드할 때만 필요합니다.
+```
+arduino-cli lib install WebSockets      # Arduino IDE: 라이브러리 관리자 > "WebSockets" by Markus Sattler
+Arduino/scripts/build.sh --build-property "compiler.cpp.extra_flags=-DREMOTE_UI_ENABLE=1"
+```
+
+빌드 결과 (core 3.1.2, `nodemcuv2:xtal=160`, 기본 lwIP "v2 Lower Memory", MMU 32KB cache + 32KB IRAM):
+
+| 빌드 | IRAM (전체/65536) | IRAM 코드 (/32768) | RAM 전역 (/80192) | flash (/1048576) |
+|---|---|---|---|---|
+| 기준 364ced6 | 63087 (96%) | 30319 | 35456 | 311960 |
+| `REMOTE_UI_ENABLE 0` | 63087 (96%) | 30319 (+0) | 35484 (+28) | 313268 (+1308) |
+| `REMOTE_UI_ENABLE 1` | 63251 (96%) | 30483 (+164) | 39200 (+3744) | 356656 (+44696) |
+| 1 + lwIP `lm2n` (no features) | 63251 | 30483 | 39124 | 346432 |
+| 1 + lwIP `hb2f` (Higher Bandwidth) | 63251 | 30483 | 39200 | 356656 |
+| 1 + MMU `4816` (16KB cache + 48KB IRAM) | 46883 (/65536) | 30499 (/49152) | 39200 | 356656 |
+| 1 + `-DNO_SW_SERIAL` (Adafruit_GPS의 SoftwareSerial 제거) | 62615 | 29847 (−636) | 39200 | 355456 |
+
+- "IRAM 96%"의 65536에는 flash 명령 캐시 32768이 포함됩니다. 실제 IRAM 코드 여유는 32768 − 30483 = **약 2.2 KB**입니다.
+- **Wi-Fi SDK(lwIP, 802.11)의 IRAM 코드는 Wi-Fi를 쓰지 않아도 이미 링크되어 있습니다.** 그래서 원격 UI를 켜도 IRAM은 164 B만 늘었습니다. lwIP 변형은 IRAM에 영향이 없고, 기본값이 이미 "Lower Memory"입니다.
+- 남은 heap은 약 80192 − 39200 ≈ 41 KB(정적 기준). AP와 TCP 연결 몇 개에 필요한 동적 메모리(대략 15~20 KB)를 넣어도 여유가 있습니다. 실물에서 `ESP.getFreeHeap()`로 확인하면 좋습니다(3단계 상태 표시 후보).
+- IRAM이 더 필요해지면 MMU `4816`이 16 KB를 더 줍니다(대신 flash 캐시가 절반이라 flash 코드가 조금 느려질 수 있음 → Health로 확인).
+- 빈 스케치도 IRAM 코드 약 26.4 KB(32 KB의 80%)를 씁니다(SDK, Wi-Fi MAC 포함). 다른 IRAM 절감책: `-DNO_SW_SERIAL`(`compiler.cpp/c.extra_flags`, GPS가 하드웨어 UART0을 쓰므로 SoftwareSerial 불필요)로 약 0.6 KB. 자세한 분석과 결정은 `docs/IRAM.md`를 봅니다.
+
+호스트 테스트 (모두 통과): `Arduino/test/run_tests.sh` 70 tests 584 checks 0 failures, `tools/ui_simulator/run_tests.sh` 267 checks 0 failures, `tools/ui_simulator/build.sh` OK, `python gui/protocol_check.py` OK. (원격 UI 코드는 호스트 빌드에 들어가지 않습니다.)
+
+#### 0단계 실물 측정 체크리스트 (사용자)
+
+준비: `REMOTE_UI_ENABLE 0` 펌웨어와 `1` 펌웨어를 각각 올려 같은 순서로 잽니다. 측정 중 모터는 정지(RRcmd 0) 상태와 Track 켠 상태를 한 번씩.
+
+1. **루프 주기 (8 Health 화면)** — 각 경우 30초 정도 보며 최솟값/최댓값을 적습니다.
+   - `Loop`: 목표 100000 µs / 10.0 Hz. 100000을 넘는 값이 자주 나오면 주기가 밀린 것입니다(대기 루프에 `poll()`이 들어가 있어서 Wi-Fi 처리는 여기에 숨음).
+   - `MAIN`: 원격 UI 1에서는 `publish()`(JSON 만들기 + 전송) 시간이 더해집니다. 폰 접속 전/후를 비교합니다.
+   - `DISP`, `GPS`, `IMU`, `EST`, `AST`: 0과 1에서 차이가 거의 없어야 합니다.
+   - 기록: Wi-Fi 끔 / AP만 켬(폰 미접속) / 폰 접속·화면 표시 중 / 폰에서 버튼 연타 중.
+2. **전류** (12 V 입력 쪽, 가능하면 3.3 V 레귤레이터 쪽도)
+   - 평균: Wi-Fi 끔 / AP 켬 / 폰 접속 중. 피크는 오실로스코프나 피크 홀드가 있으면 측정(송신 피크 300 mA 이상 예상).
+   - 레귤레이터 발열, 접속 순간 OLED 깜빡임·리셋이 없는지 확인.
+   - 필요하면 `REMOTE_UI_TX_DBM`을 바꿔(예: 0, 10, 17) 비교.
+3. **지자기 간섭 (4 Status-Mag/Alt 화면)**
+   - 가대를 고정한 채 `Mx/My/Mz`를 Wi-Fi 끔 → AP 켬 → 폰 접속·버튼 연타 순으로 각각 30초 관찰, 평균과 흔들림(최대−최소)을 적습니다.
+   - 9 Axis for Moon 화면의 Yaw가 함께 흔들리는지도 봅니다.
+   - 차이가 크면 `REMOTE_UI_TX_DBM`을 낮춰 다시 잽니다.
+4. **폰 접속 절차**
+   1. 부팅 화면에 `6. WiFi AP Telescope`가 나오는지 확인.
+   2. 안드로이드 Wi-Fi 설정에서 `Telescope` 선택, 비밀번호 `telescope`. "인터넷 없음" 경고가 나오면 "연결 유지".
+   3. Chrome에서 `http://192.168.4.1/` 열기 → `connected`와 OLED와 같은 8줄이 보이는지(메뉴를 로터리로 움직이면 폰도 따라 바뀌는지, 지연 체감).
+   4. `+1`, `OK` 버튼 → 페이지 아래 `ESP received: rotate 1, click 1`이 나오는지(이번 단계에서는 화면 커서는 움직이지 않는 것이 정상).
+   5. 폰 Wi-Fi 끄기 → `disconnected` 표시 → 다시 켜면 1초 안에 자동 재접속되는지.
+   6. 두 번째 폰은 AP 접속이 거부되는지(동시 접속 1대).
+   7. 접속한 채 GPS Fix, 시각 표시가 정상인지(GPS는 UART0이라 Wi-Fi와 무관해야 함).
+   8. 10분 이상 켜 두고 리셋(부팅 화면 재등장)이 없는지.
+
+#### 0단계 결론 (빌드 기준)
+
+- **ESP8266으로 계속 갑니다.** IRAM은 164 B만 늘었고(Wi-Fi SDK가 원래 들어 있음), RAM +3.7 KB, flash +45 KB로 모두 여유가 있습니다. lwIP 변형을 바꿀 필요도 없었습니다.
+- 다만 IRAM 코드 여유가 약 2.2 KB뿐이라 앞으로 `IRAM_ATTR` 함수를 늘리지 않아야 합니다. 부족해지면 MMU `4816`(+16 KB)을 먼저 시도합니다.
+- ESP32 검토는 실물 측정에서 ① `Loop`가 자주 100000 µs를 넘거나, ② 송신 출력을 낮춰도 Mag 흔들림이 커서 Yaw가 쓸 수 없거나, ③ 전류 피크로 리셋이 나는 경우에만 합니다.
+
 ### 1단계. 화면 미러링 (읽기 전용)
 - `src/remote/remote_ui.{h,cpp}`: AP 시작, HTTP로 페이지 제공, WebSocket으로 화면 줄 전송.
 - `board_config.h`에 `REMOTE_UI_ENABLE`, AP 이름/비밀번호.

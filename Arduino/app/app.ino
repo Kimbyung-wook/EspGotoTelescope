@@ -18,6 +18,7 @@
 #include "src/estimation/attitude_estimator.h"
 #include "src/astro/target_telemetry.h"
 #include "src/ui/telescope_ui.h"
+#include "src/remote/remote_ui.h"
 
 /************************************/
 // Devices
@@ -64,6 +65,9 @@ void bootLine(int& line, const char* text) {
 
 void setup() {
   int line = 0;
+#if !REMOTE_UI_ENABLE
+  remote::begin();   // Wi-Fi off (REMOTE_UI_ENABLE 0)
+#endif
   /************************************/
   // Display
   /************************************/
@@ -105,6 +109,14 @@ void setup() {
   /************************************/
   ra_motor.begin();
   bootLine(line, "5. GPIO/PWM is ON");
+
+#if REMOTE_UI_ENABLE
+  /************************************/
+  // Remote UI : Wi-Fi AP + web page + WebSocket
+  /************************************/
+  remote::begin();
+  bootLine(line, "6. WiFi AP " REMOTE_UI_AP_SSID);
+#endif
 
   att_est.begin(ATT_EST_TAU_S, 1.0f / hz);
   loop_timer.start(micros());
@@ -180,6 +192,8 @@ void loop() {
   ui.step(delta, click, ui_ctx, frame);
   memcpy(monitor->msg, frame.lines, sizeof(frame.lines));
   monitor->print();
+  remote::publish(frame);   // phone mirror (only when the lines changed)
+  // Stage 0: remote input is received and counted but not merged yet (stage 2).
 
   // Outputs (tracking overrides the manual RRcmd while it is on)
   astro::applyTracking(ui_ctx.tel, ui_ctx.state, RA_DUTY_AT_SIDEREAL);
@@ -192,6 +206,7 @@ void loop() {
   /************************************/
   perform_rest.tic();
   while (!loop_timer.due(micros())) {
+    remote::poll();   // HTTP / WebSocket (empty when REMOTE_UI_ENABLE is 0)
     yield();
   }
   perform_rest.toc();

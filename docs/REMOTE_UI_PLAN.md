@@ -136,7 +136,7 @@ Arduino/scripts/build.sh --build-property "compiler.cpp.extra_flags=-DREMOTE_UI_
   - `TEXT` / `DOT` 버튼으로 글자 화면(검은 바탕 빨간 고정폭 글씨, 상태바 줄은 어둡게)과 바꿀 수 있고, 고른 방식은 브라우저에 기억합니다.
   - 상태 줄: `connected` / `connected, no data N s`(3초 넘게 프레임 없음) / `disconnected, retrying...`(1초마다 재접속).
   - 화면 꺼짐 방지: Wake Lock API를 씁니다. 다만 Wake Lock은 HTTPS 또는 localhost에서만 동작해서 `http://192.168.4.1`에서는 안 됩니다. 이때 상태 줄에 `keep-awake needs your phone setting`을 표시하니, 폰의 화면 꺼짐 시간을 길게 설정합니다.
-- 메시지: 접속하면 ESP가 `{"hello":{"input":false}}`를 보냅니다. 페이지는 `input`이 true일 때만 입력 버튼을 보여줍니다(2단계에서 true). 화면은 바뀔 때, 그리고 바뀌지 않아도 1초마다 보냅니다.
+- 메시지: 접속하면 ESP가 `{"hello":{"input":false}}`를 보냅니다. 페이지는 `input`이 true일 때만 입력 버튼을 보여줍니다(2단계부터 true). 화면은 바뀔 때, 그리고 바뀌지 않아도 1초마다 보냅니다.
 - PC 데모: `python Arduino/tools/ui_simulator/gui/web_bridge.py` → `http://localhost:8080/`. 펌웨어 UI 러너를 10 Hz로 돌리고 같은 페이지를 제공합니다. 데모에서는 입력 버튼(−10 −1 OK +1 +10)도 동작합니다. `--mirror-only`는 1단계 펌웨어처럼 입력을 무시합니다. 같은 Wi-Fi의 폰에서 `http://<PC IP>:8080/`으로 열어 볼 수도 있습니다(방화벽 허용 필요).
 - 실물 확인 (남음): `REMOTE_UI_ENABLE=1`로 올리고 폰을 `Telescope` AP(비밀번호 `telescope`)에 붙여 `http://192.168.4.1`을 엽니다. 폰 화면이 OLED와 같은지, Health 루프 주기가 흔들리지 않는지 확인합니다.
 
@@ -145,6 +145,18 @@ Arduino/scripts/build.sh --build-property "compiler.cpp.extra_flags=-DREMOTE_UI_
 - 가상 다이얼: 원을 드래그하면 15°마다 `rotate ±1`, 짧게 누르면 클릭. 세밀 조정용 `−10 −1 +1 +10` 버튼.
 - 연결이 끊기면 원격 입력을 버립니다(남은 회전량이 계속 들어가지 않게).
 - 시험: Offset 편집, Track 켜기/끄기를 폰으로만 해봅니다.
+
+#### 2단계 구현 (2026-11-24)
+- 펌웨어: `remote::takeInput(rotate, click)`이 쌓인 폰 입력을 꺼내고, `app.ino`의 `loop()`가 로터리 입력에 더합니다(`delta += 원격 회전`, `click = 로터리 클릭 || 원격 클릭`). 접속 시 `{"hello":{"input":true}}`를 보내 페이지에 입력부를 엽니다.
+  - 클릭은 한 루프에 하나씩 꺼내고, 쌓아 두는 클릭은 최대 3개입니다(연타가 화면 여러 장을 한꺼번에 넘기지 않게).
+  - 연결이 끊기면 쌓인 회전량과 클릭을 버립니다.
+  - `REMOTE_UI_ENABLE=0`이면 `takeInput`은 항상 0을 돌려주는 inline 함수라 코드가 늘지 않습니다.
+- 페이지: 화면 아래에 가상 다이얼(원 + 손잡이 표시)과 가운데 `OK` 버튼, 그 아래 `−10 −1 +1 +10` 버튼.
+  - 다이얼은 원을 따라 끌면 15°마다 한 칸(시계 방향 = +, 로터리와 같음). 한 바퀴 = 24칸. 칸 수는 50 ms마다 모아서 보냅니다.
+  - 한 칸마다, 버튼을 누를 때마다 짧게 진동합니다(지원하는 폰).
+- PC 데모로 확인: OK로 화면을 나가고, 다이얼 시계 방향 90°(+6칸), 반시계 45°(−3칸)로 메뉴 커서가 그만큼 움직이는 것을 확인했습니다.
+- 빌드: 기본(`REMOTE_UI_ENABLE=0`) IRAM 30,319 B로 변화 없음. `REMOTE_UI_ENABLE=1`은 IRAM 30,483 B, flash 366,720 B.
+- 실물 확인 (남음): 폰만으로 Offset 편집, Track 켜기/끄기. 다이얼과 로터리를 동시에 돌려도 이상 없는지.
 
 ### 3단계. 다듬기
 - 접속 상태 표시(폰: 연결/끊김, OLED 상태바에 Wi-Fi 표시).

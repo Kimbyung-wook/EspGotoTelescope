@@ -20,18 +20,30 @@ body:not(.dot) #dot{display:none}
 #mode{float:right;background:none;color:var(--dim);border:1px solid var(--line);font:12px monospace;padding:2px 8px}
 #st{font-size:14px;margin:10px 0;color:var(--dim)}
 #st.ok{color:var(--fg)}
-#in{display:none;gap:6px;margin-top:8px}
-#in button{flex:1;background:#180000;color:var(--fg);border:1px solid #500;font:20px monospace;padding:14px 0}
-#in button:active{background:#400}
-#in.on{display:flex}
+#in{display:none;margin-top:12px}
+#in.on{display:block}
+#row{display:flex;gap:6px}
+#row button{flex:1;background:#180000;color:var(--fg);border:1px solid #500;font:20px monospace;padding:14px 0}
+#row button:active{background:#400}
+#dial{position:relative;width:min(70vw,260px);aspect-ratio:1;margin:14px auto 12px;border-radius:50%;
+ border:2px solid #500;background:radial-gradient(circle,#140000 55%,#0a0000 56%);touch-action:none;user-select:none}
+#knob{position:absolute;left:50%;top:4%;width:6%;height:16%;margin-left:-3%;border-radius:4px;background:var(--fg)}
+#arm{position:absolute;inset:0;transform-origin:50% 50%}
+#ok{position:absolute;left:30%;top:30%;width:40%;height:40%;border-radius:50%;background:#200;color:var(--fg);
+ border:1px solid #600;font:22px monospace}
+#ok:active{background:#500}
 </style></head><body>
 <canvas id="dot" width="128" height="64"></canvas>
 <pre id="scr">connecting...</pre>
-<div id="in"><button data-r="-10">-10</button><button data-r="-1">-1</button><button data-c="1">OK</button><button data-r="1">+1</button><button data-r="10">+10</button></div>
+<div id="in">
+<div id="dial"><div id="arm"><div id="knob"></div></div><button id="ok">OK</button></div>
+<div id="row"><button data-r="-10">-10</button><button data-r="-1">-1</button><button data-r="1">+1</button><button data-r="10">+10</button></div>
+</div>
 <div id="st">-</div><button id="mode">TEXT</button>
 <script>
 // Telescope remote UI page (docs/REMOTE_UI_PLAN.md). Served by the ESP8266 and by
 // tools/ui_simulator/gui/web_bridge.py. WebSocket port = HTTP port + 1 (ESP: 80 -> 81).
+// Input (dial, OK, +-1/+-10) is shown only when the server says hello.input = true.
 var ws, last = 0, lock = null, inputOk = false, cur = [];
 // Adafruit GFX classic 5x7 font (glcdfont.c, BSD license, Copyright (c) 2012 Adafruit
 // Industries): 256 glyphs x 5 column bytes, bit 0 = top pixel. Same glyphs as the OLED.
@@ -122,10 +134,40 @@ function connect() {
   ws.onclose = function () { inputOk = false; inp.className = ''; setTimeout(connect, 1000); };
 }
 function send(o) { if (inputOk && ws && ws.readyState === 1) ws.send(JSON.stringify(o)); }
-inp.addEventListener('click', function (e) {
+function buzz() { if (navigator.vibrate) navigator.vibrate(8); }
+document.getElementById('row').addEventListener('click', function (e) {
   var b = e.target.closest('button'); if (!b) return;
-  if (b.dataset.r) send({ rotate: +b.dataset.r }); else send({ click: 1 });
+  send({ rotate: +b.dataset.r }); buzz();
 });
+document.getElementById('ok').addEventListener('click', function () { send({ click: 1 }); buzz(); });
+// Virtual dial: drag around the ring, one step per STEP_DEG like a rotary detent
+// (clockwise = +, as the encoder). Steps are sent at most every 50 ms.
+var STEP_DEG = 15, dial = document.getElementById('dial'), arm = document.getElementById('arm');
+var dragA = null, acc = 0, shown = 0, queued = 0, timer = null;
+function angleOf(e) {
+  var r = dial.getBoundingClientRect();
+  return Math.atan2(e.clientY - (r.top + r.height / 2), e.clientX - (r.left + r.width / 2)) * 180 / Math.PI;
+}
+function flush() { timer = null; if (queued) { send({ rotate: queued }); queued = 0; } }
+dial.addEventListener('pointerdown', function (e) {
+  if (e.target.id === 'ok') return;
+  dragA = angleOf(e); dial.setPointerCapture(e.pointerId);
+});
+dial.addEventListener('pointermove', function (e) {
+  if (dragA === null) return;
+  var a = angleOf(e), d = a - dragA;
+  if (d > 180) d -= 360; if (d < -180) d += 360;
+  dragA = a; acc += d; shown += d;
+  arm.style.transform = 'rotate(' + shown + 'deg)';
+  var steps = acc > 0 ? Math.floor(acc / STEP_DEG) : Math.ceil(acc / STEP_DEG);
+  if (steps) {
+    acc -= steps * STEP_DEG; queued += steps; buzz();
+    if (!timer) timer = setTimeout(flush, 50);
+  }
+});
+function endDrag() { dragA = null; acc = 0; }
+dial.addEventListener('pointerup', endDrag);
+dial.addEventListener('pointercancel', endDrag);
 function keepAwake() {
   if (!('wakeLock' in navigator) || lock) return;
   navigator.wakeLock.request('screen').then(function (l) { lock = l; l.onrelease = function () { lock = null; }; })

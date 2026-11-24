@@ -163,6 +163,12 @@ void loop() {
   int  delta = count - rotary_count_prev;
   rotary_count_prev = count;
   bool click = rotary.takeClick();
+  // Phone (remote UI): dial steps add to the rotary, a click counts like the button
+  int  remote_delta = 0;
+  bool remote_click = false;
+  remote::takeInput(remote_delta, remote_click);
+  delta += remote_delta;
+  click = click || remote_click;
 
   // Sensors
   gps->read_all();
@@ -193,7 +199,6 @@ void loop() {
   memcpy(monitor->msg, frame.lines, sizeof(frame.lines));
   monitor->print();
   remote::publish(frame);   // phone mirror (only when the lines changed)
-  // Stage 1: mirror only. Remote input is merged with the rotary in stage 2.
 
   // Outputs (tracking overrides the manual RRcmd while it is on)
   astro::applyTracking(ui_ctx.tel, ui_ctx.state, RA_DUTY_AT_SIDEREAL);

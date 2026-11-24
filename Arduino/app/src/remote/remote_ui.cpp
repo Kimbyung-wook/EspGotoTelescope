@@ -24,8 +24,9 @@ void begin() {
 namespace remote {
 namespace {
 
-// Stage 1: mirror only. The page shows its input buttons when this is true (stage 2).
-constexpr bool INPUT_ENABLED = false;
+// Stage 2: the page shows its dial and buttons and the input drives the UI.
+constexpr bool INPUT_ENABLED = true;
+constexpr int  MAX_PENDING_CLICKS = 3;      // clicks queued faster than 10 Hz
 constexpr unsigned long RESEND_MS = 1000;   // resend an unchanged frame (page "no data" check)
 
 ESP8266WebServer http(REMOTE_UI_HTTP_PORT);
@@ -78,6 +79,11 @@ void onWsEvent(uint8_t num, WStype_t type, uint8_t* payload, size_t length) {
     force_send = true;
     return;
   }
+  if (type == WStype_DISCONNECTED) {         // drop input that has not been used yet
+    pending_rotate = 0;
+    pending_clicks = 0;
+    return;
+  }
   if (!INPUT_ENABLED) return;
   if (type != WStype_TEXT || length == 0 || length > 64) return;
   char msg[65];
@@ -86,7 +92,7 @@ void onWsEvent(uint8_t num, WStype_t type, uint8_t* payload, size_t length) {
 
   long v = 0;
   if (findInt(msg, "\"rotate\"", v) && v >= -100 && v <= 100) pending_rotate += (int)v;
-  if (findInt(msg, "\"click\"", v) && v > 0) pending_clicks += 1;
+  if (findInt(msg, "\"click\"", v) && v > 0 && pending_clicks < MAX_PENDING_CLICKS) pending_clicks += 1;
 }
 
 } // namespace
@@ -136,11 +142,11 @@ void publish(const Frame& frame) {
   ws.broadcastTXT(json, pos);
 }
 
-void takeInput(int& rotate, int& clicks) {
+void takeInput(int& rotate, bool& click) {
   rotate = pending_rotate;
-  clicks = pending_clicks;
   pending_rotate = 0;
-  pending_clicks = 0;
+  click = pending_clicks > 0;
+  if (click) pending_clicks--;
 }
 
 int clients() { return ws.connectedClients(); }

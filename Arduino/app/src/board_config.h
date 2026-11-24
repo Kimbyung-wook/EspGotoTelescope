@@ -57,4 +57,20 @@
 /************************************/
 #define MAIN_LOOP_HZ 10.0f
 
+/************************************/
+// Remote UI : phone browser over Wi-Fi (docs/REMOTE_UI_PLAN.md)
+//   0 = Wi-Fi is turned off at boot. 1 = SoftAP + web page + WebSocket.
+//   Override without editing: --build-property "compiler.cpp.extra_flags=-DREMOTE_UI_ENABLE=1"
+//   Needs the "WebSockets" library (Markus Sattler, links2004) when 1.
+/************************************/
+#ifndef REMOTE_UI_ENABLE
+#define REMOTE_UI_ENABLE 0
+#endif
+#define REMOTE_UI_AP_SSID    "Telescope"
+#define REMOTE_UI_AP_PASS    "telescope"  // WPA2, at least 8 characters
+#define REMOTE_UI_AP_CHANNEL 6
+#define REMOTE_UI_TX_DBM     10.0f        // 0 .. 20.5 dBm (lower = less current and Mag noise)
+#define REMOTE_UI_HTTP_PORT  80           // page : http://192.168.4.1/
+#define REMOTE_UI_WS_PORT    81           // WebSocket : ws://192.168.4.1:81/
+
 #endif // _BOARD_CONFIG_H_
